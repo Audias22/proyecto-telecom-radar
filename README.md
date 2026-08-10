@@ -13,8 +13,8 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Por cotizar/comprar | Pendiente confirmar tiempo de entrega en Guatemala Digital |
-| Colgante (botón + ESP32) | No iniciado | |
+| Radar (MR60BHA2) | Comprado | Guatemala Digital, Q289, entrega estimada 21/09/2026 |
+| Colgante (botón + ESP32) | Todos los componentes comprados en Electrónica DIY | ESP32-C3 x2, batería LiPo 450mAh, cargador TP4056, buzzer activo, pulsador 12x12mm x2. Falta diseñar/imprimir carcasa y cordón |
 | Base + notificación | No iniciado | |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
@@ -87,8 +87,13 @@ El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el
 
 | Componente | Tienda | Precio | Tiempo de entrega | Estado |
 |---|---|---|---|---|
-| MR60BHA2 | Guatemala Digital | Por confirmar | ~2 semanas | Por pedir |
-| Botón pulsador grande | | | | |
-| Batería LiPo 3.7V | | | | |
-| Cargador TP4056 | | | | |
-| Buzzer | | | | |
+| MR60BHA2 (radar + ESP32-C6 integrado) | Guatemala Digital | Q322.40 (incluye envío) — Orden #1493658 | 21/09/2026 | Comprado |
+| ESP32-C3 Super Mini (x2, para colgante y pruebas) | Electrónica DIY | Q75 c/u (Q150 total) | Por confirmar | Comprado |
+| Batería LiPo 450mAh 3.8V HV | Electrónica DIY | Q42 | Por confirmar | Comprado |
+| Módulo de carga TP4056 (con protección, USB-C) | Electrónica DIY | Q12.50 | Por confirmar | Comprado |
+| Buzzer activo | Electrónica DIY | Q12 | Por confirmar | Comprado |
+| Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
+
+**Subtotal Electrónica DIY (colgante):** Q220.50 + envío Q30.00 = **Q250.50** — Pedido #35862
+
+**Nota técnica:** el ESP32-C3 usa núcleo RISC-V, igual que el ESP32-C6 del radar (a diferencia del ESP32-WROOM-32 clásico, que usa Xtensa). Se eligió por su tamaño reducido, ideal para el colgante, y menor riesgo de fricción en ESP-NOW al estar más emparentado con el chip del radar. Pendiente confirmar en pruebas el pin correcto de wake-up desde deep sleep para el botón.
