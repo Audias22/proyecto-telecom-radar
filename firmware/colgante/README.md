@@ -25,8 +25,10 @@ Todos están vacíos con `TODO`. `main.cpp` por ahora solo imprime nombre y vers
 
 - Botón en GPIO0-GPIO5 (únicos pines que despiertan al ESP32-C3 de deep sleep).
 - Batería Li-ion 240 mAh con cargador TP4056.
-- Por confirmar con el módulo: si el TP4056 usado incluye protección de descarga (DW01); si no,
-  el firmware debe dejar de transmitir por debajo de un voltaje mínimo.
+- El módulo TP4056 comprado es la versión con protección (USB-C). Por confirmar con el módulo el
+  voltaje de corte por descarga, para fijar `BATERIA_BAJA_MV` con margen sobre ese corte.
+- La corriente de carga del módulo viene en 1 A; hay que cambiar R3 por 4.7 kΩ antes de conectar
+  la batería de 240 mAh (ver nota técnica en el README principal).
 - Por confirmar con el módulo: consumo real en deep sleep de la placa completa (LED de encendido,
   regulador, divisor de batería). Define la duración de la batería.
 - Mientras el colgante duerme, el puerto USB desaparece. Para cargar firmware, mantener BOOT

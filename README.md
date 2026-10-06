@@ -19,10 +19,10 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Por cotizar/comprar | Pendiente confirmar tiempo de entrega en Guatemala Digital |
-| Colgante (botón + ESP32) | No iniciado | Estructura del firmware y protocolo definidos |
-| Base + notificación | No iniciado | Estructura del firmware definida; usa el XIAO ESP32-C6 del kit |
-| Firebase + panel web | No iniciado | Modelo de datos y reglas definidos |
+| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q289, orden #1493658. Ya entrega datos con el ejemplo de Arduino IDE |
+| Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
+| Base + notificación | Estructura y especificación definidas | Sin código funcional. Usa el XIAO ESP32-C6 del kit |
+| Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
 
@@ -193,9 +193,20 @@ Instrucciones en `web/README.md`.
 
 | Componente | Tienda | Precio | Tiempo de entrega | Estado |
 |---|---|---|---|---|
-| MR60BHA2 | Guatemala Digital | Por confirmar | ~2 semanas | Por pedir |
-| ESP32-C3 Super Mini | | | | |
-| Botón pulsador grande | | | | |
-| Batería LiPo 3.7V | | | | |
-| Cargador TP4056 | | | | |
-| Buzzer | | | | |
+| MR60BHA2 (radar + ESP32-C6 integrado) | Guatemala Digital | Q322.40 (incluye envío) — Orden #1493658 | 21/09/2026 | Recibido y probado |
+| ESP32-C3 Super Mini (x2, para colgante y pruebas) | Electrónica DIY | Q75 c/u (Q150 total) | Por confirmar | Comprado |
+| Batería Li-ion 3.7V 240mAh (301645) | Tettsa | Q45 | Por confirmar | Pedido, sin llegar |
+| Módulo de carga TP4056 (con protección, USB-C) | Electrónica DIY | Q12.50 | Por confirmar | Comprado |
+| Buzzer activo | Electrónica DIY | Q12 | Por confirmar | Comprado |
+| Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
+| Pasta flux Miyako W-3, 50g | Tettsa | Q20 | Por confirmar | Pedido, sin llegar |
+
+**Subtotal Electrónica DIY (colgante, pedido #35862):** Q220.50 + envío Q30.00 = **Q250.50**
+
+**Subtotal Tettsa (batería + flux):** Q45 + Q20 = **Q65.00**
+
+**Nota técnica — ESP32-C3:** usa núcleo RISC-V, igual que el ESP32-C6 del radar (a diferencia del ESP32-WROOM-32 clásico, que usa Xtensa). Se eligió por su tamaño reducido, ideal para el colgante, y menor riesgo de fricción en ESP-NOW al estar más emparentado con el chip del radar. Pendiente confirmar en pruebas el pin correcto de wake-up desde deep sleep para el botón.
+
+**Nota técnica — Batería:** la batería LiPo CNHL Ministar 450mAh originalmente elegida se agotó en Electrónica DIY. Se reemplazó por una Li-ion 3.7V 240mAh (menor capacidad, pero más compacta). Esta batería viene con cables sueltos sin conector JST-PH 2.0, así que se conecta soldando los cables directo a los pads BAT+ y BAT- de la placa TP4056 (respetando polaridad), en vez de usar un conector intermedio. Para eso se compró pasta flux, que facilita la adherencia de la soldadura.
+
+**Nota técnica — Corriente de carga del TP4056:** el módulo viene configurado para cargar a 1 A, demasiado para una celda de 240 mAh. La corriente la fija la resistencia de programación (R3 en este módulo). Pendiente quitar R3 y poner una resistencia THT de 4.7 kΩ. Según la fórmula de la hoja de datos del TP4056 (I = 1200 V / R_PROG), 4.7 kΩ da unos 255 mA, alrededor de 1C para esta batería. Por confirmar con la hoja de datos de la celda que acepta esa corriente de carga; si pide menos, una resistencia mayor baja la corriente (por ejemplo, 10 kΩ da unos 120 mA).
