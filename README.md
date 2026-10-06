@@ -14,7 +14,7 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 | Componente | Estado | Notas |
 |---|---|---|
 | Radar (MR60BHA2) | Comprado | Guatemala Digital, Q289, entrega estimada 21/09/2026 |
-| Colgante (botón + ESP32) | Todos los componentes comprados en Electrónica DIY | ESP32-C3 x2, batería LiPo 450mAh, cargador TP4056, buzzer activo, pulsador 12x12mm x2. Falta diseñar/imprimir carcasa y cordón |
+| Colgante (botón + ESP32) | Todos los componentes comprados | ESP32-C3 x2, batería Li-ion 240mAh, cargador TP4056, buzzer activo, pulsador 12x12mm x2, pasta flux. Falta diseñar/imprimir carcasa y cordón |
 | Base + notificación | No iniciado | |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
@@ -89,11 +89,16 @@ El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el
 |---|---|---|---|---|
 | MR60BHA2 (radar + ESP32-C6 integrado) | Guatemala Digital | Q322.40 (incluye envío) — Orden #1493658 | 21/09/2026 | Comprado |
 | ESP32-C3 Super Mini (x2, para colgante y pruebas) | Electrónica DIY | Q75 c/u (Q150 total) | Por confirmar | Comprado |
-| Batería LiPo 450mAh 3.8V HV | Electrónica DIY | Q42 | Por confirmar | Comprado |
+| Batería Li-ion 3.7V 240mAh (301645) | Tettsa | Q45 | Por confirmar | Comprado |
 | Módulo de carga TP4056 (con protección, USB-C) | Electrónica DIY | Q12.50 | Por confirmar | Comprado |
 | Buzzer activo | Electrónica DIY | Q12 | Por confirmar | Comprado |
 | Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
+| Pasta flux Miyako W-3, 50g | Tettsa | Q20 | Por confirmar | Comprado |
 
-**Subtotal Electrónica DIY (colgante):** Q220.50 + envío Q30.00 = **Q250.50** — Pedido #35862
+**Subtotal Electrónica DIY (colgante, pedido #35862):** Q220.50 + envío Q30.00 = **Q250.50**
 
-**Nota técnica:** el ESP32-C3 usa núcleo RISC-V, igual que el ESP32-C6 del radar (a diferencia del ESP32-WROOM-32 clásico, que usa Xtensa). Se eligió por su tamaño reducido, ideal para el colgante, y menor riesgo de fricción en ESP-NOW al estar más emparentado con el chip del radar. Pendiente confirmar en pruebas el pin correcto de wake-up desde deep sleep para el botón.
+**Subtotal Tettsa (batería + flux):** Q45 + Q20 = **Q65.00**
+
+**Nota técnica — ESP32-C3:** usa núcleo RISC-V, igual que el ESP32-C6 del radar (a diferencia del ESP32-WROOM-32 clásico, que usa Xtensa). Se eligió por su tamaño reducido, ideal para el colgante, y menor riesgo de fricción en ESP-NOW al estar más emparentado con el chip del radar. Pendiente confirmar en pruebas el pin correcto de wake-up desde deep sleep para el botón.
+
+**Nota técnica — Batería:** la batería LiPo CNHL Ministar 450mAh originalmente elegida se agotó en Electrónica DIY. Se reemplazó por una Li-ion 3.7V 240mAh (menor capacidad, pero más compacta). Esta batería viene con cables sueltos sin conector JST-PH 2.0, así que se conecta soldando los cables directo a los pads BAT+ y BAT- de la placa TP4056 (respetando polaridad), en vez de usar un conector intermedio. Para eso se compró pasta flux, que facilita la adherencia de la soldadura.
