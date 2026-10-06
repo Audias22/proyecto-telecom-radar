@@ -19,7 +19,7 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q289, orden #1493658. Ya entrega datos con el ejemplo de Arduino IDE |
+| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Ya entrega datos con el ejemplo de Arduino IDE |
 | Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
 | Base + notificación | Estructura y especificación definidas | Sin código funcional. Usa el XIAO ESP32-C6 del kit |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
@@ -201,9 +201,13 @@ Instrucciones en `web/README.md`.
 | Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
 | Pasta flux Miyako W-3, 50g | Tettsa | Q20 | Por confirmar | Pedido, sin llegar |
 
-**Subtotal Electrónica DIY (colgante, pedido #35862):** Q220.50 + envío Q30.00 = **Q250.50**
+**Subtotal Guatemala Digital (radar, orden #1493658):** **Q322.40** (incluye envío)
 
-**Subtotal Tettsa (batería + flux):** Q45 + Q20 = **Q65.00**
+**Subtotal Electrónica DIY (colgante, pedido #35862):** componentes Q178.50 + envío Q30.00 = **Q208.50**
+
+**Subtotal Tettsa (batería + flux):** Q45 + Q20 = Q65.00 + envío Q35.00 = **Q100.00**
+
+**Total general del proyecto:** Q322.40 + Q208.50 + Q100.00 = **Q630.90**
 
 **Nota técnica — ESP32-C3:** usa núcleo RISC-V, igual que el ESP32-C6 del radar (a diferencia del ESP32-WROOM-32 clásico, que usa Xtensa). Se eligió por su tamaño reducido, ideal para el colgante, y menor riesgo de fricción en ESP-NOW al estar más emparentado con el chip del radar. Pendiente confirmar en pruebas el pin correcto de wake-up desde deep sleep para el botón.
 
