@@ -1,0 +1,33 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Secretos (cada quien crea su copia a partir de secrets.example.h)
+secrets.h
+
+# VS Code: solo se versiona la lista de extensiones recomendadas
+.vscode/*
+!.vscode/extensions.json
+
+# Node / Firebase CLI
+node_modules/
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+database-debug.log
+ui-debug.log
+*.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Sistema operativo
+Thumbs.db
+desktop.ini
+.DS_Store

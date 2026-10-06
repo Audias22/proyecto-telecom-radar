@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "platformio.platformio-ide",
+    "editorconfig.editorconfig",
+    "bierner.markdown-mermaid"
+  ]
+}
