@@ -63,7 +63,7 @@
       "$eventoId": {
         ".write": "auth != null && root.child('cuentas_dispositivo').child(auth.uid).exists() && !data.exists()",
         ".validate": "newData.hasChildren(['tipo', 'origen', 'timestamp', 'atendido'])",
-        "tipo": { ".validate": "newData.isString() && newData.val().matches(/^(APNEA|BOTON|BATERIA_BAJA|BASE_DESCONECTADA)$/)" },
+        "tipo": { ".validate": "newData.isString() && newData.val().matches(/^(APNEA|BOTON|BATERIA_BAJA|BASE_DESCONECTADA|COLGANTE_AUSENTE|RADAR_SIN_DATOS)$/)" },
         "origen": { ".validate": "newData.isString() && newData.val().length <= 32" },
         "timestamp": { ".validate": "newData.isNumber() && newData.val() <= now" },
         "detalle": { ".validate": "newData.isString() && newData.val().length <= 200" },

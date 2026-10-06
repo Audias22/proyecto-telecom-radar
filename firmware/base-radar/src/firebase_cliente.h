@@ -13,6 +13,8 @@ enum TipoEvento : uint8_t {
     EVENTO_BOTON,
     EVENTO_BATERIA_BAJA,
     EVENTO_BASE_DESCONECTADA,
+    EVENTO_COLGANTE_AUSENTE,
+    EVENTO_RADAR_SIN_DATOS,
 };
 
 namespace firebase_cliente {

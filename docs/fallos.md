@@ -12,9 +12,9 @@ Telegram. Todo lo que va a la nube es un segundo aviso, con reintentos.
 | 4 | Caída de WiFi | `WiFi.status()` distinto de conectado | Alerta local normal. Lecturas a `cola_offline`; eventos y avisos de Telegram pendientes en una cola aparte que no descarta. Reconexión con espera creciente. Al volver, primero eventos y Telegram, después lecturas en orden. | base: `red_wifi`, `cola_offline`, `alerta_local` |
 | 5 | Caída de Firebase (o token vencido) | Error HTTP o tiempo agotado; 401 si el token venció | Con 401, vuelve a iniciar sesión. Otros errores: igual que caída de WiFi, a la cola. Telegram no depende de Firebase, así que el aviso al cuidador sale aunque Firebase falle. | base: `firebase_cliente`, `cola_offline` |
 | 6 | Base apagada (corte de luz, cable suelto) | La base no puede avisar. El panel ve `ultimo_contacto` con más de 3 min. El colgante no recibe ACK. | Panel muestra "base desconectada". El colgante da el patrón de error, así la persona sabe que el botón no funcionó. Al volver, la base compara la hora con su último `ultimo_contacto`, crea un evento `BASE_DESCONECTADA` con la duración y avisa por Telegram. | base, panel |
-| 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga (no en cada heartbeat). Sin mensajes: panel lo marca ausente por `ultimo_heartbeat` y la base avisa por Telegram. | base: `espnow_rx`, `telegram`; colgante: `bateria` |
+| 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga (no en cada heartbeat). Sin mensajes: evento `COLGANTE_AUSENTE` y Telegram; el panel lo marca ausente por `ultimo_heartbeat`. | base: `espnow_rx`, `telegram`; colgante: `bateria` |
 | 8 | Persona fuera de la cama | `presencia = false` | No se evalúa apnea. Solo se evalúa si hay presencia continua y la distancia está dentro del rango confiable (40-200 cm). Ausencia no es apnea. | base: `radar` y la lógica de detección |
-| 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía ni se usa para detectar apnea. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave y Telegram "radar sin datos". El panel lo nota porque dejan de llegar lecturas. | base: `radar` |
+| 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía ni se usa para detectar apnea. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave, evento `RADAR_SIN_DATOS` y Telegram. El panel también lo nota porque dejan de llegar lecturas. | base: `radar` |
 | 10 | Reinicio inesperado (watchdog, brownout, fallo) | Al arrancar, `esp_reset_reason()` distinto de encendido normal | Watchdog activo sobre `loop()` para que un bloqueo termine en reinicio y no en una base colgada. Al arrancar se reporta el motivo por Telegram. Se pierden las secuencias en RAM (el siguiente mensaje de cada colgante se acepta como nuevo, a lo sumo una alerta repetida) y la cola offline. | base: `main` |
 
 ## Detalles y decisiones
@@ -49,7 +49,16 @@ en el momento. Es un límite aceptado del diseño con plan Spark:
 
 ### Tipos de evento
 
-Los tipos actuales son `APNEA`, `BOTON`, `BATERIA_BAJA` y `BASE_DESCONECTADA`. Los escenarios 7
-(colgante ausente) y 9 (radar sin datos) hoy solo avisan por Telegram y se ven en el panel. Queda
-como propuesta agregar los tipos `COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` a las reglas y al modelo
-de datos para que queden en el historial.
+| Tipo | Escenario | Lo crea |
+|---|---|---|
+| `APNEA` | 8 | base, al detectar respiración ausente con presencia |
+| `BOTON` | 1, 2 | base, al recibir una alerta nueva del colgante |
+| `BATERIA_BAJA` | 7 | base, al recibir `FLAG_BATERIA_BAJA` (una vez por descarga) |
+| `BASE_DESCONECTADA` | 6 | base, al volver, con la duración en `detalle` |
+| `COLGANTE_AUSENTE` | 7 | base, si pasa `COLGANTE_AUSENTE_S` sin mensajes del colgante |
+| `RADAR_SIN_DATOS` | 9 | base, si pasan N segundos sin lecturas válidas del radar |
+
+Todos los eventos se guardan en `/eventos` (ver `modelo-datos.md`) y se avisan por Telegram.
+`COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` se crean una sola vez por episodio: no se repiten mientras
+la condición siga, y se pueden volver a crear cuando el colgante o el radar se recuperen y fallen
+de nuevo.

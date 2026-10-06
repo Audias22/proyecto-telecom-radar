@@ -26,7 +26,8 @@ Reglas en `web/database.rules.json`. La base escribe por la API REST
     diferida          bool     true si se envió desde la cola offline (opcional)
 
 /eventos/{pushId}
-    tipo              texto    APNEA | BOTON | BATERIA_BAJA | BASE_DESCONECTADA
+    tipo              texto    APNEA | BOTON | BATERIA_BAJA | BASE_DESCONECTADA |
+                               COLGANTE_AUSENTE | RADAR_SIN_DATOS
     origen            texto    "base01", "colgante1", ...
     timestamp         número   hora del servidor (ms)
     atendido          bool     false al crearse; el panel lo pasa a true
@@ -122,10 +123,14 @@ estima un rango de 100 a 200 bytes por lectura.
 Estado, colgantes y eventos son despreciables al lado de las lecturas (pocos nodos que se
 sobrescriben, y eventos que deberían ser raros).
 
-Conclusión: el proyecto cabe con margen durante el semestre. Para uso continuo, la base borra una
-vez al día las lecturas de más de 30 días (consulta `orderByKey` con `endAt` y escribe `null`).
-Con eso el total se mantiene alrededor de 50-100 MB. El tamaño real se revisa en la pestaña Uso de
-la consola después de una semana de pruebas y se anota en `pruebas/`.
+Conclusión: a unos 100 MB por mes, el 1 GB no se llena durante el proyecto, así que no se
+implementa borrado de lecturas viejas. El tamaño real se revisa en la pestaña Uso de la consola
+después de una semana de pruebas y se anota en `pruebas/`.
+
+Mejora futura, para uso continuo más allá del proyecto: que la base borre una vez al día las
+lecturas de más de 30 días (consulta `orderByKey` con `endAt` y escribe `null`; las reglas ya
+permiten que la cuenta de la base borre en su propia ruta de `/lecturas`). Con eso el total se
+mantendría alrededor de 50-100 MB.
 
 ### Descarga
 
