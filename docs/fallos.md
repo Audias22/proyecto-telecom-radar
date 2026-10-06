@@ -24,6 +24,12 @@ Telegram. Todo lo que va a la nube es un segundo aviso, con reintentos.
 - Definición de trabajo: presencia continua, distancia en rango y respiración ausente (o
   `resp_rpm` = 0) durante un tiempo umbral. El umbral está por definir con pruebas; se parte de
   20 s para reducir falsas alarmas. Se registra cada prueba en `pruebas/`.
+- Medido el 2026-10-06 (`radar.md`, sección 5): con el radar apuntando a una pared y sin nadie,
+  el radar reporta presencia, respiración 0 y un latido congelado. Esa combinación es la misma
+  que la definición de apnea de arriba, así que presencia + `resp_rpm` = 0 **no basta**. La
+  detección tiene que exigir además señal de fase de una persona (en esa prueba `fase_resp` fue
+  ~60 veces menor con la pared que con una persona) o que la persona se haya detectado
+  respirando antes de que la respiración cayera a 0.
 - Si la persona se mueve mucho (se da vuelta en la cama) el radar puede dar lecturas inestables.
   Esas lecturas no deben disparar alerta; se descartan como en el escenario 9.
 - Límite conocido: si la persona sale de la cama y no vuelve (por ejemplo, una caída fuera del

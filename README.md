@@ -19,9 +19,9 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Ya entrega datos con el ejemplo de Arduino IDE |
+| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona (ver `docs/radar.md`) |
 | Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
-| Base + notificación | Estructura y especificación definidas | Sin código funcional. Usa el XIAO ESP32-C6 del kit |
+| Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |

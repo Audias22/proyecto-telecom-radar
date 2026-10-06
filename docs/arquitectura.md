@@ -42,7 +42,7 @@ flowchart LR
 | Enlace | Medio | Contenido | Documento |
 |---|---|---|---|
 | Radar -> persona | 60 GHz FMCW | Micro-movimiento del pecho | |
-| Radar -> base | UART dentro del kit | Respiración, latido, presencia, distancia | Por confirmar con el módulo: formato de tramas |
+| Radar -> base | UART0 dentro del kit (GPIO17/16, 115200) | Fases, respiración, latido, presencia, distancia | `radar.md` |
 | Colgante <-> base | ESP-NOW sobre 802.11, 2.4 GHz | Paquetes de 8 bytes, ACK de aplicación | `protocolo.md` |
 | Base -> router | WiFi 802.11 en modo STA | | |
 | Base -> Firebase | HTTPS, API REST de Realtime Database | JSON | `modelo-datos.md` |

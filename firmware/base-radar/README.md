@@ -14,15 +14,23 @@ Firmware del XIAO ESP32-C6 que viene en el kit Seeed MR60BHA2.
 | `alerta_local` | Buzzer y LED; funciona sin red |
 | `cola_offline` | Guardar lecturas cuando no hay red y reenviarlas al volver |
 
-Todos están vacíos con `TODO`. `main.cpp` por ahora solo imprime nombre y versión.
+`radar` está implementado (ver `docs/radar.md`); los demás están vacíos con `TODO`. `main.cpp`
+imprime una línea CSV por lectura del radar, que se captura con `analisis/capturar_serial.py`.
 
 ## Configuración
 
-- `include/config.h`: versión, pines y periodos. Los pines del buzzer y LED están por confirmar.
+- `include/config.h`: versión, pines, periodos, rangos válidos del radar y tiempo de "radar sin
+  datos".
 - `include/secrets.h`: credenciales. Copiar de `include/secrets.example.h`. No se sube al repo.
+
+## Hardware del kit
+
+- Radar: UART0, RX = GPIO17 (D7), TX = GPIO16 (D6), 115200 baudios. Confirmado con el kit.
+- Buzzer y LED: puerto Grove, D0 (GPIO0) y D10 (GPIO18), según el mapa de pines de Seeed. Falta
+  probarlos con el buzzer conectado. El kit también trae un LED RGB WS2812 en D1.
+- Al cerrar el puerto serie con DTR/RTS activos, la base se reinicia (ver `docs/radar.md`).
 
 ## Pendiente de confirmar con el módulo
 
-- Pines de la UART del radar y protocolo de tramas (o uso de la librería de Seeed).
-- Pines libres del XIAO dentro del kit para buzzer y LED.
+- Que D0 y D10 del Grove funcionen para el buzzer y el LED.
 - Antena que usa el kit (el XIAO ESP32-C6 tiene selector interna/externa).
