@@ -1,0 +1,11 @@
+{
+  "name": "protocolo",
+  "version": "1.0.0",
+  "description": "Formato de paquetes ESP-NOW y constantes compartidas entre el colgante y la base",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "build": {
+    "includeDir": ".",
+    "srcDir": "."
+  }
+}
