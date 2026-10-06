@@ -3,8 +3,9 @@
 .pioenvs/
 .piolibdeps/
 
-# Secretos (cada quien crea su copia a partir de secrets.example.h)
+# Secretos y configuración local (cada quien crea su copia a partir del .example)
 secrets.h
+web/panel/config.js
 
 # VS Code: solo se versiona la lista de extensiones recomendadas
 .vscode/*
