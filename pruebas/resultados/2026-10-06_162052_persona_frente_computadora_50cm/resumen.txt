@@ -1,0 +1,13 @@
+Captura: 2026-10-06_162052_persona_frente_computadora_50cm
+Duración: 59.9 s, 972 muestras (16.20 por segundo)
+Parámetros: remuestreo 10 Hz, pasabanda 0.1-0.6 Hz (Butterworth orden 2, ida y vuelta), ventana 30 s, paso 1 s, FFT de 4096 puntos
+Ventanas analizadas: 31
+
+Estimador                      mediana     desv.
+Módulo (muestras crudas)         18.00      4.94
+Módulo (mediana por ventana)     17.00      0.83
+FFT                              16.81      1.56
+Cruces por cero                  16.16      1.18
+
+RMS de fase_resp filtrada por ventana: mediana 0.18598, desv. 0.06094
+Unidades: rpm (respiraciones por minuto); RMS en las unidades de fase del radar.
