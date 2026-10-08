@@ -24,6 +24,8 @@ pip install -r requirements.txt
 | `capturar_serial.py` | Guarda el CSV que imprime la base en `pruebas/crudos/` |
 | `estimar_respiracion.py` | Estima la frecuencia respiratoria a partir de `fase_resp` (FFT y cruces por cero) |
 | `test_estimar_respiracion.py` | Pruebas de `estimar_respiracion.py` con señales sintéticas |
+| `validar_respiracion.py` | Compara los estimadores contra las capturas con conteo manual (espectros y tabla de errores) |
+| `detectar_apnea.py` | Detector de apnea por caída de amplitud; evalúa detección y falsas alarmas en todas las capturas |
 
 ### Capturar
 
@@ -57,10 +59,22 @@ python estimar_respiracion.py ..\pruebas\crudos\2026-10-06_172200_persona_sentad
 ```
 
 `--conteo` es opcional: el conteo manual en respiraciones por minuto, para calcular el error.
-Escribe `resumen.txt` y `grafica.png` en `pruebas/resultados/<nombre_de_la_captura>/`. Los
-parámetros (frecuencia de remuestreo, banda, ventana, tamaño de FFT, histéresis) son constantes
-al principio del script. El método y los resultados están en `docs/radar.md`, sección
-"Procesamiento propio".
+`--senal` elige la señal: `fase_resp` (por defecto), `fase_total_desenvuelta` o
+`fase_total_integrada`. Escribe `resumen.txt` y `grafica.png` en
+`pruebas/resultados/<nombre_de_la_captura>/` (con `_<senal>` al final si no es `fase_resp`). Los
+parámetros (rango, banda, ventana, tamaño de FFT, subarmónico, histéresis) son constantes al
+principio del script. El método y los resultados están en `docs/radar.md`, secciones 8 a 10.
+
+### Validar y detectar apnea
+
+```
+python validar_respiracion.py
+python detectar_apnea.py
+```
+
+Usan las capturas listadas al principio de cada script (con su conteo manual o el intervalo de
+apnea) y escriben en `pruebas/resultados/validacion_respiracion/` y
+`pruebas/resultados/deteccion_apnea/`.
 
 ### Pruebas
 
@@ -75,7 +89,9 @@ python test_estimar_respiracion.py
 ```
 
 Generan un seno de 0.25 Hz (15 rpm) con ruido, deriva y el muestreo irregular del radar, y
-verifican que FFT y cruces den 15 ± 1 rpm en todas las ventanas.
+verifican que FFT, autocorrelación y cruces den 15 ± 1 rpm en todas las ventanas. También
+prueban los extremos del rango (6.5 y 34 rpm) y una señal de 8 rpm con el segundo armónico más
+fuerte que la fundamental.
 
 ## Convenciones
 

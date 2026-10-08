@@ -183,6 +183,12 @@ Error contra el conteo manual en la captura `172200`: módulo −10.5 rpm, FFT �
 
 ### Observaciones
 
+> Actualización (sección 9): estas observaciones salieron de una sola captura con conteo
+> manual. Con cuatro capturas etiquetadas (lenta, normal, rápida), ningún estimador sigue la
+> respiración real; la conclusión de que los cruces por cero son el estimador más estable no se
+> sostiene. Los parámetros de esta sección también cambiaron (rango 6-35 rpm, pasabanda
+> 0.08-0.70 Hz).
+
 - **El valor del módulo no sirve para detectar apnea.** En la captura con conteo manual se
   equivocó por 10 rpm y pasó varios segundos en 0 con la persona respirando.
 - **Cruces por cero fue el estimador más estable** en las tres capturas con persona. La FFT falla
@@ -205,3 +211,161 @@ Error contra el conteo manual en la captura `172200`: módulo −10.5 rpm, FFT �
   un movimiento) que deforma el borde de la señal filtrada; afecta solo a la última ventana.
 - Pendiente: más capturas con conteo manual (varias distancias, acostado, respiración lenta y
   pausas de respiración simuladas) para validar los estimadores y fijar los umbrales.
+
+## 9. Validación con capturas etiquetadas (resultado negativo)
+
+Script: `analisis/validar_respiracion.py`. Salidas: `pruebas/resultados/validacion_respiracion/`
+(`espectros.png`, `errores.md`).
+
+### Capturas
+
+Persona sentada a ~84 cm, quieta. Conteo manual del segundo 30 al 90 (la de `172200`, de todo el
+minuto, porque dura 62 s).
+
+| Captura | Conteo manual | Módulo (mediana en el tramo) |
+|---|---|---|
+| `2026-10-06_172200_persona_sentada_84cm` | 15.5 | 5 |
+| `2026-10-07_222846_normal_84cm` | 14 | 17 |
+| `2026-10-07_223440_lenta_84cm` | 8 | 3 |
+| `2026-10-07_223850_rapida_84cm` | 31 | 14 |
+| `2026-10-07_224314_apnea_84cm` | apnea de 45 a 65 s | ver sección 10 |
+
+### ¿Alguna señal tiene su pico en la frecuencia del conteo?
+
+No. En `espectros.png` (espectro de cada señal en el tramo del conteo, con el conteo marcado):
+
+- **`fase_resp`**: la energía queda entre ~6 y ~28 rpm, con varios picos de altura parecida y casi
+  nada por encima de 30 rpm. En la lenta los picos están en ~10, ~15 y ~20 rpm (no en 8); en la
+  rápida, en ~6-13 rpm (no en 31). En el tiempo es una señal suave con oscilaciones de 3-4 s
+  sin importar el ritmo real. Esto es consistente con la hipótesis: el módulo entrega
+  `fase_resp` ya filtrada en una banda alrededor de un ritmo típico y no sigue la respiración
+  real fuera de ella. La respiración de 31 rpm no aparece.
+- **`fase_total`**: no se comporta como una fase envuelta, sino como un **incremento de fase entre
+  tramas**. Oscila alrededor de 0 con picos aislados de ±2-3 rad y casi no tiene saltos de −π a π
+  que desenvolver en la lenta y la normal; su variación entre muestras crece con la velocidad de
+  la respiración (diferencia mediana 0.10 en la normal, 0.64 en la rápida).
+  - Las muestras en 0.000000 exacto (0.27-0.44 por segundo) caen **siempre** en la trama que sigue
+    al intervalo corto (~45 ms) de cada par de tramas; se descartan como tramas sin dato.
+  - **Desenvolverla (`unwrap`) la empeora**: en la rápida, el unwrap interpreta los picos de ruido
+    como vueltas completas y fabrica escalones de hasta −25 rad. Su espectro es ruido de banda
+    ancha.
+  - **Integrarla** (mediana de 3 muestras + suma acumulada) da una señal parecida a `fase_resp` en
+    la normal y la lenta, lo que apoya que `fase_resp` es esa misma señal filtrada. Su espectro
+    concentra la energía en frecuencias bajas y tampoco tiene pico en el conteo.
+
+### Errores
+
+Estimador de `estimar_respiracion.py` con los mismos parámetros para las cuatro capturas: rango
+6-35 rpm, pasabanda 0.08-0.70 Hz, ventana de 30 s, verificación de subarmónico (umbral 0.5),
+autocorrelación y cruces por cero (histéresis 0.05 × RMS). Mediana de las ventanas dentro del
+tramo del conteo. Entre paréntesis, el error en rpm.
+
+| Captura | Conteo | Módulo | `fase_resp` FFT | `fase_resp` autocorr. | `fase_resp` cruces | `fase_total` desenv. FFT | `fase_total` integr. autocorr. | `fase_total` integr. cruces |
+|---|---|---|---|---|---|---|---|---|
+| persona_sentada_84cm | 15.5 | 5.0 (−10.5) | 7.6 (−7.9) | 6.6 (−8.9) | 14.5 (−1.0) | 13.9 (−1.6) | 6.3 (−9.2) | 16.0 (+0.5) |
+| normal | 14 | 17.0 (+3.0) | 11.8 (−2.2) | 20.4 (+6.4) | 19.7 (+5.7) | 11.3 (−2.7) | 7.2 (−6.8) | 15.2 (+1.2) |
+| lenta | 8 | 3.0 (−5.0) | 10.3 (+2.3) | 10.4 (+2.4) | 16.6 (+8.6) | 6.8 (−1.2) | 7.6 (−0.4) | 16.8 (+8.8) |
+| rápida | 31 | 14.0 (−17.0) | 10.7 (−20.3) | 9.8 (−21.2) | 12.8 (−18.2) | 10.9 (−20.1) | 6.8 (−24.2) | 12.6 (−18.4) |
+| **Error absoluto medio** | | **8.9** | **8.2** | **9.7** | **8.4** | **6.4** | **10.2** | **7.3** |
+
+La tabla completa (las 9 combinaciones de señal y estimador) está en `errores.md`. Ninguna
+combinación queda cerca del conteo en las cuatro capturas a la vez: el mejor error medio es
+6.4 rpm, apenas mejor que el módulo (8.9), y todas fallan la rápida por 14-24 rpm. Las que
+aciertan en una captura fallan en otra (por ejemplo, `fase_total` integrada con cruces: +0.5,
++1.2, +8.8, −18.4), así que no hay un parámetro que ajustar: la información de frecuencia no está
+en las señales.
+
+Sobre los armónicos: la verificación de subarmónico y la autocorrelación funcionan con señales
+sintéticas (pruebas con un armónico al doble de amplitud que la fundamental), pero con los datos
+reales no ayudan porque el problema no es un armónico sino que no hay pico en la frecuencia real.
+La verificación de subarmónico incluso empeoró la FFT de `fase_resp` en `172200` (de 13.7 a
+7.6 rpm), porque encontró un pico de ruido a la mitad de la frecuencia.
+
+El RMS de las señales sí crece con el ritmo (`fase_resp`: 0.12 en la lenta, 0.09 en la normal,
+0.24 en la rápida; `fase_total` integrada: 1.4, 0.8 y 4.1), pero no de forma monótona ni
+calibrable con cuatro capturas.
+
+### Posibles causas y siguiente paso
+
+No se pueden distinguir con estos datos; quedan como hipótesis:
+
+1. `fase_resp` está filtrada por el módulo (lo indica el espectro) y no sirve para ritmos fuera de
+   ~6-28 rpm.
+2. `fase_total` llega a ~16 tramas/s; si es un incremento de fase, con respiración rápida la fase
+   puede cambiar más de π entre tramas y el incremento se envuelve (aliasing), lo que explicaría
+   que el ruido crezca con la velocidad.
+3. Posición: persona sentada a ~84 cm. La aplicación de Seeed para este sensor es el monitoreo de
+   sueño; el pecho de una persona sentada se mueve menos de frente al radar y el movimiento del
+   cuerpo pesa más.
+
+Siguiente prueba sugerida: persona acostada, radar a 40-60 cm del pecho, respiración marcada con
+metrónomo (8, 15 y 30 rpm) durante 2 minutos cada una, y apneas de 20-30 s. Si con eso tampoco hay
+pico en la frecuencia del metrónomo, la estimación propia de frecuencia queda descartada con este
+módulo y el sistema debe apoyarse en otra señal para la apnea.
+
+## 10. Detección de apnea por caída de amplitud (resultado negativo)
+
+Script: `analisis/detectar_apnea.py`. Salidas: `pruebas/resultados/deteccion_apnea/`
+(`apnea.png`, `relacion.png`, `deteccion.md`).
+
+### Detector
+
+No estima la frecuencia. Una vez por segundo compara el RMS de los últimos 5 s de `fase_resp`
+filtrada (pasabanda **causal**, como correría en el ESP32) con una referencia: la mediana del RMS
+de 5 s de los últimos 45 s de respiración normal. Si con presencia el RMS queda por debajo de
+0.5 × referencia durante 10 s seguidos, da la alarma.
+
+- La referencia se congela mientras el RMS está bajo, para que la apnea no la contamine.
+- Solo se arma con al menos 30 s de historia y con referencia ≥ 0.01 (la pared dio 0.003 y las
+  personas al menos 0.035): un objeto quieto nunca "respiró", así que no puede dejar de hacerlo.
+- Parámetros fijados antes de ver los resultados: 5 s (pedido), 45 s (dentro de 30-60 s), 0.5,
+  10 s (definición clínica de apnea).
+
+Retraso mínimo del diseño con una señal ideal (amplitud constante que cae a 0 de golpe), a
+15 rpm: ~0.7 s de retardo del filtro causal + ~3.75 s hasta que el RMS de 5 s baja de la mitad
+(hace falta que el 75 % de la ventana ya no tenga respiración) + 10 s de duración mínima =
+**~14.5 s**. A 8 rpm el retardo del filtro sube a ~1.8 s.
+
+### Resultado
+
+| Captura | Alarmas | Resultado |
+|---|---|---|
+| apnea (45-65 s) | ninguna | **apnea no detectada** |
+| persona_sentada_84cm | 45 s | 1 falsa alarma |
+| normal | ninguna | sin falsas alarmas |
+| lenta | 51 s, 86 s | 2 falsas alarmas |
+| rápida | ninguna | sin falsas alarmas |
+| pared | ninguna | sin falsas alarmas (nunca se arma) |
+| persona_sentada_80cm | ninguna | sin falsas alarmas |
+| persona_frente_computadora_50cm | 46 s | 1 falsa alarma |
+
+Con la rejilla de umbrales 0.3-0.6 y duraciones de 5, 10 y 15 s (`deteccion.md`), **ninguna
+combinación detecta la apnea**, y las más sensibles dan hasta 6 falsas alarmas en total. El
+retraso de detección no se puede medir porque no hubo detección.
+
+### Por qué falla
+
+En `apnea.png` se ve que el RMS de `fase_resp` **no baja durante la apnea**: entre 45-48 s y
+58-63 s está entre los valores más altos de la captura (~0.25, el doble de la referencia), y
+entre ~51 y 58 s baja a ~0.06-0.09, que apenas roza el umbral (0.06) alrededor de los 57 s. El mínimo de
+toda la captura (0.04) está a los 75 s, con la persona ya respirando. En `fase_total` integrada hay
+una excursión grande entre 56 y 60 s, también dentro de la apnea. El `resp_rpm` del módulo marca
+15-25 rpm durante toda la apnea.
+
+En las capturas sin apnea, la relación RMS corto / referencia baja de 0.5 durante tramos largos de
+respiración normal (en la lenta, ~10 s seguidos entre 75 y 86 s), lo que produce las falsas
+alarmas. Es decir, la amplitud de `fase_resp` en ventanas de 5 s varía tanto con la respiración
+normal como con la apnea, y no las distingue.
+
+Observación sin confirmar: el RMS de `fase_latido` bajó de 0.27 (0-45 s) a 0.16 (45-65 s) durante
+la apnea, pero en la respiración normal también pasó por valores de ~0.13 (10-20 s). Con una sola
+captura de apnea no se puede saber si sirve.
+
+### Conclusión
+
+Con las capturas actuales (persona sentada a ~84 cm), ninguna señal del radar permite estimar la
+frecuencia respiratoria en 8-31 rpm ni detectar una apnea de 20 s por caída de amplitud. Antes de
+seguir con el firmware de detección hay que repetir las capturas en la posición de uso real
+(acostado, radar sobre el pecho) con la prueba sugerida en la sección 9. Si el resultado se
+mantiene, la detección de apnea por radar no es viable con este módulo y hay que replantear ese
+requisito del proyecto (por ejemplo, limitar el radar a presencia y apoyarse en el botón).

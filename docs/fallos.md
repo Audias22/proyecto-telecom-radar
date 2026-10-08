@@ -30,6 +30,10 @@ Telegram. Todo lo que va a la nube es un segundo aviso, con reintentos.
   detección tiene que exigir además señal de fase de una persona (en esa prueba `fase_resp` fue
   ~60 veces menor con la pared que con una persona) o que la persona se haya detectado
   respirando antes de que la respiración cayera a 0.
+- Validación del 2026-10-07 (`radar.md`, secciones 9 y 10), con la persona sentada a ~84 cm:
+  ninguna señal del radar siguió la frecuencia respiratoria real (8-31 rpm) y un detector por
+  caída de amplitud no detectó una apnea de 20 s. La detección de apnea queda pendiente de
+  repetir las pruebas en la posición de uso real (acostado, radar sobre el pecho).
 - Si la persona se mueve mucho (se da vuelta en la cama) el radar puede dar lecturas inestables.
   Esas lecturas no deben disparar alerta; se descartan como en el escenario 9.
 - Límite conocido: si la persona sale de la cama y no vuelve (por ejemplo, una caída fuera del
