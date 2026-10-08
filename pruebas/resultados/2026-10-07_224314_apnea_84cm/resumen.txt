@@ -1,0 +1,15 @@
+Captura: 2026-10-07_224314_apnea_84cm
+Señal: fase_resp
+Duración: 90.0 s, 1461 muestras (16.23 por segundo)
+Parámetros: remuestreo 10 Hz, pasabanda 0.08-0.7 Hz (Butterworth orden 2, ida y vuelta), rango 6-35 rpm, ventana 30 s, paso 1 s, FFT de 4096 puntos
+Ventanas analizadas: 61
+
+Estimador                      mediana     desv.
+Módulo (muestras crudas)         13.00      5.11
+Módulo (mediana por ventana)     15.00      1.46
+FFT                               7.78      6.35
+Autocorrelación                   6.91      0.91
+Cruces por cero                  17.31      2.07
+
+RMS de la señal filtrada por ventana: mediana 0.14318, desv. 0.01533
+Unidades: rpm (respiraciones por minuto); RMS en las unidades de fase del radar.

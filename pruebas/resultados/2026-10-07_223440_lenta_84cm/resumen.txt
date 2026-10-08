@@ -1,0 +1,16 @@
+Captura: 2026-10-07_223440_lenta_84cm
+Señal: fase_resp
+Duración: 90.0 s, 1463 muestras (16.24 por segundo)
+Parámetros: remuestreo 10 Hz, pasabanda 0.08-0.7 Hz (Butterworth orden 2, ida y vuelta), rango 6-35 rpm, ventana 30 s, paso 1 s, FFT de 4096 puntos
+Ventanas analizadas: 61
+
+Estimador                      mediana     desv.   error vs conteo
+Módulo (muestras crudas)         11.00      8.28             +3.00
+Módulo (mediana por ventana)     11.00      5.75             +3.00
+FFT                               8.72      4.45             +0.72
+Autocorrelación                  10.05      4.17             +2.05
+Cruces por cero                  14.93      2.55             +6.93
+Conteo manual                     8.00
+
+RMS de la señal filtrada por ventana: mediana 0.11366, desv. 0.01360
+Unidades: rpm (respiraciones por minuto); RMS en las unidades de fase del radar.
