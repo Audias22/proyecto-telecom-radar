@@ -50,6 +50,42 @@ def test_fft_da_15_rpm():
     assert np.all(error <= TOLERANCIA_RPM), f"error máximo FFT {error.max():.2f} rpm"
 
 
+def test_autocorrelacion_da_15_rpm():
+    ventanas = _procesar_sintetica()
+    error = np.abs(ventanas["autocorrelacion_rpm"] - 60 * FRECUENCIA_HZ)
+    assert not np.any(np.isnan(error))
+    assert np.all(error <= TOLERANCIA_RPM), f"error máximo autocorrelación {error.max():.2f} rpm"
+
+
+def _ventana_con_armonico(fundamental_hz, amplitud_armonico):
+    """Ventana de 30 s con la fundamental (amplitud 0.5) y su segundo armónico más fuerte."""
+    t = np.arange(er.MUESTRAS_VENTANA) / er.FS_HZ
+    return (0.5 * np.sin(2 * np.pi * fundamental_hz * t)
+            + amplitud_armonico * np.sin(2 * np.pi * 2 * fundamental_hz * t + 0.7))
+
+
+def test_fft_no_confunde_armonico_con_fundamental():
+    # 8 rpm con el armónico de 16 rpm al doble de amplitud: sin la verificación de subarmónico
+    # el pico más alto está en 16 rpm.
+    ventana = _ventana_con_armonico(8 / 60, amplitud_armonico=1.0)
+    assert abs(60 * er.estimar_fft(ventana, verificar_subarmonico=False) - 16) <= TOLERANCIA_RPM
+    assert abs(60 * er.estimar_fft(ventana) - 8) <= TOLERANCIA_RPM
+
+
+def test_autocorrelacion_no_confunde_armonico_con_fundamental():
+    ventana = _ventana_con_armonico(8 / 60, amplitud_armonico=1.0)
+    assert abs(60 * er.estimar_autocorrelacion(ventana) - 8) <= TOLERANCIA_RPM
+
+
+def test_rango_extremos():
+    # Los extremos del rango (6 y 35 rpm) se estiman con los tres métodos.
+    t = np.arange(er.MUESTRAS_VENTANA) / er.FS_HZ
+    for rpm in (6.5, 34.0):
+        ventana = np.sin(2 * np.pi * rpm / 60 * t)
+        for nombre, estimador in er.ESTIMADORES.items():
+            assert abs(60 * estimador(ventana) - rpm) <= TOLERANCIA_RPM, f"{nombre} a {rpm} rpm"
+
+
 def test_cruces_da_15_rpm():
     ventanas = _procesar_sintetica()
     error = np.abs(ventanas["cruces_rpm"] - 60 * FRECUENCIA_HZ)
