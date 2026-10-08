@@ -31,6 +31,25 @@ pip install -r requirements.txt
 python capturar_serial.py persona_sentada_84cm --duracion 60
 ```
 
+Desde la terminal de VS Code en Windows (PowerShell, en la raíz del repositorio), usando el venv
+sin activarlo:
+
+```
+analisis\.venv\Scripts\python analisis\capturar_serial.py persona_sentada_84cm --puerto COM3 --duracion 60
+```
+
+Si el venv todavía no existe, crearlo una vez desde la raíz:
+
+```
+python -m venv analisis\.venv
+analisis\.venv\Scripts\python -m pip install -r analisis\requirements.txt
+```
+
+**El monitor serial de PlatformIO tiene que estar cerrado**: ocupa el COM3 y el script no puede
+abrir el puerto (error de acceso denegado). Cerrarlo con la papelera de la terminal del monitor o
+con Ctrl+C dentro de ella. El número de puerto puede cambiar entre computadoras; `pio device list`
+lo muestra. Sin `--duracion`, la captura sigue hasta Ctrl+C.
+
 ### Estimar la respiración
 
 ```
