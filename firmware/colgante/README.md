@@ -10,12 +10,53 @@ espera ACK (reintentos y barrido de canales) -> beep -> deep sleep. Detalle en `
 | Módulo | Responsabilidad |
 |---|---|
 | `boton` | Botón de auxilio, antirrebote y causa del despertar (implementado) |
-| `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC |
+| `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC (implementado) |
 | `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
 | `bateria` | Voltaje de la batería por ADC |
 
-`espnow_tx` y `bateria` todavía tienen su implementación pendiente. `main.cpp` por ahora solo
-imprime nombre y versión.
+`bateria` todavía tiene su implementación pendiente. `main.cpp` por ahora solo imprime nombre y
+versión; aún no integra el ciclo completo.
+
+## Transmisión ESP-NOW
+
+- `iniciar()` activa WiFi únicamente en modo STA, sin asociarlo a un router, desactiva el ahorro
+  de energía durante la transmisión, selecciona el último canal válido conservado en RTC e
+  inicializa ESP-NOW con la MAC unicast de `include/secrets.h`.
+- La MAC se copia a memoria propia al compilar y se valida antes de encender el enlace. Una MAC
+  cero o multicast deja el transmisor inactivo; `enviar()` devuelve `ENVIO_SIN_ACK`. El archivo
+  `secrets.h` continúa ignorado por Git y debe crearse desde `secrets.example.h`.
+- Cada mensaje nuevo incrementa una sola vez la secuencia RTC. Todos sus reintentos conservan esa
+  secuencia; a partir del segundo intento llevan `FLAG_REINTENTO`. Los envíos del barrido llevan
+  además `FLAG_BARRIDO` y recorren los canales 1 a 13 con los intentos y tiempos de
+  `protocolo.h`.
+- Después de un arranque que no sea desde deep sleep, los paquetes llevan `FLAG_ARRANQUE_FRIO`
+  hasta que llega un ACK de aplicación válido. Aceptar una trama en `esp_now_send()` no basta para
+  limpiar el indicador: así una pérdida total de ACK no deja a la base comparando la secuencia
+  reiniciada contra un valor antiguo. El canal y la secuencia sobreviven al deep sleep; un reinicio
+  normal vuelve a iniciar la secuencia.
+- El callback de recepción solo copia a una cola estática paquetes de exactamente 8 bytes que
+  provienen de la MAC configurada. El flujo principal acepta el ACK únicamente si coinciden
+  versión, tipo `MSG_ACK`, id del colgante, secuencia y canal. ACK ajenos o tardíos no prolongan
+  el tiempo límite ni pueden guardar un canal incorrecto.
+- El resultado del callback de entrega 802.11 no se usa como confirmación. La entrega se considera
+  exitosa exclusivamente al recibir el ACK de aplicación. `detener()` desregistra el callback y
+  el peer, detiene ESP-NOW y apaga WiFi incluso después de una inicialización parcial.
+- La construcción de paquetes, validación de ACK, validación de canal y composición de flags están
+  separadas como funciones puras en `espnow_tx::logica`, sin dependencias de WiFi. Esto permite
+  pruebas unitarias automatizadas en un entorno host con paquetes sintetizados. La compilación del
+  firmware verifica además varios casos de lógica y las firmas reales de Arduino ESP32 3.3.7;
+  esas verificaciones no sustituyen pruebas de comunicación por radio.
+
+Queda pendiente probar con una base real la MAC, recepción del ACK, pérdida de tramas, cambio de
+canal del router, recorrido completo 1-13, persistencia RTC tras deep sleep, alcance y consumo del
+radio. También se debe medir si los tiempos iniciales de `protocolo.h` son suficientes en el
+entorno de instalación.
+
+ESP-NOW se usa sin PMK/LMK, según la primera versión del protocolo. Por tanto, validar la MAC de
+origen detecta tráfico ajeno normal, pero no autentica criptográficamente a la base: un atacante
+con radio cercano podría falsificar la MAC y un ACK. Si el modelo de amenaza exige impedirlo,
+habrá que añadir cifrado ESP-NOW de forma coordinada con la base y gestionar las claves fuera del
+repositorio.
 
 ## Botón de auxilio
 
