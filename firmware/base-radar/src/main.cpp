@@ -5,6 +5,10 @@
 //   - Líneas que empiezan con '#': comentarios (arranque, avisos). No son datos.
 //   - Encabezado: ms,valida,presencia,distancia_cm,resp_rpm,latido_bpm,fase_total,fase_resp,fase_latido
 //   - Datos: valida y presencia como 0/1; valores no recibidos como "nan".
+//
+// Con -DDIAGNOSTICO (entorno "diagnostico") se compila src/diagnostico.cpp en su lugar.
+
+#ifndef DIAGNOSTICO
 
 #include <Arduino.h>
 #include <protocolo.h>
@@ -52,3 +56,5 @@ void loop() {
         sin_datos_antes = sin_datos;
     }
 }
+
+#endif  // DIAGNOSTICO
