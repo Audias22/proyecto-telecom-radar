@@ -1,0 +1,1045 @@
+# DIAGNOSTICO base-radar v0.2.0 orden 'D'
+# FASE CRUDO 150000 ms
+# cambio t=474131 tipo=0F09 datos: 01 00
+# muestra t=474131 tipo=0F09 largo=2 hex: 01 14 7E 00 02 0F 09 90 01 00 FE
+# muestra t=474134 tipo=0A13 largo=12 hex: 01 14 7F 00 0C 0A 13 80 80 45 0D 40 80 A4 D0 3C 0C FC 8F BF 7F
+#   floats LE (memcpy | manual): 2.20736694|2.20736694 0.0254690647|0.0254690647 -1.12487936|-1.12487936
+#   u32 LE: 1074611584 1020306560 3213884428
+# (169124 ms desde la trama de fase anterior)
+# fase_total_grande t=474135 tipo=0A13 largo=12 hex: 01 14 7F 00 0C 0A 13 80 80 45 0D 40 80 A4 D0 3C 0C FC 8F BF 7F
+#   floats LE (memcpy | manual): 2.20736694|2.20736694 0.0254690647|0.0254690647 -1.12487936|-1.12487936
+#   u32 LE: 1074611584 1020306560 3213884428
+# muestra t=474136 tipo=0A14 largo=4 hex: 01 14 80 00 04 0A 14 70 00 00 98 41 26
+#   floats LE (memcpy | manual): 19|19
+#   u32 LE: 1100480512
+# texto t=474137: breath rate = 19.000000 
+# muestra t=474210 tipo=0A13 largo=12 hex: 01 14 82 00 0C 0A 13 7D 00 B0 76 BE E0 56 7F 3D AE 41 4B BF 68
+#   floats LE (memcpy | manual): -0.240905762|-0.240905762 0.0623387098|0.0623387098 -0.793970942|-0.793970942
+#   u32 LE: 3195449344 1031755488 3209380270
+# muestra t=474253 tipo=0A04 largo=20 hex: 01 14 83 00 14 0A 04 73 01 00 00 00 46 33 22 BC 43 44 47 3F 00 00 00 00 00 00 00 00 6A
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 -0.00989991985|-0.00989991985 0.778385341|0.778385341 0|0 0|0
+#   u32 LE: 1 3156357958 1061635139 0 0
+# cambio t=474254 tipo=0A29 datos: 01 00
+# muestra t=474254 tipo=0A29 largo=2 hex: 01 14 84 00 02 0A 29 4F 01 00 FE
+# cambio t=474255 tipo=0A17 datos: 2B 8D 60 BD 7F 41 3B 3F | u32 3177221419 float 0.731468 | floats -0.0548221 0.731468
+# muestra t=474255 tipo=0A17 largo=8 hex: 01 14 85 00 08 0A 17 7A 2B 8D 60 BD 7F 41 3B 3F BE
+#   floats LE (memcpy | manual): -0.0548221283|-0.0548221283 0.731468141|0.731468141
+#   u32 LE: 3177221419 1060847999
+# muestra t=474256 tipo=0A16 largo=8 hex: 01 14 86 00 08 0A 16 78 01 00 00 00 9A 99 65 42 DA
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 57.4000015|57.4000015
+#   u32 LE: 1 1113954714
+# muestra t=474257 tipo=0F09 largo=2 hex: 01 14 87 00 02 0F 09 69 01 00 FE
+# muestra t=474257 tipo=0A13 largo=12 hex: 01 14 88 00 0C 0A 13 77 00 00 00 00 60 A1 CC 3D 40 AB 7C BE E6
+#   floats LE (memcpy | manual): 0|0 0.0999171734|0.0999171734 -0.246747017|-0.246747017
+#   u32 LE: 0 1036820832 3195841344
+# (47 ms desde la trama de fase anterior)
+# fase_total_cero t=474258 tipo=0A13 largo=12 hex: 01 14 88 00 0C 0A 13 77 00 00 00 00 60 A1 CC 3D 40 AB 7C BE E6
+#   floats LE (memcpy | manual): 0|0 0.0999171734|0.0999171734 -0.246747017|-0.246747017
+#   u32 LE: 0 1036820832 3195841344
+# muestra t=474259 tipo=0A14 largo=4 hex: 01 14 89 00 04 0A 14 79 00 00 A0 41 1E
+#   floats LE (memcpy | manual): 20|20
+#   u32 LE: 1101004800
+# texto t=474260: breath rate = 20.000000 
+# (74 ms desde la trama de fase anterior)
+# fase_total_grande t=474332 tipo=0A13 largo=12 hex: 01 14 8B 00 0C 0A 13 74 80 20 15 C0 08 0F 0D 3E EE 83 8B 3E 66
+#   floats LE (memcpy | manual): -2.33010864|-2.33010864 0.137752652|0.137752652 0.272490919|0.272490919
+#   u32 LE: 3222610048 1041043208 1049330670
+# muestra t=474375 tipo=0A04 largo=20 hex: 01 14 8C 00 14 0A 04 7C 01 00 00 00 46 33 22 BC 43 44 47 3F 00 00 00 00 00 00 00 00 6A
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 -0.00989991985|-0.00989991985 0.778385341|0.778385341 0|0 0|0
+#   u32 LE: 1 3156357958 1061635139 0 0
+# muestra t=474376 tipo=0A29 largo=2 hex: 01 14 8D 00 02 0A 29 46 01 00 FE
+# cambio t=474376 tipo=0A17 datos: FE 8C 04 BD E1 42 41 3F | u32 3171192062 float 0.754927 | floats -0.032361 0.754927
+# muestra t=474377 tipo=0A17 largo=8 hex: 01 14 8E 00 08 0A 17 71 FE 8C 04 BD E1 42 41 3F E9
+#   floats LE (memcpy | manual): -0.0323610231|-0.0323610231 0.754926741|0.754926741
+#   u32 LE: 3171192062 1061241569
+# muestra t=474378 tipo=0A16 largo=8 hex: 01 14 8F 00 08 0A 16 71 01 00 00 00 9A 99 65 42 DA
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 57.4000015|57.4000015
+#   u32 LE: 1 1113954714
+# muestra t=474378 tipo=0F09 largo=2 hex: 01 14 90 00 02 0F 09 7E 01 00 FE
+# muestra t=474379 tipo=0A14 largo=4 hex: 01 14 92 00 04 0A 14 62 00 00 A0 41 1E
+#   floats LE (memcpy | manual): 20|20
+#   u32 LE: 1101004800
+# texto t=474382: breath rate = 20.000000 
+# muestra t=474497 tipo=0A04 largo=20 hex: 01 14 95 00 14 0A 04 65 01 00 00 00 75 5C 60 BD 3C B1 3C 3F 00 00 00 00 00 00 00 00 84
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 -0.0547756739|-0.0547756739 0.737079382|0.737079382 0|0 0|0
+#   u32 LE: 1 3177208949 1060942140 0 0
+# muestra t=474498 tipo=0A29 largo=2 hex: 01 14 96 00 02 0A 29 5D 01 00 FE
+# cambio t=474499 tipo=0A17 datos: BA 74 32 BD 0E FA 3E 3F | u32 3174200506 float 0.746003 | floats -0.0435684 0.746003
+# muestra t=474499 tipo=0A17 largo=8 hex: 01 14 97 00 08 0A 17 68 BA 74 32 BD 0E FA 3E 3F 4B
+#   floats LE (memcpy | manual): -0.0435683504|-0.0435683504 0.746003032|0.746003032
+#   u32 LE: 3174200506 1061091854
+# muestra t=474500 tipo=0A16 largo=8 hex: 01 14 98 00 08 0A 16 66 01 00 00 00 9A 99 65 42 DA
+#   floats LE (memcpy | manual): 1.40129846e-45|1.40129846e-45 57.4000015|57.4000015
+#   u32 LE: 1 1113954714
+# texto t=474504: breath rate = 21.000000 
+# cambio t=474619 tipo=0A17 datos: 98 68 49 BD A5 D5 3D 3F | u32 3175704728 float 0.741541 | floats -0.049172 0.741541
+# texto t=474627: breath rate = 21.000000 
+# muestra t=474627 tipo=0A15 largo=4 hex: 01 14 A6 00 04 0A 15 57 00 00 B2 42 0F
+#   floats LE (memcpy | manual): 89|89
+#   u32 LE: 1118961664
+# texto t=474630: heart rate = 89.000000 
+# cambio t=474746 tipo=0A17 datos: 56 F9 DD BD 60 9F 32 3F | u32 3185441110 float 0.697744 | floats -0.108386 0.697744
+# texto t=474752: breath rate = 21.000000 
+# cambio t=474868 tipo=0A17 datos: EE 4D 0D BE 3E 04 2D 3F | u32 3188542958 float 0.675846 | floats -0.137993 0.675846
+# texto t=474874: breath rate = 22.000000 
+# (77 ms desde la trama de fase anterior)
+# fase_total_grande t=474948 tipo=0A13 largo=12 hex: 01 14 BA 00 0C 0A 13 45 00 8E 09 C0 08 84 C3 3E F1 CA 2B 3F E6
+#   floats LE (memcpy | manual): -2.14929199|-2.14929199 0.381866693|0.381866693 0.67106539|0.67106539
+#   u32 LE: 3221851648 1053000712 1059834609
+# cambio t=474991 tipo=0A29 datos: 02 00
+# cambio t=474992 tipo=0A17 datos: E2 7B 2D BE 46 69 29 3F | u32 3190651874 float 0.661763 | floats -0.169418 0.661763
+# texto t=474998: breath rate = 22.000000 
+# cambio t=475114 tipo=0A29 datos: 01 00
+# cambio t=475114 tipo=0A17 datos: D5 A9 4D BE 4E CE 25 3F | u32 3192760789 float 0.647679 | floats -0.200843 0.647679
+# texto t=475120: breath rate = 22.000000 
+# crudo/s seg=475 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=475237 tipo=0A17 datos: 16 0D 2D BE E2 E9 27 3F | u32 3190623510 float 0.655913 | floats -0.168995 0.655913
+# texto t=475245: breath rate = 23.000000 
+# muestra t=475245 tipo=0A15 largo=4 hex: 01 14 D5 00 04 0A 15 24 00 00 B4 42 09
+#   floats LE (memcpy | manual): 90|90
+#   u32 LE: 1119092736
+# texto t=475248: heart rate = 90.000000 
+# cambio t=475364 tipo=0A17 datos: FC 02 11 BE F2 F8 28 3F | u32 3188785916 float 0.660049 | floats -0.141613 0.660049
+# texto t=475371: breath rate = 23.000000 
+# cambio t=475487 tipo=0A17 datos: D4 11 1B BE 49 93 26 3F | u32 3189445076 float 0.650685 | floats -0.151435 0.650685
+# texto t=475493: breath rate = 23.000000 
+# cambio t=475609 tipo=0A17 datos: 13 51 10 BE AE 44 25 3F | u32 3188740371 float 0.645579 | floats -0.140934 0.645579
+# texto t=475616: breath rate = 23.000000 
+# (76 ms desde la trama de fase anterior)
+# fase_total_grande t=475689 tipo=0A13 largo=12 hex: 01 14 F2 00 0C 0A 13 0D 80 13 33 C0 28 D4 38 3E 14 2F 9E 3E FE
+#   floats LE (memcpy | manual): -2.79806519|-2.79806519 0.180496812|0.180496812 0.308952928|0.308952928
+#   u32 LE: 3224572800 1043911720 1050554132
+# cambio t=475732 tipo=0A17 datos: 84 17 B2 BD 4C 3A 25 3F | u32 3182565252 float 0.645421 | floats -0.0869589 0.645421
+# texto t=475739: breath rate = 24.000000 
+# cambio t=475855 tipo=0A17 datos: B2 E0 9B BD D3 96 22 3F | u32 3181109426 float 0.635114 | floats -0.0761122 0.635114
+# texto t=475863: breath rate = 24.000000 
+# muestra t=475863 tipo=0A15 largo=4 hex: 01 15 04 00 04 0A 15 F4 00 00 BA 42 07
+#   floats LE (memcpy | manual): 93|93
+#   u32 LE: 1119485952
+# texto t=475866: heart rate = 93.000000 
+# cambio t=475982 tipo=0A17 datos: FC 96 07 BE 72 9B 20 3F | u32 3188168444 float 0.627372 | floats -0.132412 0.627372
+# texto t=475988: breath rate = 24.000000 
+# cambio t=476105 tipo=0A17 datos: E8 0A 43 BE 7E D3 21 3F | u32 3192064744 float 0.632133 | floats -0.190471 0.632133
+# texto t=476111: breath rate = 24.000000 
+# crudo/s seg=476 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=476226 tipo=0A17 datos: DE C4 60 BE 84 6F 22 3F | u32 3194012894 float 0.634514 | floats -0.219501 0.634514
+# texto t=476233: breath rate = 24.000000 
+# cambio t=476348 tipo=0A17 datos: D9 A1 6F BE 86 BD 22 3F | u32 3194986969 float 0.635704 | floats -0.234016 0.635704
+# texto t=476355: breath rate = 25.000000 
+# cambio t=476471 tipo=0A29 datos: 02 00
+# cambio t=476471 tipo=0A17 datos: D3 37 88 BE 9C 16 20 3F | u32 3196598227 float 0.625345 | floats -0.266051 0.625345
+# texto t=476479: breath rate = 25.000000 
+# texto t=476481: heart rate = 96.000000 
+# cambio t=476597 tipo=0A29 datos: 01 00
+# cambio t=476598 tipo=0A17 datos: F0 ED 82 BE F8 EF 1C 3F | u32 3196251632 float 0.613037 | floats -0.255722 0.613037
+# texto t=476604: breath rate = 25.000000 
+# texto t=476726: breath rate = 25.000000 
+# texto t=476849: breath rate = 25.000000 
+# texto t=476971: breath rate = 25.000000 
+# texto t=477094: breath rate = 26.000000 
+# texto t=477097: heart rate = 99.000000 
+# crudo/s seg=477 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=477213 tipo=0A17 datos: 8A B3 5F BE DF 6C 1E 3F | u32 3193942922 float 0.618849 | floats -0.218458 0.618849
+# texto t=477220: breath rate = 26.000000 
+# cambio t=477336 tipo=0A17 datos: 2C 77 28 BE 27 2D 23 3F | u32 3190322988 float 0.637408 | floats -0.164517 0.637408
+# texto t=477342: breath rate = 26.000000 
+# cambio t=477458 tipo=0A17 datos: FC D8 0C BE 4B 8D 25 3F | u32 3188513020 float 0.646687 | floats -0.137546 0.646687
+# texto t=477464: breath rate = 26.000000 
+# cambio t=477581 tipo=0A17 datos: C0 5C F4 BD 06 AB 28 3F | u32 3186908352 float 0.65886 | floats -0.119318 0.65886
+# texto t=477587: breath rate = 25.000000 
+# cambio t=477705 tipo=0A17 datos: FB 39 F6 BD 48 80 2B 3F | u32 3187030523 float 0.669926 | floats -0.120228 0.669926
+# texto t=477712: breath rate = 23.000000 
+# texto t=477715: heart rate = 103.000000 
+# cambio t=477831 tipo=0A17 datos: 98 28 F7 BD EA EA 2C 3F | u32 3187091608 float 0.67546 | floats -0.120683 0.67546
+# texto t=477837: breath rate = 22.000000 
+# cambio t=477953 tipo=0A29 datos: 02 00
+# cambio t=477953 tipo=0A17 datos: E7 9F F7 BD 3A A0 2D 3F | u32 3187122151 float 0.678226 | floats -0.12091 0.678226
+# (46 ms desde la trama de fase anterior)
+# fase_total_cero t=477956 tipo=0A13 largo=12 hex: 01 15 A2 00 0C 0A 13 5C 00 00 00 00 A8 00 35 BE 00 6F 0A BD 04
+#   floats LE (memcpy | manual): 0|0 -0.176760316|-0.176760316 -0.0337972641|-0.0337972641
+#   u32 LE: 0 3191144616 3171577600
+# texto t=477959: breath rate = 21.000000 
+# cambio t=478075 tipo=0A29 datos: 01 00
+# cambio t=478076 tipo=0A17 datos: 36 17 F8 BD 8B 55 2E 3F | u32 3187152694 float 0.680993 | floats -0.121138 0.680993
+# texto t=478081: breath rate = 20.000000 
+# crudo/s seg=478 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=478203: breath rate = 19.000000 
+# texto t=478327: breath rate = 18.000000 
+# texto t=478330: heart rate = 105.000000 
+# texto t=478452: breath rate = 17.000000 
+# texto t=478574: breath rate = 16.000000 
+# texto t=478696: breath rate = 16.000000 
+# cambio t=478812 tipo=0A17 datos: A4 2A FB BD AA 2F 2F 3F | u32 3187354276 float 0.684321 | floats -0.12264 0.684321
+# texto t=478819: breath rate = 15.000000 
+# cambio t=478935 tipo=0A17 datos: C3 F9 06 BE A6 3D 2D 3F | u32 3188128195 float 0.676722 | floats -0.131812 0.676722
+# texto t=478943: breath rate = 14.000000 
+# texto t=478945: heart rate = 104.000000 
+# cambio t=479062 tipo=0A17 datos: 34 0D 0D BE C6 C0 2B 3F | u32 3188526388 float 0.67091 | floats -0.137746 0.67091
+# texto t=479068: breath rate = 13.000000 
+# crudo/s seg=479 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=479184 tipo=0A17 datos: F8 C5 13 BE 07 78 2A 3F | u32 3188966904 float 0.665894 | floats -0.14431 0.665894
+# texto t=479191: breath rate = 13.000000 
+# cambio t=479307 tipo=0A17 datos: CA D1 1D BE 21 01 29 3F | u32 3189625290 float 0.660173 | floats -0.154121 0.660173
+# texto t=479313: breath rate = 12.000000 
+# cambio t=479429 tipo=0A29 datos: 02 00
+# cambio t=479430 tipo=0A17 datos: 0E E9 24 BE 0C 05 28 3F | u32 3190089998 float 0.656327 | floats -0.161045 0.656327
+# texto t=479436: breath rate = 11.000000 
+# cambio t=479552 tipo=0A29 datos: 01 00
+# cambio t=479552 tipo=0A17 datos: 17 85 27 BE DC 2A 27 3F | u32 3190261015 float 0.652998 | floats -0.163594 0.652998
+# texto t=479560: breath rate = 11.000000 
+# texto t=479563: heart rate = 102.000000 
+# texto t=479685: breath rate = 10.000000 
+# texto t=479807: breath rate = 10.000000 
+# cambio t=479923 tipo=0A17 datos: 28 D7 2D BE DD D6 25 3F | u32 3190675240 float 0.64781 | floats -0.169766 0.64781
+# texto t=479930: breath rate = 9.000000 
+# cambio t=480046 tipo=0A17 datos: 62 46 51 BE 36 3E 20 3F | u32 3192997474 float 0.625949 | floats -0.20437 0.625949
+# texto t=480052: breath rate = 9.000000 
+# crudo/s seg=480 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=480168 tipo=0A17 datos: FF FD 62 BE E3 71 1D 3F | u32 3194158591 float 0.615019 | floats -0.221672 0.615019
+# texto t=480176: breath rate = 8.000000 
+# texto t=480179: heart rate = 102.000000 
+# cambio t=480295 tipo=0A17 datos: CE D9 6B BE BA 0B 1C 3F | u32 3194739150 float 0.609554 | floats -0.230323 0.609554
+# texto t=480301: breath rate = 8.000000 
+# cambio t=480417 tipo=0A17 datos: B5 47 70 BE A5 58 1B 3F | u32 3195029429 float 0.606821 | floats -0.234649 0.606821
+# texto t=480423: breath rate = 8.000000 
+# cambio t=480538 tipo=0A17 datos: A8 7E 72 BE 1A FF 1A 3F | u32 3195174568 float 0.605455 | floats -0.236811 0.605455
+# texto t=480545: breath rate = 7.000000 
+# cambio t=480660 tipo=0A17 datos: 22 9A 73 BE 55 D2 1A 3F | u32 3195247138 float 0.604772 | floats -0.237893 0.604772
+# texto t=480667: breath rate = 7.000000 
+# cambio t=480783 tipo=0A17 datos: B9 84 82 BE D3 74 15 3F | u32 3196224697 float 0.583814 | floats -0.254919 0.583814
+# texto t=480790: breath rate = 6.000000 
+# texto t=480793: heart rate = 103.000000 
+# cambio t=480910 tipo=0A29 datos: 02 00
+# cambio t=480910 tipo=0A17 datos: 27 9F 61 BE 40 40 13 3F | u32 3194068775 float 0.575199 | floats -0.220334 0.575199
+# texto t=480916: breath rate = 6.000000 
+# cambio t=481033 tipo=0A29 datos: 01 00
+# cambio t=481033 tipo=0A17 datos: 11 45 1B BD 06 94 1D 3F | u32 3172680977 float 0.61554 | floats -0.0379077 0.61554
+# (47 ms desde la trama de fase anterior)
+# fase_total_cero t=481036 tipo=0A13 largo=12 hex: 01 16 8D 00 0C 0A 13 70 00 00 00 00 50 E4 E9 BD 68 F2 2A 3E 91
+#   floats LE (memcpy | manual): 0|0 -0.114205003|-0.114205003 0.166940331|0.166940331
+#   u32 LE: 0 3186222160 1043001960
+# texto t=481039: breath rate = 7.000000 
+# crudo/s seg=481 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=481155 tipo=0A17 datos: A8 31 04 BB 70 21 20 3F | u32 3137614248 float 0.62551 | floats -0.00201712 0.62551
+# texto t=481161: breath rate = 6.000000 
+# cambio t=481277 tipo=0A17 datos: C2 7B 82 3C 24 68 21 3F | u32 1015184322 float 0.630495 | floats 0.0159282 0.630495
+# texto t=481283: breath rate = 6.000000 
+# cambio t=481400 tipo=0A17 datos: 80 41 45 39 10 7A 1D 3F | u32 960840064 float 0.615144 | floats 0.000188118 0.615144
+# texto t=481407: breath rate = 6.000000 
+# texto t=481410: heart rate = 104.000000 
+# cambio t=481526 tipo=0A17 datos: 72 B8 FB BB 06 83 1B 3F | u32 3153836146 float 0.607468 | floats -0.0076819 0.607468
+# texto t=481532: breath rate = 5.000000 
+# cambio t=481648 tipo=0A17 datos: 4E 66 AA BD 0E 14 16 3F | u32 3182061134 float 0.586244 | floats -0.0832029 0.586244
+# texto t=481654: breath rate = 5.000000 
+# cambio t=481770 tipo=0A17 datos: B1 BB F7 BD 92 5C 13 3F | u32 3187129265 float 0.575631 | floats -0.120963 0.575631
+# texto t=481777: breath rate = 5.000000 
+# cambio t=481892 tipo=0A17 datos: 31 33 0F BE D4 00 12 3F | u32 3188667185 float 0.570325 | floats -0.139844 0.570325
+# texto t=481899: breath rate = 5.000000 
+# cambio t=482015 tipo=0A17 datos: DE DD 18 BE F5 52 11 3F | u32 3189300702 float 0.567672 | floats -0.149284 0.567672
+# texto t=482022: breath rate = 4.000000 
+# texto t=482025: heart rate = 106.000000 
+# crudo/s seg=482 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=482141 tipo=0A17 datos: 34 B3 1D BE 06 FC 10 3F | u32 3189617460 float 0.566346 | floats -0.154004 0.566346
+# texto t=482147: breath rate = 4.000000 
+# cambio t=482263 tipo=0A17 datos: DF 1D 20 BE 8E D0 10 3F | u32 3189775839 float 0.565682 | floats -0.156364 0.565682
+# texto t=482269: breath rate = 4.000000 
+# cambio t=482384 tipo=0A29 datos: 02 00
+# cambio t=482385 tipo=0A17 datos: 34 53 21 BE D2 BA 10 3F | u32 3189855028 float 0.565351 | floats -0.157544 0.565351
+# texto t=482391: breath rate = 4.000000 
+# cambio t=482507 tipo=0A29 datos: 01 00
+# cambio t=482507 tipo=0A17 datos: 8A 88 22 BE 16 A5 10 3F | u32 3189934218 float 0.565019 | floats -0.158724 0.565019
+# texto t=482513: breath rate = 4.000000 
+# cambio t=482629 tipo=0A17 datos: 1A D9 2C BE 72 62 16 3F | u32 3190610202 float 0.58744 | floats -0.168797 0.58744
+# texto t=482637: breath rate = 3.000000 
+# texto t=482640: heart rate = 108.000000 
+# cambio t=482756 tipo=0A17 datos: D1 C2 04 BE E8 8E 1E 3F | u32 3187983057 float 0.619368 | floats -0.129649 0.619368
+# texto t=482762: breath rate = 3.000000 
+# cambio t=482879 tipo=0A17 datos: C8 16 D5 BD BD C1 20 3F | u32 3184858824 float 0.627956 | floats -0.104047 0.627956
+# texto t=482885: breath rate = 3.000000 
+# cambio t=483002 tipo=0A17 datos: 7B 13 D6 BD 2A 9A 1E 3F | u32 3184923515 float 0.61954 | floats -0.104529 0.61954
+# texto t=483008: breath rate = 3.000000 
+# cambio t=483124 tipo=0A17 datos: 32 0F 19 BE 42 A8 1C 3F | u32 3189313330 float 0.611942 | floats -0.149472 0.611942
+# crudo/s seg=483 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:9 0A04:9 0A29:9 0A17:9 0A16:9 0A15:1
+# texto t=483131: breath rate = 3.000000 
+# cambio t=483247 tipo=0A17 datos: 33 2C 4D BE E0 2A 1D 3F | u32 3192728627 float 0.613935 | floats -0.200364 0.613935
+# texto t=483254: breath rate = 4.000000 
+# texto t=483257: heart rate = 110.000000 
+# cambio t=483373 tipo=0A17 datos: 78 88 59 BE A0 8B 21 3F | u32 3193538680 float 0.631037 | floats -0.212435 0.631037
+# texto t=483380: breath rate = 5.000000 
+# cambio t=483496 tipo=0A17 datos: 4C 99 54 BE B0 9D 23 3F | u32 3193215308 float 0.639125 | floats -0.207616 0.639125
+# texto t=483502: breath rate = 6.000000 
+# cambio t=483618 tipo=0A17 datos: FA 90 55 BE 98 66 22 3F | u32 3193278714 float 0.634378 | floats -0.208561 0.634378
+# texto t=483625: breath rate = 7.000000 
+# cambio t=483741 tipo=0A17 datos: D2 0C 56 BE 0C CB 21 3F | u32 3193310418 float 0.632004 | floats -0.209033 0.632004
+# texto t=483747: breath rate = 8.000000 
+# cambio t=483862 tipo=0A29 datos: 02 00
+# cambio t=483863 tipo=0A17 datos: BE 4A 56 BE 46 7D 21 3F | u32 3193326270 float 0.630818 | floats -0.209269 0.630818
+# texto t=483870: breath rate = 9.000000 
+# texto t=483873: heart rate = 112.000000 
+# cambio t=483989 tipo=0A29 datos: 01 00
+# cambio t=483989 tipo=0A17 datos: A9 88 56 BE 80 2F 21 3F | u32 3193342121 float 0.629631 | floats -0.209506 0.629631
+# texto t=483995: breath rate = 10.000000 
+# texto t=484118: breath rate = 11.000000 
+# crudo/s seg=484 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:11 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=484240: breath rate = 12.000000 
+# texto t=484363: breath rate = 13.000000 
+# texto t=484486: breath rate = 13.000000 
+# texto t=484489: heart rate = 113.000000 
+# texto t=484611: breath rate = 14.000000 
+# texto t=484734: breath rate = 15.000000 
+# texto t=484856: breath rate = 16.000000 
+# texto t=484978: breath rate = 17.000000 
+# texto t=485101: breath rate = 17.000000 
+# texto t=485104: heart rate = 112.000000 
+# crudo/s seg=485 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=485227: breath rate = 18.000000 
+# cambio t=485343 tipo=0A29 datos: 02 00
+# texto t=485349: breath rate = 18.000000 
+# cambio t=485465 tipo=0A29 datos: 01 00
+# texto t=485471: breath rate = 19.000000 
+# texto t=485594: breath rate = 19.000000 
+# cambio t=485710 tipo=0A17 datos: D0 54 45 BE 8C F1 1F 3F | u32 3192214736 float 0.624779 | floats -0.192706 0.624779
+# texto t=485717: breath rate = 20.000000 
+# texto t=485720: heart rate = 108.000000 
+# cambio t=485836 tipo=0A17 datos: A5 D1 2B BE 77 14 1F 3F | u32 3190542757 float 0.621406 | floats -0.167792 0.621406
+# texto t=485843: breath rate = 20.000000 
+# cambio t=485959 tipo=0A17 datos: CC 35 3C BE 2C 0F 1D 3F | u32 3191616972 float 0.613513 | floats -0.183799 0.613513
+# texto t=485965: breath rate = 21.000000 
+# cambio t=486081 tipo=0A17 datos: DF 67 44 BE 87 0C 1C 3F | u32 3192154079 float 0.609566 | floats -0.191802 0.609566
+# texto t=486087: breath rate = 20.000000 
+# crudo/s seg=486 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=486203 tipo=0A17 datos: E8 80 48 BE 34 8B 1B 3F | u32 3192422632 float 0.607593 | floats -0.195804 0.607593
+# texto t=486209: breath rate = 19.000000 
+# cambio t=486325 tipo=0A17 datos: 6D 8D 4A BE 8B 4A 1B 3F | u32 3192556909 float 0.606606 | floats -0.197805 0.606606
+# texto t=486333: breath rate = 18.000000 
+# texto t=486336: heart rate = 104.000000 
+# cambio t=486451 tipo=0A17 datos: B0 93 4B BE 36 2A 1B 3F | u32 3192624048 float 0.606113 | floats -0.198806 0.606113
+# texto t=486458: breath rate = 17.000000 
+# cambio t=486573 tipo=0A17 datos: D1 16 4C BE 0C 1A 1B 3F | u32 3192657617 float 0.605866 | floats -0.199306 0.605866
+# texto t=486580: breath rate = 16.000000 
+# cambio t=486696 tipo=0A17 datos: 62 58 4C BE F7 11 1B 3F | u32 3192674402 float 0.605743 | floats -0.199556 0.605743
+# texto t=486702: breath rate = 15.000000 
+# cambio t=486818 tipo=0A29 datos: 02 00
+# cambio t=486818 tipo=0A17 datos: AA 69 77 BE 85 44 19 3F | u32 3195496874 float 0.598702 | floats -0.241614 0.598702
+# texto t=486825: breath rate = 14.000000 
+# cambio t=486941 tipo=0A29 datos: 01 00
+# cambio t=486941 tipo=0A17 datos: F5 84 6B BE BA EA 1C 3F | u32 3194717429 float 0.612957 | floats -0.229999 0.612957
+# texto t=486949: breath rate = 15.000000 
+# texto t=486952: heart rate = 101.000000 
+# cambio t=487068 tipo=0A17 datos: 6B D8 5F BE CE EF 1E 3F | u32 3193952363 float 0.620847 | floats -0.218599 0.620847
+# texto t=487074: breath rate = 15.000000 
+# crudo/s seg=487 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=487191 tipo=0A17 datos: 8F 8D 59 BE 27 41 1E 3F | u32 3193539983 float 0.618182 | floats -0.212454 0.618182
+# texto t=487197: breath rate = 15.000000 
+# cambio t=487313 tipo=0A17 datos: CE 6E 4D BE D4 0A 18 3F | u32 3192745678 float 0.593915 | floats -0.200618 0.593915
+# texto t=487319: breath rate = 16.000000 
+# cambio t=487436 tipo=0A17 datos: 69 EC 41 BE 1A 1A 12 3F | u32 3191991401 float 0.570711 | floats -0.189378 0.570711
+# texto t=487442: breath rate = 16.000000 
+# cambio t=487558 tipo=0A17 datos: 48 0A 49 BE 73 CF 12 3F | u32 3192457800 float 0.573478 | floats -0.196328 0.573478
+# texto t=487566: breath rate = 16.000000 
+# texto t=487569: heart rate = 96.000000 
+# cambio t=487685 tipo=0A17 datos: B4 4C 5B BE 6E FD 15 3F | u32 3193654452 float 0.585898 | floats -0.21416 0.585898
+# texto t=487692: breath rate = 16.000000 
+# cambio t=487808 tipo=0A17 datos: D1 EB 5D BE 12 F4 15 3F | u32 3193826257 float 0.585755 | floats -0.21672 0.585755
+# texto t=487814: breath rate = 16.000000 
+# cambio t=487930 tipo=0A17 datos: C8 54 4C BE D6 47 13 3F | u32 3192673480 float 0.575315 | floats -0.199542 0.575315
+# texto t=487937: breath rate = 16.000000 
+# cambio t=488053 tipo=0A17 datos: 43 89 43 BE B8 F1 11 3F | u32 3192097091 float 0.570095 | floats -0.190953 0.570095
+# texto t=488059: breath rate = 16.000000 
+# crudo/s seg=488 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=488175 tipo=0A17 datos: 50 D0 3B BE D7 16 0F 3F | u32 3191590992 float 0.558942 | floats -0.183412 0.558942
+# texto t=488183: breath rate = 17.000000 
+# texto t=488186: heart rate = 96.000000 
+# cambio t=488302 tipo=0A29 datos: 02 00
+# cambio t=488302 tipo=0A17 datos: 3A 78 3B BE 5C E2 11 3F | u32 3191568442 float 0.56986 | floats -0.183076 0.56986
+# texto t=488308: breath rate = 17.000000 
+# cambio t=488425 tipo=0A29 datos: 01 00
+# cambio t=488425 tipo=0A17 datos: DC E1 31 BE 03 B2 20 3F | u32 3190940124 float 0.627716 | floats -0.173713 0.627716
+# texto t=488431: breath rate = 17.000000 
+# cambio t=488547 tipo=0A17 datos: CD C8 25 BE EA 8B 24 3F | u32 3190147277 float 0.64276 | floats -0.161899 0.64276
+# texto t=488554: breath rate = 17.000000 
+# cambio t=488670 tipo=0A17 datos: E4 D1 17 BE 7E 41 26 3F | u32 3189232100 float 0.649437 | floats -0.148262 0.649437
+# texto t=488676: breath rate = 17.000000 
+# cambio t=488792 tipo=0A17 datos: 70 D6 10 BE 48 1C 27 3F | u32 3188774512 float 0.652775 | floats -0.141443 0.652775
+# texto t=488800: breath rate = 17.000000 
+# texto t=488803: heart rate = 97.000000 
+# cambio t=488919 tipo=0A17 datos: FA ED 08 BE 7D 5E 27 3F | u32 3188256250 float 0.653786 | floats -0.13372 0.653786
+# texto t=488925: breath rate = 17.000000 
+# cambio t=489041 tipo=0A17 datos: 21 CA 07 BE 3C A9 25 3F | u32 3188181537 float 0.647114 | floats -0.132607 0.647114
+# texto t=489048: breath rate = 17.000000 
+# crudo/s seg=489 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=489164 tipo=0A17 datos: 70 94 13 BE 12 2B 20 3F | u32 3188954224 float 0.625657 | floats -0.144121 0.625657
+# texto t=489170: breath rate = 17.000000 
+# cambio t=489286 tipo=0A17 datos: 1C AA 21 BE 5B 41 1A 3F | u32 3189877276 float 0.60256 | floats -0.157875 0.60256
+# texto t=489293: breath rate = 17.000000 
+# cambio t=489409 tipo=0A17 datos: F2 B4 28 BE 80 4C 17 3F | u32 3190338802 float 0.591011 | floats -0.164753 0.591011
+# texto t=489417: breath rate = 17.000000 
+# texto t=489419: heart rate = 98.000000 
+# cambio t=489536 tipo=0A17 datos: F0 3E 1F BE 7A FF 17 3F | u32 3189718768 float 0.593742 | floats -0.155514 0.593742
+# texto t=489542: breath rate = 17.000000 
+# cambio t=489658 tipo=0A17 datos: 4E E6 17 BE A2 33 1B 3F | u32 3189237326 float 0.606257 | floats -0.148339 0.606257
+# texto t=489665: breath rate = 18.000000 
+# cambio t=489781 tipo=0A29 datos: 02 00
+# cambio t=489781 tipo=0A17 datos: AE 08 23 BE 6B F3 1C 3F | u32 3189967022 float 0.613089 | floats -0.159213 0.613089
+# texto t=489787: breath rate = 18.000000 
+# cambio t=489903 tipo=0A29 datos: 01 00
+# cambio t=489903 tipo=0A17 datos: 0D 2B 2E BE 34 B3 1E 3F | u32 3190696717 float 0.619922 | floats -0.170086 0.619922
+# texto t=489910: breath rate = 17.000000 
+# cambio t=490026 tipo=0A17 datos: E6 3E 40 BE 14 60 1F 3F | u32 3191881446 float 0.62256 | floats -0.18774 0.62256
+# texto t=490033: breath rate = 17.000000 
+# texto t=490036: heart rate = 101.000000 
+# crudo/s seg=490 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=490152 tipo=0A17 datos: D2 48 49 BE 84 B6 1F 3F | u32 3192473810 float 0.623879 | floats -0.196567 0.623879
+# texto t=490159: breath rate = 17.000000 
+# cambio t=490275 tipo=0A17 datos: C8 CD 4D BE BC E1 1F 3F | u32 3192769992 float 0.624538 | floats -0.20098 0.624538
+# texto t=490281: breath rate = 17.000000 
+# cambio t=490397 tipo=0A17 datos: 44 10 50 BE 58 F7 1F 3F | u32 3192918084 float 0.624868 | floats -0.203187 0.624868
+# texto t=490403: breath rate = 17.000000 
+# cambio t=490520 tipo=0A17 datos: 70 FB 55 BE C6 4E 20 3F | u32 3193305968 float 0.626202 | floats -0.208967 0.626202
+# texto t=490526: breath rate = 17.000000 
+# cambio t=490642 tipo=0A17 datos: 92 C6 4F BE 44 AB 1E 3F | u32 3192899218 float 0.619801 | floats -0.202906 0.619801
+# texto t=490650: breath rate = 17.000000 
+# texto t=490653: heart rate = 100.000000 
+# cambio t=490769 tipo=0A17 datos: 23 AC 4C BE 84 D9 1D 3F | u32 3192695843 float 0.6166 | floats -0.199875 0.6166
+# texto t=490775: breath rate = 16.000000 
+# cambio t=490891 tipo=0A17 datos: EC 1E 4B BE A4 70 1D 3F | u32 3192594156 float 0.615 | floats -0.19836 0.615
+# texto t=490897: breath rate = 16.000000 
+# cambio t=491013 tipo=0A17 datos: 50 58 4A BE 34 3C 1D 3F | u32 3192543312 float 0.6142 | floats -0.197603 0.6142
+# texto t=491020: breath rate = 16.000000 
+# crudo/s seg=491 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=491135 tipo=0A17 datos: 02 F5 49 BE FC 21 1D 3F | u32 3192517890 float 0.6138 | floats -0.197224 0.6138
+# texto t=491142: breath rate = 16.000000 
+# cambio t=491257 tipo=0A29 datos: 02 00
+# cambio t=491258 tipo=0A17 datos: 5B C3 49 BE E0 14 1D 3F | u32 3192505179 float 0.6136 | floats -0.197034 0.6136
+# texto t=491265: breath rate = 16.000000 
+# texto t=491268: heart rate = 97.000000 
+# cambio t=491384 tipo=0A29 datos: 01 00
+# cambio t=491384 tipo=0A17 datos: B4 91 49 BE C3 07 1D 3F | u32 3192492468 float 0.6134 | floats -0.196845 0.6134
+# texto t=491390: breath rate = 16.000000 
+# cambio t=491507 tipo=0A17 datos: 18 AD 34 BE CA 8F 1A 3F | u32 3191123224 float 0.603757 | floats -0.176442 0.603757
+# texto t=491513: breath rate = 16.000000 
+# cambio t=491629 tipo=0A17 datos: 58 CA 0D BE FB 30 1A 3F | u32 3188574808 float 0.60231 | floats -0.138467 0.60231
+# texto t=491636: breath rate = 16.000000 
+# cambio t=491752 tipo=0A17 datos: E0 04 A6 BD C2 DD 1C 3F | u32 3181774048 float 0.612759 | floats -0.081064 0.612759
+# texto t=491758: breath rate = 16.000000 
+# cambio t=491875 tipo=0A17 datos: 58 05 83 BD DA B3 1D 3F | u32 3179480408 float 0.616026 | floats -0.063975 0.616026
+# texto t=491882: breath rate = 16.000000 
+# texto t=491885: heart rate = 96.000000 
+# cambio t=492001 tipo=0A17 datos: 30 93 91 BD 44 76 1D 3F | u32 3180434224 float 0.615086 | floats -0.0710815 0.615086
+# texto t=492008: breath rate = 15.000000 
+# cambio t=492124 tipo=0A17 datos: FD EC A7 BD 3E 73 1D 3F | u32 3181899005 float 0.61504 | floats -0.081995 0.61504
+# crudo/s seg=492 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:10 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# texto t=492130: breath rate = 15.000000 
+# cambio t=492247 tipo=0A17 datos: 80 C0 A9 BD 5B 6C 1F 3F | u32 3182018688 float 0.622747 | floats -0.0828867 0.622747
+# texto t=492253: breath rate = 16.000000 
+# cambio t=492369 tipo=0A17 datos: C3 D0 A1 BD 02 64 21 3F | u32 3181498563 float 0.630432 | floats -0.0790115 0.630432
+# texto t=492376: breath rate = 16.000000 
+# cambio t=492492 tipo=0A17 datos: E4 D8 9D BD D5 5F 22 3F | u32 3181238500 float 0.634275 | floats -0.0770738 0.634275
+# texto t=492499: breath rate = 16.000000 
+# texto t=492502: heart rate = 95.000000 
+# cambio t=492618 tipo=0A17 datos: F5 DC 9B BD BE DD 22 3F | u32 3181108469 float 0.636196 | floats -0.076105 0.636196
+# texto t=492624: breath rate = 16.000000 
+# cambio t=492740 tipo=0A29 datos: 02 00
+# cambio t=492740 tipo=0A17 datos: FE DE 9A BD B3 1C 23 3F | u32 3181043454 float 0.637157 | floats -0.0756206 0.637157
+# texto t=492746: breath rate = 16.000000 
+# cambio t=492862 tipo=0A29 datos: 01 00
+# cambio t=492862 tipo=0A17 datos: 06 E1 99 BD A8 5B 23 3F | u32 3180978438 float 0.638117 | floats -0.0751362 0.638117
+# texto t=492869: breath rate = 16.000000 
+# texto t=492991: breath rate = 16.000000 
+# texto t=493115: breath rate = 17.000000 
+# texto t=493117: heart rate = 93.000000 
+# crudo/s seg=493 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:11 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=493240: breath rate = 17.000000 
+# texto t=493362: breath rate = 17.000000 
+# texto t=493484: breath rate = 17.000000 
+# texto t=493606: breath rate = 17.000000 
+# texto t=493730: breath rate = 17.000000 
+# texto t=493733: heart rate = 93.000000 
+# texto t=493855: breath rate = 17.000000 
+# texto t=493977: breath rate = 17.000000 
+# texto t=494099: breath rate = 16.000000 
+# crudo/s seg=494 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=494215 tipo=0A29 datos: 02 00
+# texto t=494221: breath rate = 16.000000 
+# cambio t=494337 tipo=0A29 datos: 01 00
+# texto t=494345: breath rate = 15.000000 
+# texto t=494348: heart rate = 93.000000 
+# texto t=494470: breath rate = 14.000000 
+# texto t=494592: breath rate = 13.000000 
+# cambio t=494709 tipo=0A17 datos: 26 03 91 BD 5C 77 21 3F | u32 3180397350 float 0.630728 | floats -0.0708068 0.630728
+# texto t=494715: breath rate = 14.000000 
+# cambio t=494831 tipo=0A17 datos: 36 94 8C BD 36 85 20 3F | u32 3180106806 float 0.627033 | floats -0.0686421 0.627033
+# texto t=494837: breath rate = 14.000000 
+# cambio t=494954 tipo=0A17 datos: 29 B6 72 BD BD 8A 1C 3F | u32 3178411561 float 0.611492 | floats -0.0592558 0.611492
+# texto t=494961: breath rate = 14.000000 
+# texto t=494964: heart rate = 90.000000 
+# cambio t=495080 tipo=0A17 datos: D6 BF 63 BD E0 A9 1A 3F | u32 3177430998 float 0.604155 | floats -0.0556029 0.604155
+# texto t=495087: breath rate = 14.000000 
+# crudo/s seg=495 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=495203 tipo=0A17 datos: 2F 5C 8B BD A0 E0 1A 3F | u32 3180026927 float 0.60499 | floats -0.0680469 0.60499
+# texto t=495209: breath rate = 15.000000 
+# cambio t=495326 tipo=0A17 datos: 4E 80 AE BD E4 ED 1C 3F | u32 3182329934 float 0.613005 | floats -0.0852057 0.613005
+# texto t=495332: breath rate = 15.000000 
+# cambio t=495448 tipo=0A17 datos: 7F 05 CB BD BC 58 1E 3F | u32 3184199039 float 0.618541 | floats -0.0991316 0.618541
+# texto t=495455: breath rate = 15.000000 
+# cambio t=495571 tipo=0A17 datos: 82 AF E9 BD 27 F3 1D 3F | u32 3186208642 float 0.616991 | floats -0.114104 0.616991
+# texto t=495579: breath rate = 15.000000 
+# texto t=495582: heart rate = 88.000000 
+# cambio t=495698 tipo=0A29 datos: 02 00
+# cambio t=495698 tipo=0A17 datos: B2 21 08 BE E1 EF 1C 3F | u32 3188203954 float 0.613035 | floats -0.132941 0.613035
+# texto t=495704: breath rate = 15.000000 
+# cambio t=495820 tipo=0A29 datos: 01 00
+# cambio t=495821 tipo=0A17 datos: A4 6B 1B BE 9B EC 1B 3F | u32 3189468068 float 0.609079 | floats -0.151778 0.609079
+# texto t=495827: breath rate = 15.000000 
+# texto t=495949: breath rate = 16.000000 
+# cambio t=496066 tipo=0A17 datos: 23 8C 2D BE EC AC 1B 3F | u32 3190656035 float 0.608107 | floats -0.16948 0.608107
+# texto t=496072: breath rate = 16.000000 
+# crudo/s seg=496 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=496188 tipo=0A17 datos: 62 9C 36 BE 14 8D 1B 3F | u32 3191250018 float 0.607621 | floats -0.178331 0.607621
+# texto t=496196: breath rate = 16.000000 
+# texto t=496199: heart rate = 84.000000 
+# cambio t=496315 tipo=0A17 datos: 82 24 3B BE 28 7D 1B 3F | u32 3191547010 float 0.607378 | floats -0.182756 0.607378
+# texto t=496321: breath rate = 16.000000 
+# cambio t=496438 tipo=0A17 datos: FC 24 33 BE 12 1D 1C 3F | u32 3191022844 float 0.609819 | floats -0.174946 0.609819
+# texto t=496444: breath rate = 16.000000 
+# cambio t=496561 tipo=0A17 datos: 3A 25 2F BE 08 6D 1C 3F | u32 3190760762 float 0.611039 | floats -0.17104 0.611039
+# texto t=496567: breath rate = 16.000000 
+# cambio t=496683 tipo=0A17 datos: 58 25 2D BE 02 95 1C 3F | u32 3190629720 float 0.611649 | floats -0.169088 0.611649
+# texto t=496690: breath rate = 17.000000 
+# cambio t=496806 tipo=0A17 datos: E6 01 0B BE 01 D4 1E 3F | u32 3188392422 float 0.620422 | floats -0.135749 0.620422
+# texto t=496814: breath rate = 17.000000 
+# texto t=496817: heart rate = 81.000000 
+# cambio t=496933 tipo=0A17 datos: 59 D2 F5 BD 4A 1E 21 3F | u32 3187003993 float 0.629368 | floats -0.12003 0.629368
+# texto t=496939: breath rate = 17.000000 
+# cambio t=497055 tipo=0A17 datos: 99 3A 2D BE B8 E4 20 3F | u32 3190635161 float 0.62849 | floats -0.169169 0.62849
+# texto t=497062: breath rate = 18.000000 
+# crudo/s seg=497 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=497178 tipo=0A29 datos: 02 00
+# cambio t=497178 tipo=0A17 datos: 24 BD 45 BE B8 2D 21 3F | u32 3192241444 float 0.629604 | floats -0.193104 0.629604
+# texto t=497184: breath rate = 18.000000 
+# cambio t=497301 tipo=0A29 datos: 01 00
+# cambio t=497301 tipo=0A17 datos: 58 CC 44 BE 6E 12 1C 3F | u32 3192179800 float 0.609656 | floats -0.192186 0.609656
+# texto t=497307: breath rate = 18.000000 
+# texto t=497431: breath rate = 18.000000 
+# texto t=497434: heart rate = 79.000000 
+# cambio t=497551 tipo=0A17 datos: 82 BA 25 BE EB 72 1C 3F | u32 3190143618 float 0.611129 | floats -0.161844 0.611129
+# texto t=497557: breath rate = 19.000000 
+# texto t=497680: breath rate = 19.000000 
+# texto t=497803: breath rate = 19.000000 
+# texto t=497925: breath rate = 19.000000 
+# texto t=498049: breath rate = 19.000000 
+# texto t=498052: heart rate = 76.000000 
+# crudo/s seg=498 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# (46 ms desde la trama de fase anterior)
+# fase_total_cero t=498171 tipo=0A13 largo=12 hex: 01 1B A8 00 0C 0A 13 58 00 00 00 00 C0 1A 77 3D 5C 08 B3 BB 33
+#   floats LE (memcpy | manual): 0|0 0.0603282452|0.0603282452 -0.005463643|-0.005463643
+#   u32 LE: 0 1031215808 3149072476
+# texto t=498174: breath rate = 19.000000 
+# texto t=498297: breath rate = 19.000000 
+# texto t=498420: breath rate = 19.000000 
+# texto t=498542: breath rate = 19.000000 
+# cambio t=498658 tipo=0A29 datos: 02 00
+# texto t=498666: breath rate = 19.000000 
+# texto t=498669: heart rate = 74.000000 
+# cambio t=498785 tipo=0A29 datos: 01 00
+# texto t=498792: breath rate = 19.000000 
+# texto t=498914: breath rate = 19.000000 
+# texto t=499037: breath rate = 19.000000 
+# crudo/s seg=499 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=499160: breath rate = 19.000000 
+# texto t=499284: breath rate = 19.000000 
+# texto t=499286: heart rate = 74.000000 
+# texto t=499409: breath rate = 19.000000 
+# texto t=499532: breath rate = 19.000000 
+# texto t=499655: breath rate = 19.000000 
+# (47 ms desde la trama de fase anterior)
+# fase_total_cero t=499774 tipo=0A13 largo=12 hex: 01 1C 21 00 0C 0A 13 D6 00 00 00 00 D9 5B 1C BE AE 17 82 3E DA
+#   floats LE (memcpy | manual): 0|0 -0.152694121|-0.152694121 0.254086912|0.254086912
+#   u32 LE: 0 3189529561 1048713134
+# texto t=499777: breath rate = 19.000000 
+# texto t=499902: breath rate = 19.000000 
+# texto t=499904: heart rate = 75.000000 
+# texto t=500027: breath rate = 19.000000 
+# crudo/s seg=500 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=500143 tipo=0A29 datos: 02 00
+# texto t=500149: breath rate = 19.000000 
+# cambio t=500265 tipo=0A29 datos: 01 00
+# texto t=500272: breath rate = 19.000000 
+# texto t=500394: breath rate = 19.000000 
+# texto t=500518: breath rate = 19.000000 
+# texto t=500521: heart rate = 76.000000 
+# texto t=500643: breath rate = 19.000000 
+# texto t=500765: breath rate = 19.000000 
+# texto t=500888: breath rate = 19.000000 
+# texto t=501011: breath rate = 19.000000 
+# crudo/s seg=501 estado0A29=1 presencia0F09=1 0F09:9 0A13:16 0A14:8 0100:9 0A04:9 0A29:9 0A17:9 0A16:9 0A15:1
+# texto t=501134: breath rate = 19.000000 
+# texto t=501137: heart rate = 79.000000 
+# texto t=501260: breath rate = 19.000000 
+# texto t=501382: breath rate = 19.000000 
+# texto t=501505: breath rate = 19.000000 
+# cambio t=501620 tipo=0A29 datos: 02 00
+# texto t=501627: breath rate = 19.000000 
+# cambio t=501743 tipo=0A29 datos: 01 00
+# texto t=501751: breath rate = 19.000000 
+# texto t=501753: heart rate = 81.000000 
+# texto t=501876: breath rate = 18.000000 
+# texto t=501998: breath rate = 18.000000 
+# texto t=502121: breath rate = 18.000000 
+# crudo/s seg=502 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:9 0100:11 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=502244: breath rate = 18.000000 
+# texto t=502367: breath rate = 18.000000 
+# texto t=502370: heart rate = 82.000000 
+# texto t=502492: breath rate = 17.000000 
+# texto t=502615: breath rate = 17.000000 
+# texto t=502737: breath rate = 17.000000 
+# texto t=502860: breath rate = 17.000000 
+# texto t=502984: breath rate = 17.000000 
+# texto t=502987: heart rate = 84.000000 
+# cambio t=503103 tipo=0A29 datos: 02 00
+# texto t=503109: breath rate = 17.000000 
+# crudo/s seg=503 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=503225 tipo=0A29 datos: 01 00
+# texto t=503232: breath rate = 16.000000 
+# texto t=503354: breath rate = 16.000000 
+# texto t=503477: breath rate = 16.000000 
+# texto t=503601: breath rate = 16.000000 
+# texto t=503604: heart rate = 86.000000 
+# texto t=503726: breath rate = 16.000000 
+# texto t=503848: breath rate = 16.000000 
+# texto t=503973: breath rate = 16.000000 
+# texto t=504096: breath rate = 16.000000 
+# crudo/s seg=504 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=504221: breath rate = 16.000000 
+# texto t=504224: heart rate = 88.000000 
+# texto t=504347: breath rate = 16.000000 
+# texto t=504471: breath rate = 16.000000 
+# cambio t=504588 tipo=0A29 datos: 02 00
+# texto t=504594: breath rate = 15.000000 
+# cambio t=504710 tipo=0A29 datos: 01 00
+# texto t=504717: breath rate = 16.000000 
+# texto t=504842: breath rate = 16.000000 
+# texto t=504844: heart rate = 91.000000 
+# texto t=504967: breath rate = 16.000000 
+# texto t=505090: breath rate = 17.000000 
+# crudo/s seg=505 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=505213: breath rate = 18.000000 
+# texto t=505336: breath rate = 18.000000 
+# texto t=505460: breath rate = 19.000000 
+# texto t=505463: heart rate = 94.000000 
+# texto t=505585: breath rate = 20.000000 
+# texto t=505708: breath rate = 20.000000 
+# texto t=505830: breath rate = 19.000000 
+# texto t=505952: breath rate = 18.000000 
+# cambio t=506068 tipo=0A29 datos: 02 00
+# texto t=506076: breath rate = 17.000000 
+# texto t=506079: heart rate = 94.000000 
+# crudo/s seg=506 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=506194 tipo=0A29 datos: 01 00
+# texto t=506201: breath rate = 17.000000 
+# texto t=506323: breath rate = 16.000000 
+# texto t=506445: breath rate = 15.000000 
+# texto t=506567: breath rate = 14.000000 
+# texto t=506690: breath rate = 14.000000 
+# texto t=506693: heart rate = 94.000000 
+# texto t=506815: breath rate = 14.000000 
+# texto t=506937: breath rate = 14.000000 
+# texto t=507059: breath rate = 14.000000 
+# crudo/s seg=507 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=507181: breath rate = 14.000000 
+# texto t=507305: breath rate = 15.000000 
+# texto t=507307: heart rate = 92.000000 
+# texto t=507430: breath rate = 15.000000 
+# cambio t=507545 tipo=0A29 datos: 02 00
+# texto t=507552: breath rate = 15.000000 
+# cambio t=507667 tipo=0A29 datos: 01 00
+# texto t=507674: breath rate = 15.000000 
+# texto t=507796: breath rate = 15.000000 
+# texto t=507919: breath rate = 16.000000 
+# texto t=507922: heart rate = 89.000000 
+# texto t=508044: breath rate = 16.000000 
+# crudo/s seg=508 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=508166: breath rate = 16.000000 
+# texto t=508289: breath rate = 17.000000 
+# texto t=508411: breath rate = 17.000000 
+# texto t=508534: breath rate = 17.000000 
+# texto t=508537: heart rate = 86.000000 
+# texto t=508659: breath rate = 18.000000 
+# texto t=508781: breath rate = 18.000000 
+# texto t=508904: breath rate = 18.000000 
+# cambio t=509019 tipo=0A29 datos: 02 00
+# texto t=509026: breath rate = 19.000000 
+# crudo/s seg=509 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=509142 tipo=0A29 datos: 01 00
+# texto t=509149: breath rate = 19.000000 
+# texto t=509152: heart rate = 83.000000 
+# texto t=509275: breath rate = 19.000000 
+# texto t=509397: breath rate = 19.000000 
+# texto t=509520: breath rate = 19.000000 
+# texto t=509643: breath rate = 20.000000 
+# texto t=509767: breath rate = 20.000000 
+# texto t=509770: heart rate = 80.000000 
+# texto t=509893: breath rate = 20.000000 
+# texto t=510015: breath rate = 20.000000 
+# crudo/s seg=510 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=510138: breath rate = 20.000000 
+# texto t=510262: breath rate = 20.000000 
+# texto t=510387: breath rate = 21.000000 
+# texto t=510390: heart rate = 77.000000 
+# cambio t=510507 tipo=0A29 datos: 02 00
+# texto t=510513: breath rate = 21.000000 
+# cambio t=510629 tipo=0A29 datos: 01 00
+# texto t=510636: breath rate = 21.000000 
+# texto t=510761: breath rate = 21.000000 
+# texto t=510884: breath rate = 21.000000 
+# (45 ms desde la trama de fase anterior)
+# fase_total_cero t=511003 tipo=0A13 largo=12 hex: 01 1F 78 00 0C 0A 13 8C 00 00 00 00 00 C2 64 BB 5A 20 77 BD 52
+#   floats LE (memcpy | manual): 0|0 -0.00349056721|-0.00349056721 -0.0603335872|-0.0603335872
+#   u32 LE: 0 3143942656 3178700890
+# texto t=511008: breath rate = 21.000000 
+# texto t=511011: heart rate = 74.000000 
+# crudo/s seg=511 estado0A29=1 presencia0F09=1 0F09:9 0A13:16 0A14:8 0100:10 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# texto t=511135: breath rate = 21.000000 
+# texto t=511259: breath rate = 21.000000 
+# texto t=511382: breath rate = 21.000000 
+# texto t=511505: breath rate = 21.000000 
+# texto t=511629: breath rate = 21.000000 
+# texto t=511632: heart rate = 72.000000 
+# texto t=511755: breath rate = 21.000000 
+# texto t=511878: breath rate = 22.000000 
+# cambio t=511994 tipo=0A29 datos: 02 00
+# texto t=512001: breath rate = 22.000000 
+# cambio t=512117 tipo=0A29 datos: 01 00
+# texto t=512124: breath rate = 22.000000 
+# crudo/s seg=512 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:9 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=512248: breath rate = 22.000000 
+# texto t=512251: heart rate = 71.000000 
+# texto t=512374: breath rate = 22.000000 
+# (45 ms desde la trama de fase anterior)
+# fase_total_cero t=512492 tipo=0A13 largo=12 hex: 01 1F EA 00 0C 0A 13 1E 00 00 00 00 CA 94 B8 3C 20 65 22 BE FC
+#   floats LE (memcpy | manual): 0|0 0.0225318857|0.0225318857 -0.158588886|-0.158588886
+#   u32 LE: 0 1018729674 3189925152
+# texto t=512496: breath rate = 22.000000 
+# texto t=512619: breath rate = 22.000000 
+# texto t=512741: breath rate = 22.000000 
+# texto t=512865: breath rate = 22.000000 
+# texto t=512867: heart rate = 69.000000 
+# texto t=512990: breath rate = 22.000000 
+# texto t=513112: breath rate = 22.000000 
+# crudo/s seg=513 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=513234: breath rate = 22.000000 
+# texto t=513357: breath rate = 22.000000 
+# cambio t=513473 tipo=0A29 datos: 02 00
+# texto t=513480: breath rate = 22.000000 
+# texto t=513483: heart rate = 67.000000 
+# cambio t=513599 tipo=0A29 datos: 01 00
+# texto t=513606: breath rate = 23.000000 
+# texto t=513729: breath rate = 23.000000 
+# texto t=513851: breath rate = 23.000000 
+# texto t=513974: breath rate = 23.000000 
+# texto t=514098: breath rate = 23.000000 
+# texto t=514101: heart rate = 68.000000 
+# crudo/s seg=514 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# texto t=514223: breath rate = 23.000000 
+# texto t=514346: breath rate = 23.000000 
+# texto t=514468: breath rate = 22.000000 
+# texto t=514591: breath rate = 22.000000 
+# texto t=514714: breath rate = 22.000000 
+# texto t=514717: heart rate = 72.000000 
+# texto t=514840: breath rate = 23.000000 
+# cambio t=514956 tipo=0A29 datos: 02 00
+# texto t=514962: breath rate = 23.000000 
+# cambio t=515078 tipo=0A29 datos: 01 00
+# texto t=515085: breath rate = 23.000000 
+# crudo/s seg=515 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# texto t=515207: breath rate = 23.000000 
+# crudo/s seg=516 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=516432 tipo=0A29 datos: 02 00
+# cambio t=516554 tipo=0A29 datos: 01 00
+# crudo/s seg=517 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=517913 tipo=0A29 datos: 02 00
+# cambio t=518036 tipo=0A29 datos: 01 00
+# crudo/s seg=518 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=519 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=519396 tipo=0A29 datos: 02 00
+# cambio t=519518 tipo=0A29 datos: 01 00
+# (47 ms desde la trama de fase anterior)
+# fase_total_cero t=519522 tipo=0A13 largo=12 hex: 01 22 01 00 0C 0A 13 C8 00 00 00 00 38 83 31 3E 56 65 E6 3E A0
+#   floats LE (memcpy | manual): 0|0 0.173352122|0.173352122 0.449991882|0.449991882
+#   u32 LE: 0 1043432248 1055286614
+# crudo/s seg=520 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# (46 ms desde la trama de fase anterior)
+# fase_total_cero t=520137 tipo=0A13 largo=12 hex: 01 22 30 00 0C 0A 13 F9 00 00 00 00 66 2D 6D 3E 08 A4 CC BD 3A
+#   floats LE (memcpy | manual): 0|0 0.231618494|0.231618494 -0.0999222398|-0.0999222398
+#   u32 LE: 0 1047342438 3184305160
+# cambio t=520873 tipo=0A29 datos: 02 00
+# cambio t=520999 tipo=0A29 datos: 01 00
+# crudo/s seg=521 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# crudo/s seg=522 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=522479 tipo=0A29 datos: 02 00
+# cambio t=522602 tipo=0A29 datos: 01 00
+# crudo/s seg=523 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=523958 tipo=0A29 datos: 02 00
+# cambio t=524085 tipo=0A29 datos: 01 00
+# crudo/s seg=524 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=525 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=525441 tipo=0A29 datos: 02 00
+# cambio t=525563 tipo=0A29 datos: 01 00
+# crudo/s seg=526 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=526918 tipo=0A29 datos: 02 00
+# cambio t=527041 tipo=0A29 datos: 01 00
+# crudo/s seg=527 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=528 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=528404 tipo=0A29 datos: 02 00
+# cambio t=528526 tipo=0A29 datos: 01 00
+# crudo/s seg=529 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=529882 tipo=0A29 datos: 02 00
+# (46 ms desde la trama de fase anterior)
+# fase_total_grande t=529885 tipo=0A13 largo=12 hex: 01 25 17 00 0C 0A 13 D9 80 C6 00 C0 E0 B5 DA 3D 40 03 80 BD B5
+#   floats LE (memcpy | manual): -2.01211548|-2.01211548 0.106792212|0.106792212 -0.0625061989|-0.0625061989
+#   u32 LE: 3221276288 1037743584 3179283264
+# cambio t=530004 tipo=0A29 datos: 01 00
+# crudo/s seg=530 estado0A29=1 presencia0F09=1 0F09:9 0A13:16 0A14:8 0100:9 0A04:9 0A29:9 0A17:9 0A16:9 0A15:1
+# crudo/s seg=531 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:9 0100:11 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=531361 tipo=0A29 datos: 02 00
+# cambio t=531488 tipo=0A29 datos: 01 00
+# (82 ms desde la trama de fase anterior)
+# fase_total_grande t=532064 tipo=0A13 largo=12 hex: 01 25 BB 00 0C 0A 13 75 00 23 0C 40 30 70 D3 3D 21 10 62 3E 53
+#   floats LE (memcpy | manual): 2.18963623|2.18963623 0.103241324|0.103241324 0.220764652|0.220764652
+#   u32 LE: 1074537216 1037266992 1046614049
+# (46 ms desde la trama de fase anterior)
+# fase_total_grande t=532110 tipo=0A13 largo=12 hex: 01 25 C1 00 0C 0A 13 0F 00 4A 0F 40 68 CB 1E 3E 22 5F B6 3E 8C
+#   floats LE (memcpy | manual): 2.2388916|2.2388916 0.155072808|0.155072808 0.356194556|0.356194556
+#   u32 LE: 1074743808 1042205544 1052139298
+# crudo/s seg=532 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# (46 ms desde la trama de fase anterior)
+# fase_total_grande t=532233 tipo=0A13 largo=12 hex: 01 25 CA 00 0C 0A 13 04 80 15 06 40 2A C5 84 3E 4E 59 B6 3E E6
+#   floats LE (memcpy | manual): 2.09506226|2.09506226 0.259316742|0.259316742 0.356150091|0.356150091
+#   u32 LE: 1074140544 1048888618 1052137806
+# cambio t=532844 tipo=0A29 datos: 02 00
+# cambio t=532966 tipo=0A29 datos: 01 00
+# crudo/s seg=533 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=534 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=534324 tipo=0A29 datos: 02 00
+# cambio t=534446 tipo=0A29 datos: 01 00
+# crudo/s seg=535 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=535805 tipo=0A29 datos: 02 00
+# cambio t=535927 tipo=0A29 datos: 01 00
+# crudo/s seg=536 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=537 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=537282 tipo=0A29 datos: 02 00
+# cambio t=537404 tipo=0A29 datos: 01 00
+# crudo/s seg=538 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=538759 tipo=0A29 datos: 02 00
+# cambio t=538885 tipo=0A29 datos: 01 00
+# crudo/s seg=539 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=540 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# cambio t=540242 tipo=0A29 datos: 02 00
+# cambio t=540365 tipo=0A29 datos: 01 00
+# crudo/s seg=541 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=541721 tipo=0A29 datos: 02 00
+# cambio t=541844 tipo=0A29 datos: 01 00
+# crudo/s seg=542 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=543 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=543201 tipo=0A29 datos: 02 00
+# cambio t=543324 tipo=0A29 datos: 01 00
+# crudo/s seg=544 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=544673 tipo=0A29 datos: 02 00
+# cambio t=544795 tipo=0A29 datos: 01 00
+# crudo/s seg=545 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=546 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=546147 tipo=0A29 datos: 02 00
+# cambio t=546273 tipo=0A29 datos: 01 00
+# crudo/s seg=547 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=547627 tipo=0A29 datos: 02 00
+# cambio t=547749 tipo=0A29 datos: 01 00
+# crudo/s seg=548 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# (45 ms desde la trama de fase anterior)
+# fase_total_cero t=548612 tipo=0A13 largo=12 hex: 01 2A AB 00 0C 0A 13 6A 00 00 00 00 F4 9C 96 3D 02 BB 67 BD 5F
+#   floats LE (memcpy | manual): 0|0 0.0735415518|0.0735415518 -0.0565748289|-0.0565748289
+#   u32 LE: 0 1033280756 3177691906
+# cambio t=549103 tipo=0A29 datos: 02 00
+# crudo/s seg=549 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=549225 tipo=0A29 datos: 01 00
+# (49 ms desde la trama de fase anterior)
+# fase_total_cero t=549602 tipo=0A13 largo=12 hex: 01 2A F7 00 0C 0A 13 36 00 00 00 00 AC 9A CF 3D 62 20 6E 3D 2A
+#   floats LE (memcpy | manual): 0|0 0.101369232|0.101369232 0.0581363514|0.0581363514
+#   u32 LE: 0 1037015724 1030627426
+# crudo/s seg=550 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=550582 tipo=0A29 datos: 02 00
+# cambio t=550705 tipo=0A29 datos: 01 00
+# crudo/s seg=551 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=552060 tipo=0A29 datos: 02 00
+# crudo/s seg=552 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=552182 tipo=0A29 datos: 01 00
+# crudo/s seg=553 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=553535 tipo=0A29 datos: 02 00
+# cambio t=553661 tipo=0A29 datos: 01 00
+# crudo/s seg=554 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=555013 tipo=0A29 datos: 02 00
+# crudo/s seg=555 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=555135 tipo=0A29 datos: 01 00
+# (76 ms desde la trama de fase anterior)
+# fase_total_cero t=555830 tipo=0A13 largo=12 hex: 01 2C D0 00 0C 0A 13 17 00 00 00 00 34 11 23 BD 94 86 11 BD FA
+#   floats LE (memcpy | manual): 0|0 -0.0398113281|-0.0398113281 -0.0355287343|-0.0355287343
+#   u32 LE: 0 3173191988 3172042388
+# crudo/s seg=556 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# cambio t=556488 tipo=0A29 datos: 02 00
+# cambio t=556611 tipo=0A29 datos: 01 00
+# crudo/s seg=557 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=557968 tipo=0A29 datos: 02 00
+# cambio t=558090 tipo=0A29 datos: 01 00
+# crudo/s seg=558 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=559 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=559443 tipo=0A29 datos: 02 00
+# cambio t=559565 tipo=0A29 datos: 01 00
+# crudo/s seg=560 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=560917 tipo=0A29 datos: 02 00
+# cambio t=561043 tipo=0A29 datos: 01 00
+# crudo/s seg=561 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=562010 tipo=0A29 datos: 02 00
+# crudo/s seg=562 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:2 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=562257 tipo=0A29 datos: 01 00
+# crudo/s seg=563 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:8 0A29:9 0A17:9 0A16:9 0A15:2
+# cambio t=563363 tipo=0A29 datos: 02 00
+# cambio t=563490 tipo=0A29 datos: 01 00
+# crudo/s seg=564 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=564844 tipo=0A29 datos: 02 00
+# cambio t=564967 tipo=0A29 datos: 01 00
+# crudo/s seg=565 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=566 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=566319 tipo=0A29 datos: 02 00
+# cambio t=566441 tipo=0A29 datos: 01 00
+# crudo/s seg=567 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:7 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=568 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:1 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=568382 tipo=0A29 datos: 02 00
+# cambio t=568868 tipo=0A29 datos: 01 00
+# crudo/s seg=569 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:3 0A29:9 0A17:9 0A16:9 0A15:2
+# cambio t=569606 tipo=0A29 datos: 02 00
+# cambio t=569728 tipo=0A29 datos: 01 00
+# (47 ms desde la trama de fase anterior)
+# fase_total_grande t=569732 tipo=0A13 largo=12 hex: 01 30 E6 00 0C 0A 13 3D 00 FC 38 C0 1A 44 F4 3E 50 19 33 BE AB
+#   floats LE (memcpy | manual): -2.89038086|-2.89038086 0.477082074|0.477082074 -0.174901247|-0.174901247
+#   u32 LE: 3224960000 1056195610 3191019856
+# crudo/s seg=570 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=571083 tipo=0A29 datos: 02 00
+# crudo/s seg=571 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=571205 tipo=0A29 datos: 01 00
+# crudo/s seg=572 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=572565 tipo=0A29 datos: 02 00
+# cambio t=572688 tipo=0A29 datos: 01 00
+# crudo/s seg=573 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=574041 tipo=0A29 datos: 02 00
+# crudo/s seg=574 estado0A29=2 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=574164 tipo=0A29 datos: 01 00
+# crudo/s seg=575 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=575518 tipo=0A29 datos: 02 00
+# cambio t=575644 tipo=0A29 datos: 01 00
+# crudo/s seg=576 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=576999 tipo=0A29 datos: 02 00
+# cambio t=577121 tipo=0A29 datos: 01 00
+# crudo/s seg=577 estado0A29=1 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:11 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# crudo/s seg=578 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=578970 tipo=0A29 datos: 02 00
+# cambio t=579092 tipo=0A29 datos: 01 00
+# crudo/s seg=579 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=580 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=580448 tipo=0A29 datos: 02 00
+# cambio t=580575 tipo=0A29 datos: 01 00
+# crudo/s seg=581 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=581930 tipo=0A29 datos: 02 00
+# cambio t=582053 tipo=0A29 datos: 01 00
+# crudo/s seg=582 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# (46 ms desde la trama de fase anterior)
+# fase_total_cero t=582179 tipo=0A13 largo=12 hex: 01 34 9B 00 0C 0A 13 44 00 00 00 00 68 AD D4 BD 5D BB 80 BD 88
+#   floats LE (memcpy | manual): 0|0 -0.103846371|-0.103846371 -0.0628573671|-0.0628573671
+#   u32 LE: 0 3184831848 3179330397
+# (46 ms desde la trama de fase anterior)
+# fase_total_cero t=582673 tipo=0A13 largo=12 hex: 01 34 C1 00 0C 0A 13 1E 00 00 00 00 40 0A 2D BD D8 E3 C9 BC 6B
+#   floats LE (memcpy | manual): 0|0 -0.0422461033|-0.0422461033 -0.0246447772|-0.0246447772
+#   u32 LE: 0 3173845568 3167347672
+# crudo/s seg=583 estado0A29=1 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# cambio t=583409 tipo=0A29 datos: 02 00
+# cambio t=583532 tipo=0A29 datos: 01 00
+# crudo/s seg=584 estado0A29=1 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# cambio t=584893 tipo=0A29 datos: 02 00
+# crudo/s seg=585 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=586 estado0A29=2 presencia0F09=1 0F09:9 0A13:16 0A14:8 0100:10 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# crudo/s seg=587 estado0A29=2 presencia0F09=1 0F09:8 0A13:17 0A14:9 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=588 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=589 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=590 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=591 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=592 estado0A29=2 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# (47 ms desde la trama de fase anterior)
+# fase_total_grande t=592421 tipo=0A13 largo=12 hex: 01 37 A8 00 0C 0A 13 74 00 97 41 C0 28 EF A5 3D 47 90 83 3D DF
+#   floats LE (memcpy | manual): -3.02484131|-3.02484131 0.0810225606|0.0810225606 0.0642400309|0.0642400309
+#   u32 LE: 3225523968 1034284840 1032032327
+# (46 ms desde la trama de fase anterior)
+# fase_total_grande t=592544 tipo=0A13 largo=12 hex: 01 37 B1 00 0C 0A 13 6D 00 88 45 C0 AC 7E 24 3D A9 11 0D 3E B2
+#   floats LE (memcpy | manual): -3.08642578|-3.08642578 0.0401598662|0.0401598662 0.137762681|0.137762681
+#   u32 LE: 3225782272 1025801900 1041043881
+# (77 ms desde la trama de fase anterior)
+# fase_total_grande t=592745 tipo=0A13 largo=12 hex: 01 37 BD 00 0C 0A 13 61 80 DD 10 40 9C E5 38 BD F4 F1 C9 BC 7E
+#   floats LE (memcpy | manual): 2.26351929|2.26351929 -0.0451408476|-0.0451408476 -0.0246515051|-0.0246515051
+#   u32 LE: 1074847104 3174622620 3167351284
+# (77 ms desde la trama de fase anterior)
+# fase_total_grande t=593119 tipo=0A13 largo=12 hex: 01 37 DA 00 0C 0A 13 06 00 A8 1A 40 84 86 87 BE 76 82 9A 3E 66
+#   floats LE (memcpy | manual): 2.41650391|2.41650391 -0.264698148|-0.264698148 0.301776588|0.301776588
+#   u32 LE: 1075488768 3196552836 1050313334
+# crudo/s seg=593 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# (47 ms desde la trama de fase anterior)
+# fase_total_grande t=593166 tipo=0A13 largo=12 hex: 01 37 E0 00 0C 0A 13 3C 80 1E 1E 40 7C 02 96 BE 49 D6 AD 3E 65
+#   floats LE (memcpy | manual): 2.47061157|2.47061157 -0.292987704|-0.292987704 0.339525491|0.339525491
+#   u32 LE: 1075715712 3197502076 1051579977
+# (77 ms desde la trama de fase anterior)
+# fase_total_grande t=593243 tipo=0A13 largo=12 hex: 01 37 E3 00 0C 0A 13 3F 00 6D 3F C0 D8 D6 A0 BE 20 A6 56 3E 93
+#   floats LE (memcpy | manual): -2.99102783|-2.99102783 -0.314139128|-0.314139128 0.209618092|0.209618092
+#   u32 LE: 3225382144 3198211800 1045866016
+# (46 ms desde la trama de fase anterior)
+# fase_total_grande t=593412 tipo=0A13 largo=12 hex: 01 37 F2 00 0C 0A 13 2E 00 22 42 C0 80 14 A4 BE C5 A8 EC BE EE
+#   floats LE (memcpy | manual): -3.0333252|-3.0333252 -0.320468903|-0.320468903 -0.462225109|-0.462225109
+#   u32 LE: 3225559552 3198424192 3203180741
+# crudo/s seg=594 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=595 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=596 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=597 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=598 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=599 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=600 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=601 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=602 estado0A29=2 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:9 0A04:9 0A29:9 0A17:9 0A16:9 0A15:1
+# crudo/s seg=603 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:11 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=604 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=605 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=606 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=607 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=608 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=609 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=610 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=611 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=612 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=613 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=614 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=615 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=616 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=617 estado0A29=2 presencia0F09=1 0F09:8 0A13:17 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=618 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=619 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=620 estado0A29=2 presencia0F09=1 0F09:9 0A13:17 0A14:9 0100:10 0A04:9 0A29:9 0A17:9 0A16:9 0A15:2
+# crudo/s seg=621 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# crudo/s seg=622 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:10 0A04:8 0A29:8 0A17:8 0A16:8 0A15:2
+# crudo/s seg=623 estado0A29=2 presencia0F09=1 0F09:8 0A13:16 0A14:8 0100:9 0A04:8 0A29:8 0A17:8 0A16:8 0A15:1
+# RESUMEN CRUDO
+#   tipo 0F09: 1216 tramas (8.11/s)
+#   tipo 0A13: 2431 tramas (16.21/s)
+#   tipo 0A14: 1216 tramas (8.11/s)
+#   tipo 0100: 1458 tramas (9.72/s)
+#   tipo 0A04: 1194 tramas (7.96/s)
+#   tipo 0A29: 1215 tramas (8.10/s)
+#   tipo 0A17: 1215 tramas (8.10/s)
+#   tipo 0A16: 1215 tramas (8.10/s)
+#   tipo 0A15: 242 tramas (1.61/s)
+#   errores checksum cabecera 0, datos 0, bytes descartados 2, max bytes en buffer 85
+#   tramas de fase: 2431, con fase_total en 0: 36, con |fase_total| > 2: 93
+# FIN DIAGNOSTICO
