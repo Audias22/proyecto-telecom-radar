@@ -118,7 +118,7 @@ repositorio.
   de `BOTON_REVISION_ATASCADO_S` (5 segundos por defecto) para comprobarlo de nuevo. En los wakes
   siguientes solo dedica `BOTON_REVISION_LECTURA_MS` (100 ms) a confirmar el nivel, en lugar de
   repetir la espera activa de 5 segundos.
-- El estado se conserva en RTC y `recuperandoBotonAtascado()` permite que el futuro flujo principal
+- El estado se conserva en RTC y `recuperandoBotonAtascado()` permite que el flujo principal
   omita radio, heartbeat y sonidos durante ese wake de recuperación. El indicador se acepta solo
   cuando la causa de wake es el timer; un reinicio por otra causa lo limpia como obsoleto.
 - Cuando se detecta la liberación, el wake activo en bajo se restaura automáticamente; no queda
@@ -126,11 +126,11 @@ repositorio.
   liberación seguida de una nueva pulsación: esa es la ventana máxima temporal sin detección. El
   valor deberá ajustarse con mediciones de consumo y pruebas de uso reales.
 - Cualquier error al limpiar o habilitar fuentes se informa por Serial, aplica una pausa de 1 s y
-  evita entrar en deep sleep con una configuración incompleta. El futuro flujo principal deberá
-  decidir si reintenta o adopta otro estado seguro cuando `dormir()` regrese.
+  evita entrar en deep sleep con una configuración incompleta. Cuando `dormir()` regresa, `loop()`
+  reintenta solo la suspensión, sin retransmitir ni volver a sonar (ver Ciclo principal integrado).
 - El buzzer activo de GPIO10 se maneja directamente en nivel alto. La confirmación dura 120 ms y
   el error son tres sonidos de 500 ms separados por 250 ms. El módulo no invoca estos sonidos al
-  dormir ni durante un heartbeat; deberán llamarse únicamente desde el futuro flujo de alerta.
+  dormir ni durante un heartbeat; `main.cpp` los llama únicamente al terminar una alerta.
 - Arduino ESP32 3.3.7 habilita por defecto resistencias internas adecuadas al modo de wake dentro
   de `esp_deep_sleep_start()`. Aun así, Espressif recomienda un pull-up externo para wake en nivel
   bajo; su valor y el consumo adicional deben validarse con el circuito real.
@@ -146,8 +146,9 @@ deep sleep, habrá que añadir una resistencia externa sin cambiar la lógica ac
 
 - `BATERIA_MODO_SIMULADO` está inicialmente en `1`. En este modo `leerMilivoltios()` devuelve
   exactamente `3900 mV`, escribe por Serial que el dato es simulado y no configura ni consulta el
-  ADC. `modoSimulado()` permite que la futura integración evite presentar ese valor como una
-  medición física.
+  ADC. `modoSimulado()` permite que `main.cpp` registre que ese valor no es una medición física.
+  El paquete no tiene un campo que indique simulación: la base recibe `3900 mV` como cualquier
+  otro valor.
 - Los `3900 mV` sirven únicamente para ejercitar el formato del paquete y la lógica. No demuestran
   que haya una batería conectada, no describen su carga y no deben almacenarse como telemetría
   física. Antes de probar el dispositivo real se debe cambiar `BATERIA_MODO_SIMULADO` a `0`.
@@ -197,9 +198,9 @@ encima del máximo esperado.
 
 Una lectura del pin que supere ese límite o una conversión imposible devuelve el centinela
 `BATERIA_LECTURA_INVALIDA_MV = 0`. Debido a que `PaqueteEspNow.bateria_mv` no tiene un estado de
-validez separado, si el futuro flujo transmite ese valor la base debe interpretarlo como lectura
-no disponible o fallo ADC, no como una medición física de `0 V`; además se marcará batería baja
-por seguridad. `lecturaValida()` permite distinguir el centinela antes de transmitir. Afirmar que
+validez separado, `main.cpp` lo transmite tal cual y lo registra por Serial; la base debe
+interpretarlo como lectura no disponible o fallo ADC, no como una medición física de `0 V`. El
+paquete lleva además `FLAG_BATERIA_BAJA` por seguridad. `lecturaValida()` permite distinguir el centinela antes de transmitir. Afirmar que
 un dato es físico requiere simultáneamente `!modoSimulado()` y `lecturaValida(valor)`.
 
 La calibración interna no corrige tolerancias del divisor, ruido de la placa, fugas por la alta
@@ -210,10 +211,56 @@ entre carga completa y descarga, repetir lecturas con y sin radio activo, verifi
 las resistencias reales y medir consumo en deep sleep. Solo esa curva permitirá confirmar o
 ajustar `BATERIA_BAJA_MV = 3500 mV`; hasta entonces el umbral sigue siendo una hipótesis de diseño.
 
+## Instalación y carga
+
+Requisitos e instalación de PlatformIO y pioarduino: README principal, sección "Cómo compilar el
+firmware". Desde la raíz del repositorio:
+
+```
+copy firmware\colgante\include\secrets.example.h firmware\colgante\include\secrets.h
+pio run -d firmware/colgante
+pio run -d firmware/colgante -t upload
+pio device monitor -d firmware/colgante
+```
+
+Mientras el colgante duerme, el puerto USB desaparece. Para cargar firmware, mantener BOOT
+presionado al conectar si el puerto no aparece.
+
+Después de cargar, el primer arranque no transmite (no viene de deep sleep): solo duerme. La
+primera ALERTA sale al presionar el botón con el equipo ya dormido, y el primer HEARTBEAT a los
+15 minutos.
+
 ## Configuración
 
-- `include/config.h`: versión y pines (propuestos, por confirmar).
-- `include/secrets.h`: MAC de la base e id del colgante. Copiar de `include/secrets.example.h`.
+`include/secrets.h` (ignorado por Git; copiar de `include/secrets.example.h`):
+
+| Valor | Uso |
+|---|---|
+| `BASE_MAC` | MAC de la base en modo STA, la que imprime la base por Serial al arrancar. Con la MAC en ceros el colgante no transmite y da el patrón de error en cada alerta. |
+| `COLGANTE_ID` | Id del colgante, 1-255, único si hay más de uno. La base identifica al colgante y filtra duplicados por este valor. |
+
+`include/config.h` (versionado). Valores que se deben revisar antes de usar el hardware real:
+
+| Valor | Actual | Para el dispositivo real |
+|---|---|---|
+| `BATERIA_MODO_SIMULADO` | `1` (envía 3900 mV fijos) | `0`, después de armar y medir el divisor |
+| `REGISTROS_SERIAL_HABILITADOS` | `1` (espera hasta 2 s el USB) | `0` en operación normal, para reducir tiempo despierto y consumo |
+| `PIN_BOTON`, `PIN_BATERIA_ADC`, `PIN_BUZZER` | GPIO3, GPIO1, GPIO10 | Confirmar con el circuito armado |
+
+Las constantes del enlace (canal, tiempos, reintentos, heartbeat, umbral de batería) están en
+`firmware/comun/protocolo/protocolo.h` y se comparten con la base.
+
+## Conexiones propuestas
+
+Pendientes de confirmar con el circuito armado. Ningún cableado se ha probado todavía.
+
+| Elemento | Conexión | Notas |
+|---|---|---|
+| Pulsador | GPIO3 ↔ GND | Activo en bajo con `INPUT_PULLUP`. GPIO0-GPIO5 son los únicos que despiertan de deep sleep; se evita GPIO2 (strapping). Puede necesitar pull-up externo. |
+| Buzzer activo | `+` a GPIO10, `-` a GND | Activo en nivel alto, manejado directo desde el pin. Medir su corriente: si supera lo que el GPIO puede entregar con seguridad, se necesita un transistor. |
+| Divisor de batería | `OUT+` — 1 MΩ — GPIO1 — 470 kΩ — GND, con 10 nF de GPIO1 a GND | Ver "Circuito propuesto" arriba. Nunca la batería directa a GPIO1. |
+| Batería Li-ion 240 mAh | Soldada a los pads `BAT+` / `BAT-` del TP4056 | Respetar polaridad. Antes, cambiar R3 por 4.7 kΩ. |
+| Alimentación del ESP32-C3 | Desde `OUT+` / `OUT-` del TP4056 | Por definir a qué pin de la Super Mini (5V o 3V3) y con qué regulación. No está decidido en el repositorio. |
 
 ## Hardware
 
@@ -225,5 +272,83 @@ ajustar `BATERIA_BAJA_MV = 3500 mV`; hasta entonces el umbral sigue siendo una h
   la batería de 240 mAh (ver nota técnica en el README principal).
 - Por confirmar con el módulo: consumo real en deep sleep de la placa completa (LED de encendido,
   regulador, divisor de batería). Define la duración de la batería.
-- Mientras el colgante duerme, el puerto USB desaparece. Para cargar firmware, mantener BOOT
-  presionado al conectar si el puerto no aparece.
+
+## Estado del desarrollo
+
+Rama `colgante/firmware`. Firmware completo en software; nada validado todavía en hardware.
+
+| Commit | Contenido |
+|---|---|
+| `b5bb5f9` | Botón de emergencia: pull-up, antirrebote, causa del despertar, espera limitada de liberación |
+| `8fdf77e` | Energía: deep sleep con wake por GPIO3 y timer, recuperación de botón atascado, buzzer |
+| `afa76e9` | ESP-NOW: envío unicast, ACK de aplicación, reintentos, barrido 1-13, canal y secuencia en RTC |
+| `44054d4` | Batería: modo simulado y lectura ADC preparada con divisor |
+| `5d15ab4` | Flujo principal: ALERTA / HEARTBEAT / ninguna, sonidos solo en alerta, reintento seguro de la suspensión |
+| `a4102da` | Pruebas host y decisión de despertar aislada en `src/despertar.h` |
+
+## Pruebas
+
+Las pruebas automatizadas están en `pruebas_host/` (casos, limitaciones y comandos en su README).
+Prueban la lógica pura en un PC, sin ESP32-C3 ni base.
+
+| Verificación | Resultado registrado (9 de octubre de 2026) |
+|---|---|
+| Pruebas host en Windows (zig c++ 0.13.0) | 35 casos y 538 verificaciones aprobados |
+| Pruebas host en Linux (g++ 11.4) | 35 casos y 538 verificaciones aprobados |
+| `pio run -e colgante` (PlatformIO 6.1.19, arduino-esp32 3.3.7) | Compila sin advertencias del proyecto. RAM 10.8 %, Flash 71.7 % |
+
+Que compile y pase las pruebas host no demuestra que el colgante funcione: no se ha probado radio,
+alcance, ACK de una base real, deep sleep, botón, buzzer, ADC, batería ni consumo. La lista de
+verificación para el hardware está en `pruebas_fisicas.md`.
+
+## Integración con la base
+
+El colgante depende de que el firmware de la base (`firmware/base-radar`, módulo `espnow_rx`)
+cumpla lo siguiente. En esta rama `espnow_rx` todavía es un esqueleto (`TODO`).
+
+- **MAC STA.** La base debe imprimir al arrancar la MAC de su interfaz STA, que es la que va en
+  `BASE_MAC`. El colgante descarta toda trama cuya MAC de origen no sea exactamente esa, así que
+  el ACK debe salir por la interfaz STA de la base.
+- **Canal.** La base queda en el canal del router y el colgante lo encuentra con el barrido 1-13.
+  El router debe estar en 2.4 GHz y en un canal de 1 a 13. La base debe usar
+  `WiFi.setSleep(false)`. El colgante solo acepta un ACK recibido en el mismo canal en el que
+  transmitió.
+- **Formato del ACK.** 8 bytes según `protocolo.h`: `version = 1`, `tipo = MSG_ACK (3)`,
+  `id_dispositivo` y `secuencia` iguales a los del mensaje recibido, `bateria_mv = 0`, y
+  `FLAG_ACK_DUPLICADO` si la secuencia ya se había procesado. Enviado en unicast a la MAC de origen
+  del colgante, que la base debe registrar como peer de ESP-NOW antes de responder.
+- **Tiempo de respuesta.** El colgante espera el ACK 100 ms en su canal guardado y 50 ms por canal
+  en el barrido. Si la base responde después de una operación bloqueante (HTTPS a Firebase o
+  Telegram), el colgante reintentará, barrerá y dará el patrón de error aunque la alerta haya
+  llegado. El ACK debe enviarse antes de cualquier trabajo de red.
+- **Identificación.** La base guarda la última secuencia por `id_dispositivo`. Cada colgante
+  necesita un `COLGANTE_ID` distinto.
+- **Retransmisiones.** Todos los reintentos y el barrido repiten la misma secuencia con
+  `FLAG_REINTENTO` (y `FLAG_BARRIDO` en el barrido). La base debe responder ACK también a los
+  duplicados, con `FLAG_ACK_DUPLICADO`, y no repetir la alerta.
+- **Arranque en frío.** El colgante mantiene `FLAG_ARRANQUE_FRIO` en todos los intentos (también
+  en los reintentos) hasta recibir un ACK válido. Si la base aplica literalmente "con
+  `FLAG_ARRANQUE_FRIO`, olvidar la secuencia y aceptar como nuevo" (`docs/protocolo.md`, sección
+  5), cada reintento de ese primer mensaje se procesaría como una alerta nueva. Conviene que la
+  base trate como duplicado un mensaje con `FLAG_ARRANQUE_FRIO` y `FLAG_REINTENTO` cuya secuencia
+  sea igual a la última aceptada. Se debe acordar con el responsable de la base.
+- **Batería.** `bateria_mv = 0` significa lectura no disponible, no 0 V; llega con
+  `FLAG_BATERIA_BAJA`. Mientras `BATERIA_MODO_SIMULADO = 1`, todos los mensajes llevan 3900 mV y el
+  paquete no indica que sean simulados: la base y el panel no deben tratarlos como telemetría real.
+- **Ausencia.** Heartbeat cada 15 min; la base marca ausente tras `COLGANTE_AUSENTE_S` (45 min).
+- **Sin cifrado.** ESP-NOW sin PMK/LMK en ambos lados (ver "Transmisión ESP-NOW").
+
+## Pendientes físicos
+
+Según el estado registrado en el README principal, ninguna de estas tareas está hecha. No dependen
+del firmware:
+
+- Recibir la batería Li-ion 240 mAh y la pasta flux (pedidas, sin llegar).
+- Cambiar R3 del TP4056 por una resistencia THT de 4.7 kΩ y confirmar la corriente con la hoja de
+  datos de la celda.
+- Soldar la batería a los pads `BAT+` / `BAT-` del TP4056.
+- Definir cómo se alimenta la Super Mini desde `OUT+` / `OUT-`.
+- Armar botón, buzzer y divisor de batería, y confirmar los pines.
+- Diseñar e imprimir la carcasa y el cordón.
+- Ejecutar `pruebas_fisicas.md` y ajustar con mediciones: `BATERIA_BAJA_MV`, tiempos de ACK,
+  `CANAL_MAX` según el router, y necesidad de pull-up externo o transistor para el buzzer.

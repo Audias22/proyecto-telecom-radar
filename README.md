@@ -170,8 +170,17 @@ Instrucciones en `web/README.md`.
 
 ## Avance — Abraham (colgante)
 
-### (fecha)
--
+### 8 octubre 2026
+- Botón de emergencia en GPIO3: pull-up interno, antirrebote, causa del despertar y espera limitada de liberación (`b5bb5f9`)
+
+### 9 octubre 2026
+- Energía: deep sleep con wake por botón y por timer de 15 min, recuperación de botón atascado y buzzer de confirmación/error (`8fdf77e`)
+- ESP-NOW: envío unicast a la base, ACK de aplicación, reintentos con la misma secuencia, barrido de canales 1-13, canal y secuencia en RTC (`afa76e9`)
+- Batería: modo simulado (3900 mV fijos) y lectura ADC con divisor preparada para el hardware (`44054d4`)
+- Flujo principal integrado: ALERTA por botón, HEARTBEAT por timer, sin transmisión en arranque en frío ni en recuperación del botón (`5d15ab4`)
+- Pruebas automatizadas en PC (`firmware/colgante/pruebas_host/`): 35 casos y 538 verificaciones aprobados en Windows y Linux; decisión de despertar aislada en `src/despertar.h`. El firmware compila con PlatformIO (`a4102da`)
+- Documentación del colgante completada: configuración, conexiones propuestas, dependencias con la base y lista de pruebas físicas (`firmware/colgante/pruebas_fisicas.md`)
+- Nada probado todavía en hardware: falta la batería, armar el circuito, cambiar R3 del TP4056, carcasa y cordón. Para probar el enlace se necesita `espnow_rx` de la base (ver "Integración con la base" en `firmware/colgante/README.md`)
 
 ---
 
