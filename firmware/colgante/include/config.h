@@ -13,3 +13,8 @@
 #define PIN_BOTON        3
 #define PIN_BATERIA_ADC  1
 #define PIN_BUZZER       10
+
+// Tiempos del boton. La espera de liberacion siempre termina al alcanzar el limite,
+// aunque el boton permanezca presionado o el contacto siga rebotando.
+#define BOTON_ANTIRREBOTE_MS          30UL
+#define BOTON_ESPERA_LIBERACION_MS  5000UL
