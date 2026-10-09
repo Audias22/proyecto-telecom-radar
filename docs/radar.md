@@ -369,3 +369,162 @@ seguir con el firmware de detección hay que repetir las capturas en la posició
 (acostado, radar sobre el pecho) con la prueba sugerida en la sección 9. Si el resultado se
 mantiene, la detección de apnea por radar no es viable con este módulo y hay que replantear ese
 requisito del proyecto (por ejemplo, limitar el radar a presencia y apoyarse en el botón).
+
+> Actualización: las pruebas acostado se hicieron y el resultado se mantuvo (sección 11).
+
+## 11. Persona acostada: frecuencia, apnea y cama vacía (conclusión)
+
+Scripts: `analisis/validar_respiracion.py` y `analisis/detectar_apnea.py`, con los mismos
+parámetros para todas las capturas. Salidas: `pruebas/resultados/validacion_respiracion/`
+(`espectros.png`, `variable.png`, `errores.md`) y `pruebas/resultados/deteccion_apnea/`
+(`apnea_acostado1.png`, `apnea_acostado2.png`, `actividad.png`, `deteccion.md`).
+
+### Capturas
+
+Persona acostada boca arriba, radar a ~50 cm apuntando al pecho, respiración guiada con un pacer de
+audio. Los primeros 30 s de cada captura son de acomodo y no cuentan.
+
+| Captura | Contenido |
+|---|---|
+| `2026-10-08_235538_acostado_8rpm_50cm` | pacer a 8 rpm desde los 30 s (150 s) |
+| `2026-10-08_235002_acostado_15rpm_50cm` | pacer a 15 rpm desde los 30 s (147 s) |
+| `2026-10-09_001141_acostado_30rpm_50cm` | pacer a 30 rpm desde los 30 s (150 s) |
+| `2026-10-09_000001_acostado_variable_rapido_a_lento_50cm` | sin pacer; 7 respiraciones en 0-30 s, luego 30 en 2 min bajando de rápido a lento |
+| `2026-10-09_001540_acostado_apnea1_50cm` | apnea completa de 45 a 75 s, sin moverse |
+| `2026-10-09_001918_acostado_apnea2_50cm` | igual; el radar perdió a la persona desde los ~96 s (presencia 0) |
+| `2026-10-09_002233_cama_vacia_50cm` | nadie en el cuarto; solo almohada, cobijas y colchón |
+
+### Frecuencia
+
+Mediana de las ventanas de 30 s desde los 30 s hasta el final; referencia = pacer. Entre
+paréntesis, el error en rpm (tabla completa en `errores.md`).
+
+| Pacer | Módulo | `fase_resp` FFT | `fase_resp` cruces | `fase_total` integrada cruces |
+|---|---|---|---|---|
+| 8 | 8.0 (0.0) | 9.1 (+1.1) | 13.7 (+5.7) | 11.2 (+3.2) |
+| 15 | 16.0 (+1.0) | 12.9 (−2.1) | 15.7 (+0.7) | 12.1 (−2.9) |
+| 30 | 12.0 (−18.0) | 10.4 (−19.6) | 18.2 (−11.8) | 15.7 (−14.3) |
+| **Error medio acostado** | **6.3** | **7.6** | **6.1** | **6.8** |
+| Error medio sentado (sección 9) | 8.9 | 8.2 | 8.4 | 7.3 |
+
+- Acostado los errores bajan un poco, pero **ningún método sigue los 30 rpm** (errores de 10 a
+  24 rpm en todas las combinaciones) y en los espectros ninguna señal tiene un pico dominante en
+  la frecuencia del pacer: en 8 rpm, `fase_resp` tiene un pico en 8 pero son más altos los de 5 y
+  10; en 15 rpm los picos están en 12.5 y 19; en 30 rpm hay un pico en ~28.5 (60 % del máximo) y
+  el máximo está en 15.5.
+- La mediana del `resp_rpm` del módulo coincidió con el pacer a 8 y 15 rpm, pero muestra a muestra
+  oscila entre 0 y ~25 rpm (figuras de las apneas) y a 30 rpm se queda en 12.
+- **Ritmo variable (`variable.png`)**: ninguna estimación muestra la bajada de forma clara. Las
+  pendientes entre los 30 s y el final van de +0.9 a −6.2 rpm/min; la más negativa es la del
+  módulo y sale casi toda de una meseta de 23 rpm entre 83 y 99 s.
+
+### Qué cambia durante la apnea
+
+En `apnea_acostado1.png` y `apnea_acostado2.png` (con el intervalo 45-75 s marcado):
+
+| Señal | Durante la apnea | ¿Cambio claro? |
+|---|---|---|
+| `fase_resp` y su RMS de 5 s | en apnea1 el RMS sube (0.036 en 30-45 s, 0.069 en 45-60 s); en apnea2 baja poco y tiene picos | No |
+| **Actividad** (mediana de \|`fase_total`\| en 5 s) | baja a la mitad: apnea1 de 0.135 a 0.06-0.07; apnea2 de 0.128 a 0.054-0.065 (después de un pico al empezar la apnea) | **Sí, en las dos** |
+| `fase_total` integrada | baja en la segunda mitad (apnea1: RMS 0.93 → 0.15 en 60-75 s) | Parcial |
+| `fase_latido` | baja moderadamente (RMS 0.19-0.26 → 0.11-0.20) | Débil |
+| `resp_rpm` del módulo | sigue marcando valores > 0 buena parte de la apnea y llega a 0-5 rpm hacia el final; en respiración normal también cae a 0-2 | No |
+| `latido_bpm` del módulo | cambia (sube hasta 120 al empezar apnea2), pero varía igual en respiración normal | No |
+| Presencia, distancia | sin cambio (presencia 100 %; la distancia salta entre valores fijos todo el tiempo) | No |
+| Tramas por segundo | sin cambio (16.0-16.3) | No |
+
+La caída de actividad también aparece en la apnea sentado de la sección 10. El problema es que
+**caídas parecidas ocurren en la respiración normal**, sobre todo lenta o tranquila (`actividad.png`).
+
+### Detector y validación cruzada
+
+Detector de la sección 10 con dos medidas: el RMS de `fase_resp` (original) y la actividad. Una
+alarma solo cuenta como verdadera si la caída que la dispara empezó dentro de la apnea. Umbral y
+duración se eligen en una rejilla (umbral 0.3-0.7 × referencia, duración 5-20 s) con una apnea y
+se evalúan en la otra. Falsas alarmas en 12 capturas sin apnea (4 acostado, 6 sentado, cama vacía
+y pared; 12.5 min con persona después de los 30 s).
+
+| Medida | Ajuste con | Parámetros | Apnea de prueba | Apnea sentado | Falsas alarmas | Segundos en alarma |
+|---|---|---|---|---|---|---|
+| RMS `fase_resp` | apnea1 | 0.5, 15 s | apnea2: **no detecta** | no detecta | 4 | 90 |
+| RMS `fase_resp` | apnea2 | 0.6, 5 s | apnea1: **no detecta** (2 falsas) | no detecta | 16 | 250 |
+| Actividad | apnea1 | 0.4, 5 s | apnea2: **no detecta** | detecta a los 56 s (+11 s) | 4 | 123 |
+| Actividad | apnea2 | 0.6, 5 s | apnea1: **detecta a los 55 s (+10 s)** (1 falsa) | detecta a los 55 s (+10 s) | 10 | 168 |
+
+- **El RMS de `fase_resp` no sirve**: no detecta la apnea de prueba en ninguna dirección.
+- **La actividad detecta en una dirección** (umbral 0.6) con ~10 s de retraso desde el inicio de
+  la apnea, pero con 10 falsas alarmas en 12.5 min de respiración normal (una cada ~75 s) y 22 %
+  del tiempo en alarma. Con umbral 0.4 bajan a 4 falsas, pero no detecta apnea2.
+- Hay además un defecto de diseño que estas capturas dejan ver: la referencia se congela mientras
+  la medida está baja. En `acostado_30rpm` la referencia se formó con el movimiento del acomodo y
+  la respiración tranquila posterior quedó por debajo del umbral: una sola alarma que dura 105-115
+  de los 120 s de la captura. Se puede corregir (por ejemplo, volver a aprender la referencia
+  después de cierto tiempo en alarma), pero eso agrega parámetros que no se pueden validar con
+  dos apneas.
+
+### Cama vacía
+
+| Escena | Presencia del radar | Distancia | Tramas/s | RMS `fase_resp` | Actividad | resp/latido del módulo |
+|---|---|---|---|---|---|---|
+| Cama vacía (nadie en el cuarto) | **100 %** | 80 cm | 15.66 | 0.002 | 0.004 | 0 / 0 |
+| Pared, sin nadie | **100 %** | 132 cm | 16.06 | 0.003 | 0.017 | 0 / 108 congelado |
+| Personas (13 capturas, sentado y acostado) | 85-100 % | 52-80 cm | 14.3-16.3 | 0.039-0.236 | 0.042-0.689 | variable |
+
+Valores después de los primeros 30 s (tabla completa en `deteccion.md`).
+
+- **La presencia del radar no distingue una cama vacía**: con almohada, cobijas y colchón reporta
+  presencia todo el tiempo y una distancia fija.
+- **La tasa de tramas tampoco**: baja a ~8.5-8.7 por segundo solo cuando el radar no tiene ningún
+  objetivo (primer diagnóstico, y apnea2 desde los ~96 s, cuando la presencia pasó a 0), no
+  cuando la cama está vacía. La hipótesis se confirma en parte: la tasa indica si el radar tiene
+  un objetivo, no si hay una persona, y da la misma información que la bandera de presencia.
+- **La actividad sí la distingue**: 0.004 en la cama vacía y 0.017 en la pared, contra 0.042 o
+  más con una persona, es decir, al menos 2.5 veces más que la pared y 10 veces más que la cama
+  vacía. El RMS de `fase_resp` también (0.002-0.003 contra 0.039 o más).
+
+### Conclusión
+
+**Demostrado con estas capturas** (se repite en todas las que aplican):
+
+1. Ninguna señal del radar sigue la frecuencia respiratoria en todo el rango 8-30 rpm, ni sentado
+   ni acostado. A 30 rpm todos los métodos fallan por 10 rpm o más.
+2. El `resp_rpm` del módulo no sirve para detectar apnea: sigue marcando respiración durante buena
+   parte de las tres apneas y cae a 0-2 rpm en tramos de respiración normal.
+3. La bandera de presencia y la tasa de tramas no distinguen una cama vacía (ni una pared) de una
+   persona; la actividad y el RMS de `fase_resp` sí, con al menos 2.5 veces de margen en 15
+   capturas (13 con persona y 2 sin persona).
+
+**Tendencias con pocas capturas** (no se pueden afirmar como resultado):
+
+4. La actividad baja a ~la mitad durante la apnea (3 de 3 apneas), pero caídas parecidas ocurren
+   en respiración normal; con dos apneas acostado, ningún umbral detecta las dos sin una falsa
+   alarma cada 1-3 minutos.
+5. Acostado, la mediana del módulo coincidió con el pacer a 8 y 15 rpm (una captura cada uno).
+
+**Respuesta:** con este módulo, en las condiciones probadas, **el radar no sigue la respiración ni
+detecta la apnea de forma confiable**. La mejor variante detectaría una apnea con ~10 s de retraso,
+pero daría del orden de una falsa alarma por cada uno o dos minutos de respiración normal, lo que
+en una noche sería inaceptable.
+
+### Recomendación para el firmware de la base
+
+1. **El radar no dispara alarmas de apnea.** Ni el buzzer local ni Telegram se activan por el
+   radar. La alarma confiable del sistema es el botón del colgante.
+2. **El radar sí reporta "persona en cama" / "cama vacía"** con la actividad: mediana de
+   |`fase_total`| (descartando las tramas en 0) en una ventana de 30 s. Umbral inicial **0.03**
+   (cama vacía 0.004, pared 0.017, personas ≥ 0.042); hay que confirmarlo con más capturas de cama
+   vacía y de persona dormida. No usar la bandera de presencia del radar para esto. Retraso
+   esperado: el de la ventana (~30 s), suficiente para un estado que cambia en minutos.
+3. **Se siguen enviando a Firebase** `resp_rpm`, `latido_bpm`, la distancia y la actividad como
+   datos informativos para el panel, marcados como "estimación del módulo, no validada". El panel
+   no debe presentarlos como medición clínica.
+4. **"Posible pausa respiratoria" queda como función experimental desactivada por defecto.** Si
+   se implementa (actividad, umbral 0.6 × referencia, 5 s), solo registra un evento de baja
+   prioridad para revisión, nunca una alarma, y se documenta la tasa de falsas alarmas medida aquí.
+5. Si hay "radar sin datos" (sección 7) o la tasa cae a ~8.5 tramas/s, el radar no está viendo
+   nada: se informa como falla del radar, no como apnea ni como cama vacía.
+
+Esto cambia el alcance declarado del proyecto: el radar ya no detecta apnea. Queda registrado en
+`docs/fallos.md` y en los límites conocidos del README. Para volver a intentarlo harían falta más
+apneas (al menos 10, de distintas personas y duraciones) para elegir umbrales con una validación
+real, y probar una referencia que se reaprenda.

@@ -19,7 +19,7 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona (ver `docs/radar.md`) |
+| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado y acostado: distingue cama vacía, pero no detecta apnea de forma confiable (ver `docs/radar.md`, sección 11) |
 | Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
 | Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
@@ -35,12 +35,14 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 El sistema tiene dos vías de detección que trabajan juntas, más una unidad base que las conecta con el cuidador. Detalle técnico y diagrama en `docs/arquitectura.md`.
 
 **1. Vía automática — Radar (60 GHz FMCW)**
-Un módulo MR60BHA2 se coloca cerca de la cama y mide el micro-movimiento del pecho de la persona al respirar, sin cámara y sin contacto. Funciona en oscuridad total y a través de sábanas o ropa. El módulo trae integrado un XIAO ESP32-C6 que procesa la señal. Si detecta que la respiración se detiene, genera una alerta.
+Un módulo MR60BHA2 se coloca cerca de la cama y mide el micro-movimiento del pecho de la persona, sin cámara y sin contacto. Funciona en oscuridad total y a través de sábanas o ropa. El módulo trae integrado un XIAO ESP32-C6 que procesa la señal.
+
+Resultado de las pruebas (octubre 2026, `docs/radar.md`, sección 11): el radar **distingue una persona en la cama de una cama vacía**, pero **no sigue la frecuencia respiratoria ni detecta la apnea de forma confiable** (sentado ni acostado). Por eso, en el sistema el radar informa "persona en cama" / "cama vacía" y envía sus lecturas al panel como dato informativo; no dispara alarmas de apnea.
 
 - Rango confiable de medición: 0.4 a 2 metros
 - Cono de detección: aproximadamente 80° horizontal y 80° vertical
 - Una persona a la vez, en reposo
-- La respiración es el dato confiable; el latido es más frágil y se toma como dato secundario
+- La frecuencia respiratoria y el latido que entrega el módulo son estimaciones no validadas
 
 **2. Vía manual — Colgante con botón de auxilio**
 Un colgante con un solo botón grande (decisión firme: sin múltiples botones ni voz, por simplicidad para adultos mayores). Usa un ESP32-C3 Super Mini con buzzer, batería Li-ion de 240 mAh y cargador TP4056. Pasa el tiempo en deep sleep; al presionar el botón despierta, envía una alerta por ESP-NOW (2.4 GHz) a la base, espera confirmación (ACK) y vuelve a dormir. Un beep corto confirma que la alerta llegó; tres beeps largos indican que no llegó. También despierta cada 15 minutos para mandar un heartbeat con el nivel de batería. Protocolo en `docs/protocolo.md`.
@@ -60,14 +62,14 @@ Firebase en plan Spark (gratis): Realtime Database para los datos, Authenticatio
 
 | Enlace | Banda / tipo | Función |
 |---|---|---|
-| Sensor (radar) | 60 GHz, FMCW (onda continua modulada en frecuencia) | Mide el movimiento del pecho |
+| Sensor (radar) | 60 GHz, FMCW (onda continua modulada en frecuencia) | Mide el movimiento del pecho; en el sistema indica si hay una persona en la cama |
 | Alertador (colgante -> base) | 2.4 GHz, digital por paquetes, ESP-NOW sobre 802.11 | Comunica la alerta manual, bajo consumo |
 | Base -> nube | WiFi 802.11 + HTTPS (API REST de Firebase) | Lecturas, estado y eventos |
 | Aviso al cuidador (base -> teléfono) | WiFi 802.11 + HTTPS (API de bots de Telegram) | Notifica al cuidador en su celular |
 
 ### Diferenciador
 
-El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el lugar donde más se necesita monitoreo y donde una cámara sería inaceptable por privacidad. El botón no compite con el radar, lo complementa: el radar detecta lo involuntario, el botón cubre lo voluntario.
+El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el lugar donde más se necesita monitoreo y donde una cámara sería inaceptable por privacidad. El botón es la vía de alerta confiable; el radar complementa con información de presencia en la cama sin que la persona tenga que hacer nada.
 
 ### Límites conocidos (declarados desde ya, no ocultos)
 
@@ -76,6 +78,8 @@ El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el
 - El radar no cubre 360°, solo su cono de detección
 - No se recomienda usar varios radares juntos para cubrir 360° (interferencia mutua entre módulos de 60 GHz)
 - Si la base se apaga, el aviso por Telegram no sale en ese momento (no hay servidor propio); el panel lo muestra y el colgante avisa con el patrón de error
+- **El radar no detecta la apnea.** En las pruebas no siguió la respiración real (8-30 rpm) y el mejor detector de apnea dio una falsa alarma cada ~75 s de respiración normal. Una apnea solo se avisa si la persona presiona el botón (`docs/radar.md`, sección 11; `docs/fallos.md`)
+- La bandera de presencia del propio radar sigue en 1 con la cama vacía (detecta almohada y cobijas); la base usa su propia medida de actividad para saber si hay una persona
 
 ---
 
