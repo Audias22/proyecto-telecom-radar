@@ -6,6 +6,11 @@
 #define FIRMWARE_NOMBRE  "colgante"
 #define FIRMWARE_VERSION "0.1.0"
 
+// Registros de diagnostico por USB CDC. En 0, main no inicializa Serial ni emite sus registros;
+// se recomienda deshabilitarlos en la operacion normal para reducir tiempo despierto y consumo.
+#define REGISTROS_SERIAL_HABILITADOS 1
+#define REGISTROS_SERIAL_ESPERA_MS   2000UL
+
 // Pines propuestos. Por confirmar con el módulo y el circuito armado.
 // - El botón debe estar en GPIO0-GPIO5: son los únicos que despiertan al ESP32-C3 de deep sleep.
 //   Se evita GPIO2 porque es pin de arranque (strapping).

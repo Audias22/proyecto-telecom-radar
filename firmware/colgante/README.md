@@ -3,7 +3,8 @@
 Firmware del ESP32-C3 Super Mini del colgante.
 
 Ciclo: deep sleep -> despierta por botón o por timer -> envía ALERTA o HEARTBEAT por ESP-NOW ->
-espera ACK (reintentos y barrido de canales) -> beep -> deep sleep. Detalle en `docs/protocolo.md`.
+espera ACK (reintentos y barrido de canales) -> emite sonido solo para la alerta -> deep sleep.
+Detalle en `docs/protocolo.md`.
 
 ## Módulos (`src/`)
 
@@ -14,7 +15,39 @@ espera ACK (reintentos y barrido de canales) -> beep -> deep sleep. Detalle en `
 | `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
 | `bateria` | Voltaje simulado o medido por ADC (implementado; simulación activa) |
 
-`main.cpp` por ahora solo imprime nombre y versión; aún no integra el ciclo completo.
+`main.cpp` integra el ciclo completo de los cuatro módulos.
+
+## Ciclo principal integrado
+
+- Antes de interpretar el despertar se consulta `energia::recuperandoBotonAtascado()`. En esa
+  ruta no se lee la batería, no se enciende el radio y no se emiten sonidos; solamente se vuelve
+  al procedimiento de suspensión, que revisa de forma limitada si GPIO3 ya fue liberado.
+- Solo un reinicio cuyo motivo sea `ESP_RST_DEEPSLEEP` puede originar una transmisión. El timer
+  genera `MSG_HEARTBEAT` cada 15 minutos. El encendido en frío, un reinicio inesperado y cualquier
+  otra causa vuelven a dormir sin transmitir, evitando alertas falsas. Una pulsación realizada
+  durante ese arranque inicial no se interpreta como alerta. El primer mensaje posterior conserva
+  `FLAG_ARRANQUE_FRIO`, responsabilidad de `espnow_tx`.
+- Un despertar por GPIO genera una sola `MSG_ALERTA` cuando el estado retenido de wake identifica
+  GPIO3. Si el botón continúa bajo, `presionado()` confirma que el nivel sea estable; si ya fue
+  liberado durante el arranque, se acepta igualmente el evento retenido para no perder una alerta
+  legítima breve. No es posible medir después del arranque cuánto duró ese pulso ni distinguirlo de
+  ruido eléctrico. Las pruebas físicas deben confirmar que el pull-up y el cableado no causen wakes
+  falsos; si los causan, se necesitará mejorar el circuito o añadir filtrado hardware. Antes de
+  rearmar el wake, `energia::dormir()` exige una liberación estable con el antirrebote existente.
+- Antes de cada mensaje se obtiene el voltaje. Mientras `BATERIA_MODO_SIMULADO=1`, se transmiten
+  `3900 mV` solo para desarrollar el flujo y el registro advierte que no es una medición física.
+- `espnow_tx::enviar()` determina la entrega exclusivamente por ACK de aplicación. En una alerta,
+  `ENVIO_OK` o `ENVIO_OK_BARRIDO` produce un beep corto; `ENVIO_SIN_ACK`, incluida una MAC nula o
+  una inicialización fallida, produce tres beeps de error. Un heartbeat nunca produce sonidos,
+  tenga o no ACK.
+- El radio se detiene antes de suspender. Si `energia::dormir()` retorna por un error, `loop()` no
+  reconstruye ni retransmite el evento y no vuelve a sonar: espera y reintenta únicamente la
+  suspensión. Esto evita duplicados y bucles rápidos, aunque un fallo persistente mantendrá el
+  dispositivo despierto y elevará el consumo hasta que la configuración pueda completarse o el
+  equipo se reinicie.
+- `REGISTROS_SERIAL_HABILITADOS` controla la inicialización y los mensajes de integración por USB
+  CDC. Debe ponerse en `0` para la operación normal de bajo consumo. Los registros no muestran la
+  MAC de la base, el identificador privado ni otras credenciales.
 
 ## Transmisión ESP-NOW
 
