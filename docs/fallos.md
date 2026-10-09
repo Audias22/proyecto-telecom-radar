@@ -29,8 +29,13 @@ sección 11). Mientras no se valide, la alarma confiable es el botón del colgan
   persona acostada a ~50 cm, el mejor detector probado (caída de la actividad) detectó la apnea de
   prueba en una de las dos validaciones cruzadas, con ~10 s de retraso, y dio una falsa alarma
   cada ~75 s de respiración normal. El `resp_rpm` del módulo siguió marcando respiración durante
-  las apneas. Detalle en `radar.md`, sección 11. Se está revisando la lectura del radar, el
-  montaje y el detector antes de decidir.
+  las apneas. Detalle en `radar.md`, sección 11.
+- **Revisión del 2026-10-09** (`radar.md`, sección 12): la lectura del radar es correcta (sin
+  tramas perdidas, decodificación verificada, firmware v1.6.12). Las pruebas se hicieron fuera del
+  montaje recomendado por Seeed (1 m sobre la cabecera, 45°, solo durante el sueño, ~1 min de
+  establecimiento). El detector v2 (actividad, 10 s, umbral 0.7, 20 s) detectó las 3 apneas en
+  26-29 s, pero con 3.2 falsas alarmas cada 10 min; el criterio es ≤ 1. No cumple con estos datos.
+  Falta una sesión de ~50 min en el montaje recomendado (sección 12.5) para decidir.
 - Mientras no se valide, la apnea detectada por radar no dispara alarmas.
 - El tipo de evento `APNEA` se mantiene en el modelo de datos.
 

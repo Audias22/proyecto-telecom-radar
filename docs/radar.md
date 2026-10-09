@@ -47,8 +47,8 @@ Medido contando tramas por tipo con el radar sin objetivo (diagnóstico del 2026
 | `0x0A15` | Latido (float, bpm) | Sí |
 | `0x0A16` | Distancia: bandera de objetivo (u32) + distancia (float) | Sí |
 | `0x0F09` | Presencia (1 byte) | Sí |
-| `0x0A17` | Desconocido | No |
-| `0x0A29` | Desconocido | No |
+| `0x0A17` | Posición del objetivo (2 float, m); ver sección 12 | No |
+| `0x0A29` | Estado de 2 bytes (1/2); ver sección 12 | No |
 
 Sin objetivo, los siete tipos llegaron a la misma tasa, unas 8.7 por segundo cada uno (una cada
 ~115 ms), con todos los valores en 0 y presencia 0.
@@ -531,3 +531,153 @@ preliminar (2 apneas, un tipo de detector); la decisión queda pendiente de la s
 
 El estado "en evaluación" está registrado en `docs/fallos.md` y en los límites conocidos del
 README.
+
+## 12. Revisión: lectura del radar, montaje y detector v2
+
+Firmware de diagnóstico: `firmware/base-radar/src/diagnostico.cpp` (entorno `diagnostico`).
+Registros: `pruebas/crudos/2026-10-09_diagnostico_radar_pared.txt` y
+`..._persona_sentada.txt`. Detector: `analisis/detector_apnea.py` y
+`analisis/evaluar_detector_apnea.py`; resultados en `pruebas/resultados/deteccion_apnea_v2/`.
+
+### 12.1 ¿Leemos bien el radar? Sí
+
+| Verificación | Resultado |
+|---|---|
+| Formato de la trama de fases | El manual de Seeed (*Tiny Frame Interface, Breathing and Heartbeat*, rev 2.1) define `0x0A13` como 3 float little-endian en este orden: fase total, fase de respiración, fase de latido. Es lo que decodifica la librería. La decodificación con `memcpy` y una manual byte a byte en little-endian dieron los mismos valores en todas las tramas volcadas. (El manual pone `LEN = 00 04` en el ejemplo; las tramas reales traen `00 0C`, 12 bytes.) |
+| Checksums | 0 errores de datos; 0-3 errores de cabecera en 60-150 s (bytes sueltos al resincronizar). |
+| Tramas perdidas | En crudo llegan 16 tramas de fase por segundo; en la misma escena `radar.cpp` procesó 486 tramas de fase en 30 s (16.2/s) y entregó exactamente 486 lecturas. El buffer de la UART nunca pasó de 132 bytes ocupados (de 32 KB). |
+| Ceros exactos en `fase_total` | Vienen del radar: la trama trae los bytes `00 00 00 00` con checksum válido. Casi siempre llegan ~46 ms después de la trama de fase anterior (el intervalo corto del par), y con la pared van seguidos, ~77 ms después, de un salto de ±2.7-2.9 rad. Con persona: 36 de 2431 tramas (1.5 %). |
+| Picos de ±2-3 rad | También vienen del radar (bytes de la trama). Con persona aparecen además fuera del par cero/salto: 93 de 2431 tramas. |
+| Versión del firmware del radar | Respondió a la consulta `0xFFFF` (sin datos) con `04 01 06 0C`: proyecto 4, **v1.6.12**, la última que publica Seeed. No hace falta actualizar. |
+
+**No había errores de lectura.** Las conclusiones de las secciones 9 a 11 no cambian por la
+lectura. Lo que sí las limita es el montaje y el tiempo de establecimiento (12.3).
+
+### 12.2 Las tramas del radar
+
+Con objetivo (persona o pared) llegan unas 74 tramas por segundo, de 9 tipos; sin objetivo, 7 tipos
+a ~8.7/s cada uno.
+
+| Tipo | Contenido | Tasa con objetivo | Fuente |
+|---|---|---|---|
+| `0x0A13` | Fase total, de respiración y de latido (3 float) | 16/s, en pares (~45 y ~76 ms) | Manual de Seeed y librería |
+| `0x0A14` | Respiración (float, rpm) | ~8/s | Manual y librería |
+| `0x0A15` | Latido (float, bpm) | 1-7/s (variable) | Manual y librería |
+| `0x0A16` | Bandera de objetivo (u32) + distancia (float, cm) | ~8/s | Manual y librería |
+| `0x0F09` | Presencia (2 bytes; la librería lee el primero) | ~8/s | Librería (no está en el manual) |
+| `0x0A04` | Objetivos de la nube de puntos 3D: cantidad (u32) y por objetivo x, y (float, m), índice Doppler y cluster (int32) | 0.3-8/s | Librería |
+| `0x0A17` | 2 float: x ≈ 0-0.13 y y ≈ 0.3-0.6 en la pared; por los valores, posición del objetivo en metros | ~8/s | Deducido; no está en la librería ni en el manual |
+| `0x0A29` | 2 bytes, valor 1 o 2. Pasa a 2 durante una trama cada ~1.45 s (pared y persona) y se quedó en 2 durante el movimiento y con la persona lejos | ~8/s | Deducido (una prueba) |
+| `0x0100` | **Texto ASCII de depuración**: "breath rate = N", "heart rate = N", "invalid = N" | ~9/s | Deducido; probablemente la recolección de datos que agregó el firmware v1.6.10 |
+
+Ninguna trama trae un estado de sueño, de movimiento documentado, de apnea o una energía de la
+señal. Los textos de `0x0100` repiten los ritmos (en 60 s de respiración normal: 334 "breath rate"
+con valores de 3 a 26 y 66 "heart rate"). Pendiente: el diagnóstico tenía un límite de 400 textos
+que se llenó a los 70 s, así que **no se vio qué dice el radar durante la apnea**; queda para la
+próxima sesión.
+
+La bandera de presencia (`0x0F09`) se quedó en 1 con la persona lejos, igual que con la cama vacía
+(sección 11): confirma que no sirve para saber si hay una persona.
+
+### 12.3 Montaje y uso recomendados por Seeed
+
+De la wiki del kit y de la hoja de datos del MR60BHA2 (*Technical Specification*, beta, 2024-03-05):
+
+- **Solo para sueño**: "recommended for use solely during sleep scenarios. Please refrain from
+  utilising the radar's respiratory and heart rate functions whilst seated at a desk or during
+  exercise".
+- **Montaje inclinado para sueño**: a **1 m de altura, directamente sobre la cabecera de la cama,
+  inclinado 45° hacia el centro de la cama**, con el pecho a **1.5 m o menos**; la normal del radar
+  apuntando a la zona del pecho.
+- Montaje lateral (alternativa): a la altura del pecho, a 1.5 m o menos.
+- Distancia al pecho para respiración y latido: 0.4 a 1.5 m.
+- **Tiempo para establecer la detección: 1 minuto.** "Respiratory and heart rate are weak reflection
+  signals, radar signal processing requires a period of data accumulation".
+- Medir en reposo; con movimientos grandes la medición se detiene. Las fallas esporádicas son
+  normales.
+- Evitar varios radares juntos, cortinas que se mueven, ventiladores, superficies metálicas o
+  espejos grandes, y medir a través de vidrio o madera.
+- Firmware: v1.6.10 "optimized breathing mechanics to resolve the issue where breath hold duration
+  does not decrease"; v1.6.12 "fixed target loss when stationary within 1.5 meters". El nuestro
+  ya es v1.6.12.
+
+**Comparación con lo que hicimos:**
+
+| Recomendado | Nuestras pruebas |
+|---|---|
+| Solo sueño, acostado | Sentado (secciones 8-10) y acostado (sección 11) |
+| 1 m sobre la cabecera, 45° hacia el centro de la cama | Radar a ~50 cm del pecho, de frente o de lado, colocado a ojo |
+| Esperar ~1 min a que se establezca la detección | Apneas a los 45 s del inicio; los primeros 30 s de acomodo se usaron para formar la referencia |
+| Sin movimiento | Acomodo al inicio; persona sentada |
+
+Las secciones 8 a 11 se hicieron fuera del montaje y del uso recomendados. Sus resultados valen
+para esas condiciones; **no prueban** que el radar no sirva en el montaje recomendado.
+
+### 12.4 Detector v2
+
+Cambios respecto al de las secciones 10 y 11 (fijados antes de ver resultados):
+
+- Medidas por segundo: actividad (mediana de |`fase_total`|), RMS de `fase_resp`, proporción de
+  energía de la fase integrada en 0.1-0.6 Hz frente a 0.05-3 Hz, y como apoyo opcional que el
+  `resp_rpm` del módulo sea ≤ 8. Ventanas de 5 o 10 s.
+- Solo se arma tras 30 s de respiración clara (actividad de la historia ≥ 0.03; con la pared y la
+  cama vacía nunca se arma). La proporción de banda no sirve para esto: la pared da 0.40, igual
+  que una persona.
+- Duración mínima de la caída: 20 s. La referencia (mediana de los últimos 60 s normales) se
+  reaprende si la medida lleva 60 s baja.
+
+**Criterio de éxito, fijado de antemano:** detectar en ≤ 30 s desde el inicio de la apnea, con ≤ 1
+falsa alarma cada 10 min de respiración normal.
+
+**Validación cruzada** (se eligen los parámetros con dos apneas y se prueba con la tercera; las
+falsas alarmas se cuentan en las 12 capturas sin apnea, 12.5 min con persona, que no se usan para
+elegir):
+
+| Apnea de prueba | Configuración elegida | Detección de la apnea de prueba | Falsas alarmas | Por 10 min | ¿Cumple? |
+|---|---|---|---|---|---|
+| acostado1 | actividad, 10 s, umbral 0.7 | a los 26 s | 4 | 3.2 | no |
+| acostado2 | actividad, 10 s, umbral 0.7 | a los 29 s | 4 | 3.2 | no |
+| sentado | actividad, 5 s, umbral 0.8 | no detecta | 4 | 3.2 | no |
+
+**Cota optimista** (eligiendo viendo las tres apneas): la única configuración que detecta las
+tres a tiempo (actividad, 10 s, 0.7: a los 26, 29 y 26 s) da 3.2 falsas alarmas cada 10 min. Con
+≤ 1 falsa alarma cada 10 min, lo mejor detecta 1 de 3.
+
+- **El criterio no se cumple con estos datos**, ni siquiera en la cota optimista.
+- Es una mejora clara sobre el detector anterior: de una falsa alarma cada ~75 s a una cada ~3
+  min, y la misma configuración salió elegida en dos de las tres validaciones.
+- La actividad fue la mejor medida en todas las combinaciones; el RMS de `fase_resp`, la
+  proporción de banda y el apoyo del módulo no mejoraron nada.
+- Las 4 falsas alarmas caen en **respiración lenta o tranquila**: captura de 8 rpm (90 y 115 s),
+  de 30 rpm (60 s; la referencia se formó con el acomodo) y de ritmo variable (128 s, ya en el
+  tramo lento). Al respirar lento, el pecho se mueve despacio y la actividad baja casi como en una
+  apnea.
+- **Tendencia, no resultado**: 3 apneas y 12.5 min de respiración normal no alcanzan para estimar
+  ni la sensibilidad (3 de 3 detectadas es compatible, con 95 % de confianza, con una sensibilidad
+  real de apenas ~30 %) ni la tasa de falsas alarmas.
+
+### 12.5 Prueba mínima que falta (una sesión de ~50 min)
+
+Para decidir con datos, en el montaje y uso recomendados:
+
+1. **Montaje**: persona acostada boca arriba; radar en la pared a 1 m sobre la cabecera,
+   inclinado 45° hacia el centro de la cama; medir con cinta la distancia al pecho (≤ 1.5 m).
+2. **Encender el radar y esperar 3 minutos** antes de empezar (más que el minuto de
+   establecimiento).
+3. **10 apneas de 25 s**, cada una precedida por 2 minutos de respiración normal (~25 min).
+   Con 10 de 10 detectadas, la sensibilidad sería al menos ~70 % con 95 % de confianza; con 3
+   apneas no se puede decir nada.
+4. **20 minutos de respiración normal sin apneas**, incluidos 5 minutos lentos (pacer a 8 rpm, el
+   caso que da falsas alarmas) y dos cambios de postura. Para afirmar ≤ 1 falsa alarma cada 10
+   minutos con 95 % de confianza hacen falta al menos ~37 minutos de respiración normal sin
+   ninguna falsa alarma; sumando los tramos normales entre apneas (~20 min) y estos 20 minutos se
+   llega a ~40.
+5. **3 minutos de cama vacía** al final.
+6. Captura continua de toda la sesión, con un guion de audio que indique cuándo aguantar la
+   respiración y que registre esos instantes en el mismo archivo, para no depender de un
+   cronómetro.
+7. Con el firmware de diagnóstico sin límite de textos, para ver qué reporta el radar (`0x0100` y
+   `0x0A29`) durante las apneas.
+
+El detector y sus parámetros quedan fijos antes de la sesión (actividad, ventana de 10 s, umbral
+0.7, 20 s, referencia de 60 s), y la sesión se usa solo para evaluarlos.
