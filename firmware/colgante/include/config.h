@@ -14,6 +14,26 @@
 #define PIN_BATERIA_ADC  1
 #define PIN_BUZZER       10
 
+// Medicion de bateria. El modo simulado queda habilitado mientras no exista hardware; su valor
+// sirve para desarrollar el flujo, no representa una medicion ni confirma que haya una bateria.
+#define BATERIA_MODO_SIMULADO          1
+#define BATERIA_SIMULADA_MV         3900U
+#define BATERIA_LECTURA_INVALIDA_MV     0U
+
+// Divisor propuesto: bateria protegida -- 1 Mohm -- GPIO1 -- 470 kohm -- GND.
+// Un capacitor de 10 nF entre GPIO1 y GND reduce ruido y ayuda al ADC con la alta impedancia.
+#define BATERIA_RESISTENCIA_SUPERIOR_OHM  1000000UL
+#define BATERIA_RESISTENCIA_INFERIOR_OHM   470000UL
+#define BATERIA_CAPACITOR_NF                    10U
+#define BATERIA_TENSION_MAXIMA_MV             4200U
+
+// ADC real: 12 bits, atenuacion de 11 dB y promedio de lecturas calibradas. En ESP32-C3 los
+// ~1343 mV esperados superan el rango documentado de 6 dB (~1300 mV), por eso se usan 11 dB.
+#define BATERIA_ADC_RESOLUCION_BITS              12U
+#define BATERIA_ADC_MUESTRAS                      16U
+#define BATERIA_ADC_ESTABILIZACION_MS           20UL
+#define BATERIA_ADC_LIMITE_MV                   1500U
+
 // Tiempos del boton. La espera de liberacion siempre termina al alcanzar el limite,
 // aunque el boton permanezca presionado o el contacto siga rebotando.
 #define BOTON_ANTIRREBOTE_MS          30UL

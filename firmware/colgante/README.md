@@ -12,10 +12,9 @@ espera ACK (reintentos y barrido de canales) -> beep -> deep sleep. Detalle en `
 | `boton` | Botón de auxilio, antirrebote y causa del despertar (implementado) |
 | `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC (implementado) |
 | `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
-| `bateria` | Voltaje de la batería por ADC |
+| `bateria` | Voltaje simulado o medido por ADC (implementado; simulación activa) |
 
-`bateria` todavía tiene su implementación pendiente. `main.cpp` por ahora solo imprime nombre y
-versión; aún no integra el ciclo completo.
+`main.cpp` por ahora solo imprime nombre y versión; aún no integra el ciclo completo.
 
 ## Transmisión ESP-NOW
 
@@ -104,6 +103,76 @@ Sin hardware no se han validado todavía el rebote real del pulsador, el despert
 sleep, el consumo de la resistencia interna, la polaridad real del buzzer ni el comportamiento
 eléctrico ante una pulsación prolongada. Si el pull-up interno no mantiene un nivel estable en
 deep sleep, habrá que añadir una resistencia externa sin cambiar la lógica activa en bajo.
+
+## Batería y ADC
+
+### Modo simulado
+
+- `BATERIA_MODO_SIMULADO` está inicialmente en `1`. En este modo `leerMilivoltios()` devuelve
+  exactamente `3900 mV`, escribe por Serial que el dato es simulado y no configura ni consulta el
+  ADC. `modoSimulado()` permite que la futura integración evite presentar ese valor como una
+  medición física.
+- Los `3900 mV` sirven únicamente para ejercitar el formato del paquete y la lógica. No demuestran
+  que haya una batería conectada, no describen su carga y no deben almacenarse como telemetría
+  física. Antes de probar el dispositivo real se debe cambiar `BATERIA_MODO_SIMULADO` a `0`.
+- El umbral compartido es estricto: `bateria_mv < BATERIA_BAJA_MV`. Por ello `3499 mV` se considera
+  bajo, `3500 mV` no, y el valor simulado de `3900 mV` no activa `FLAG_BATERIA_BAJA`. Esto valida
+  lógica de desarrollo, no el estado de una celda real.
+
+### Circuito propuesto
+
+No conectar una Li-ion directamente a GPIO1. El pin admite la salida reducida de este divisor:
+
+```text
+OUT+ protegido de la batería --- 1 MΩ ---+--- GPIO1 / ADC1_CH1
+                                         |
+                                         +--- 470 kΩ --- GND / OUT-
+                                         |
+                                         +--- 10 nF ---- GND / OUT-
+```
+
+El capacitor de `10 nF` se conecta del nodo GPIO1 a GND, en paralelo con la resistencia de
+`470 kΩ`. No se debe conectar el nodo a VBUS/USB de 5 V. Hay que confirmar en el módulo TP4056
+real cuáles terminales son la salida protegida `OUT+` y `OUT-`.
+
+- Resistencias propuestas: `R_superior = 1,000,000 Ω` y `R_inferior = 470,000 Ω`, idealmente de
+  1 %. Factor de reconstrucción: `(R_superior + R_inferior) / R_inferior = 1470 / 470 ≈ 3.12766`.
+- Con la Li-ion en su máximo esperado de `4.2 V`, GPIO1 recibe
+  `4.2 × 470 / 1470 ≈ 1.343 V`.
+- La corriente continua máxima del divisor es `4.2 V / 1.47 MΩ ≈ 2.86 µA`. Debe medirse junto
+  con el consumo de la placa; LED, regulador y fugas pueden dominar ampliamente ese valor.
+- La impedancia Thévenin es aproximadamente `320 kΩ`. Es alta para priorizar bajo consumo; el
+  capacitor de `10 nF` actúa como reserva local de carga para el muestreo del ADC y forma una
+  constante de tiempo de unos `3.2 ms`. La espera configurada de `20 ms` supera seis constantes
+  de tiempo antes de descartar la primera conversión. Esto reduce el error por la alta impedancia,
+  pero su efectividad todavía debe comprobarse con el circuito real.
+
+### Lectura real preparada
+
+Con la simulación desactivada, el módulo configura 12 bits y atenuación de 11 dB, descarta la
+primera conversión y promedia 16 resultados de `analogReadMilliVolts()`. Esta API utiliza el
+esquema de calibración disponible en el ESP32-C3 para convertir la lectura a milivoltios del pin;
+después se aplica el factor racional `1470/470` usando aritmética de 64 bits y redondeo.
+
+En el ESP32-C3, el rango documentado para 6 dB termina aproximadamente en `1300 mV`, de modo que
+no cubre los `1343 mV` del divisor a carga completa. La atenuación de 11 dB amplía el rango hasta
+aproximadamente `2500 mV`. El software adopta un límite más conservador de `1500 mV`, todavía por
+encima del máximo esperado.
+
+Una lectura del pin que supere ese límite o una conversión imposible devuelve el centinela
+`BATERIA_LECTURA_INVALIDA_MV = 0`. Debido a que `PaqueteEspNow.bateria_mv` no tiene un estado de
+validez separado, si el futuro flujo transmite ese valor la base debe interpretarlo como lectura
+no disponible o fallo ADC, no como una medición física de `0 V`; además se marcará batería baja
+por seguridad. `lecturaValida()` permite distinguir el centinela antes de transmitir. Afirmar que
+un dato es físico requiere simultáneamente `!modoSimulado()` y `lecturaValida(valor)`.
+
+La calibración interna no corrige tolerancias del divisor, ruido de la placa, fugas por la alta
+impedancia ni error residual del ADC.
+
+Cuando llegue el hardware se debe comparar GPIO1 y la batería con un multímetro en varios puntos
+entre carga completa y descarga, repetir lecturas con y sin radio activo, verificar el error de
+las resistencias reales y medir consumo en deep sleep. Solo esa curva permitirá confirmar o
+ajustar `BATERIA_BAJA_MV = 3500 mV`; hasta entonces el umbral sigue siendo una hipótesis de diseño.
 
 ## Configuración
 
