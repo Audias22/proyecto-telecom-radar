@@ -14,8 +14,11 @@ Detalle en `docs/protocolo.md`.
 | `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC (implementado) |
 | `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
 | `bateria` | Voltaje simulado o medido por ADC (implementado; simulación activa) |
+| `despertar` | Decisión pura ALERTA / HEARTBEAT / ninguna a partir de reset, causa de wake y recuperación (solo header) |
 
-`main.cpp` integra el ciclo completo de los cuatro módulos.
+`main.cpp` integra el ciclo completo de los cuatro módulos. Lee el motivo de reset, la causa del
+despertar, el bit de GPIO3 y la recuperación del botón atascado, y delega la decisión en
+`despertar::decidir()`, que no depende de ESP-IDF y se prueba en host (`pruebas_host/`).
 
 ## Ciclo principal integrado
 

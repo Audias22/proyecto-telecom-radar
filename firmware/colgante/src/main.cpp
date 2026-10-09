@@ -6,16 +6,11 @@
 #include "bateria.h"
 #include "boton.h"
 #include "config.h"
+#include "despertar.h"
 #include "energia.h"
 #include "espnow_tx.h"
 
 namespace {
-
-enum class AccionDespertar {
-    NINGUNA,
-    ALERTA,
-    HEARTBEAT,
-};
 
 void registrar(const char* mensaje) {
     if (REGISTROS_SERIAL_HABILITADOS != 0) {
@@ -38,35 +33,53 @@ void iniciarRegistros() {
                   PROTOCOLO_VERSION);
 }
 
-AccionDespertar determinarAccion() {
-    if (esp_reset_reason() != ESP_RST_DEEPSLEEP) {
-        registrar("main: arranque o reinicio fuera de deep sleep; no se transmite");
-        return AccionDespertar::NINGUNA;
+despertar::Causa leerCausaDespertar() {
+    switch (esp_sleep_get_wakeup_cause()) {
+        case ESP_SLEEP_WAKEUP_TIMER:
+            return despertar::Causa::TEMPORIZADOR;
+        case ESP_SLEEP_WAKEUP_GPIO:
+            return despertar::Causa::GPIO;
+        default:
+            return despertar::Causa::OTRA;
     }
+}
 
-    const esp_sleep_wakeup_cause_t causa = esp_sleep_get_wakeup_cause();
-    if (causa == ESP_SLEEP_WAKEUP_TIMER) {
-        return AccionDespertar::HEARTBEAT;
-    }
+// Lee el hardware y delega la decision en despertar::decidir(), que es pura y se prueba en host.
+// recuperandoBotonAtascado() se consulta primero, igual que antes, porque limpia su estado RTC.
+despertar::Decision determinarAccion() {
+    despertar::Entradas entradas{};
+    entradas.recuperando_boton_atascado = energia::recuperandoBotonAtascado();
+    entradas.reinicio = esp_reset_reason() == ESP_RST_DEEPSLEEP ? despertar::Reinicio::DEEP_SLEEP
+                                                                : despertar::Reinicio::OTRO;
+    entradas.causa = leerCausaDespertar();
+    entradas.gpio_boton_desperto = boton::despertoPorBoton();
+    return despertar::decidir(entradas);
+}
 
-    if (causa == ESP_SLEEP_WAKEUP_GPIO) {
-        if (!boton::despertoPorBoton()) {
+void registrarDecision(despertar::Motivo motivo) {
+    switch (motivo) {
+        case despertar::Motivo::RECUPERACION_BOTON_ATASCADO:
+            registrar("main: recuperacion de boton atascado; radio y sonidos omitidos");
+            break;
+        case despertar::Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP:
+            registrar("main: arranque o reinicio fuera de deep sleep; no se transmite");
+            break;
+        case despertar::Motivo::GPIO_AJENO:
             registrar("main: despertar GPIO ajeno a GPIO3; no se transmite");
-            return AccionDespertar::NINGUNA;
-        }
-
-        // El estado de wake queda retenido por el RTC. Si la pulsacion termino durante el
-        // arranque, exigir que el pin siga bajo perderia una alerta legitima. La lectura estable
-        // solo distingue si continua presionado; energia::dormir() confirma despues la liberacion
-        // antes de volver a habilitar el wake en nivel bajo.
-        if (!boton::presionado()) {
-            registrar("main: GPIO3 desperto el equipo y ya fue liberado; alerta aceptada");
-        }
-        return AccionDespertar::ALERTA;
+            break;
+        case despertar::Motivo::BOTON:
+            // Solo informativo: la alerta ya fue aceptada por el wake GPIO retenido en el RTC.
+            // energia::dormir() confirma despues la liberacion antes de rehabilitar el wake.
+            if (!boton::presionado()) {
+                registrar("main: GPIO3 desperto el equipo y ya fue liberado; alerta aceptada");
+            }
+            break;
+        case despertar::Motivo::CAUSA_NO_OPERATIVA:
+            registrar("main: causa de despertar no operativa; no se transmite");
+            break;
+        case despertar::Motivo::TEMPORIZADOR:
+            break;
     }
-
-    registrar("main: causa de despertar no operativa; no se transmite");
-    return AccionDespertar::NINGUNA;
 }
 
 ResultadoEnvio transmitir(TipoMensaje tipo) {
@@ -113,16 +126,12 @@ void setup() {
     iniciarRegistros();
     boton::iniciar();
 
-    if (energia::recuperandoBotonAtascado()) {
-        registrar("main: recuperacion de boton atascado; radio y sonidos omitidos");
-        intentarDormir();
-        return;
-    }
+    const despertar::Decision decision = determinarAccion();
+    registrarDecision(decision.motivo);
 
-    const AccionDespertar accion = determinarAccion();
-    if (accion == AccionDespertar::ALERTA) {
+    if (decision.accion == despertar::Accion::ALERTA) {
         informarResultado(MSG_ALERTA, transmitir(MSG_ALERTA));
-    } else if (accion == AccionDespertar::HEARTBEAT) {
+    } else if (decision.accion == despertar::Accion::HEARTBEAT) {
         informarResultado(MSG_HEARTBEAT, transmitir(MSG_HEARTBEAT));
     }
 
