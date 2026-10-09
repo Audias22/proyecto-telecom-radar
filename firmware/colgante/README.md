@@ -11,11 +11,11 @@ espera ACK (reintentos y barrido de canales) -> beep -> deep sleep. Detalle en `
 |---|---|
 | `boton` | Botón de auxilio, antirrebote y causa del despertar (implementado) |
 | `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC |
-| `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error |
+| `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
 | `bateria` | Voltaje de la batería por ADC |
 
-`espnow_tx`, `energia` y `bateria` todavía tienen su implementación pendiente. `main.cpp` por ahora
-solo imprime nombre y versión.
+`espnow_tx` y `bateria` todavía tienen su implementación pendiente. `main.cpp` por ahora solo
+imprime nombre y versión.
 
 ## Botón de auxilio
 
@@ -30,16 +30,39 @@ solo imprime nombre y versión.
 - Antes de dormir, `esperarSoltar()` permite esperar una liberación estable. La espera está
   limitada por `BOTON_ESPERA_LIBERACION_MS` (5 s por defecto): devuelve `true` si se liberó y
   `false` si agotó el tiempo, sin quedar bloqueada.
-- La función `energia::dormir()` deberá habilitar GPIO3 en nivel bajo con
-  `esp_deep_sleep_enable_gpio_wakeup()` solamente si `esperarSoltar()` devolvió `true`, además del
-  temporizador del heartbeat. Si devuelve `false`, habilitar wake en nivel bajo con el botón aún
-  presionado causaría despertares inmediatos y alertas repetidas; energía deberá omitir esa fuente
-  durante ese ciclo o posponer el deep sleep. Esa integración continúa pendiente.
+- `energia::dormir()` habilita GPIO3 en nivel bajo solamente cuando `esperarSoltar()` devuelve
+  `true`. Si el botón sigue presionado, omite temporalmente esa fuente y programa una revisión por
+  timer para evitar despertares inmediatos y alertas repetidas.
+
+## Energía y deep sleep
+
+- En operación normal se habilitan simultáneamente GPIO3 activo en bajo y el timer de
+  `HEARTBEAT_INTERVALO_S` (15 minutos). Ambas API pueden coexistir en el ESP32-C3.
+- Si el botón no se libera en 5 segundos, el equipo duerme sin wake por GPIO y despierta después
+  de `BOTON_REVISION_ATASCADO_S` (5 segundos por defecto) para comprobarlo de nuevo. En los wakes
+  siguientes solo dedica `BOTON_REVISION_LECTURA_MS` (100 ms) a confirmar el nivel, en lugar de
+  repetir la espera activa de 5 segundos.
+- El estado se conserva en RTC y `recuperandoBotonAtascado()` permite que el futuro flujo principal
+  omita radio, heartbeat y sonidos durante ese wake de recuperación. El indicador se acepta solo
+  cuando la causa de wake es el timer; un reinicio por otra causa lo limpia como obsoleto.
+- Cuando se detecta la liberación, el wake activo en bajo se restaura automáticamente; no queda
+  deshabilitado permanentemente. Durante los 5 segundos de recuperación no se puede distinguir una
+  liberación seguida de una nueva pulsación: esa es la ventana máxima temporal sin detección. El
+  valor deberá ajustarse con mediciones de consumo y pruebas de uso reales.
+- Cualquier error al limpiar o habilitar fuentes se informa por Serial, aplica una pausa de 1 s y
+  evita entrar en deep sleep con una configuración incompleta. El futuro flujo principal deberá
+  decidir si reintenta o adopta otro estado seguro cuando `dormir()` regrese.
+- El buzzer activo de GPIO10 se maneja directamente en nivel alto. La confirmación dura 120 ms y
+  el error son tres sonidos de 500 ms separados por 250 ms. El módulo no invoca estos sonidos al
+  dormir ni durante un heartbeat; deberán llamarse únicamente desde el futuro flujo de alerta.
+- Arduino ESP32 3.3.7 habilita por defecto resistencias internas adecuadas al modo de wake dentro
+  de `esp_deep_sleep_start()`. Aun así, Espressif recomienda un pull-up externo para wake en nivel
+  bajo; su valor y el consumo adicional deben validarse con el circuito real.
 
 Sin hardware no se han validado todavía el rebote real del pulsador, el despertar desde deep
-sleep, la conservación del pull-up interno durante el sueño ni el comportamiento eléctrico ante
-una pulsación prolongada. Si el pull-up interno no mantiene un nivel estable en deep sleep, habrá
-que añadir una resistencia externa sin cambiar la lógica activa en bajo.
+sleep, el consumo de la resistencia interna, la polaridad real del buzzer ni el comportamiento
+eléctrico ante una pulsación prolongada. Si el pull-up interno no mantiene un nivel estable en
+deep sleep, habrá que añadir una resistencia externa sin cambiar la lógica activa en bajo.
 
 ## Configuración
 

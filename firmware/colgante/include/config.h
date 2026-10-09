@@ -18,3 +18,17 @@
 // aunque el boton permanezca presionado o el contacto siga rebotando.
 #define BOTON_ANTIRREBOTE_MS          30UL
 #define BOTON_ESPERA_LIBERACION_MS  5000UL
+
+// Buzzer activo en nivel alto.
+#define BUZZER_CONFIRMACION_MS       120UL
+#define BUZZER_ERROR_MS              500UL
+#define BUZZER_PAUSA_ERROR_MS        250UL
+#define BUZZER_ERROR_REPETICIONES      3U
+
+// Si el boton sigue bajo al dormir, se usa temporalmente solo el timer. Este intervalo corto
+// permite comprobar de nuevo la liberacion sin entrar en un ciclo de wake inmediato.
+#define BOTON_REVISION_ATASCADO_S      5U
+#define BOTON_REVISION_LECTURA_MS    100UL
+
+// Evita que un error persistente de configuracion provoque reintentos en un bucle caliente.
+#define ENERGIA_ERROR_REINTENTO_MS  1000UL
