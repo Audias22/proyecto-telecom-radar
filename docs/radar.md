@@ -372,7 +372,11 @@ requisito del proyecto (por ejemplo, limitar el radar a presencia y apoyarse en 
 
 > Actualización: las pruebas acostado se hicieron y el resultado se mantuvo (sección 11).
 
-## 11. Persona acostada: frecuencia, apnea y cama vacía (conclusión)
+## 11. Persona acostada: frecuencia, apnea y cama vacía (resultados preliminares, en evaluación)
+
+> Estado: **en evaluación**. Estos resultados salen de 2 apneas acostado y de un solo tipo de
+> detector. Antes de concluir se revisa la lectura del radar, el montaje recomendado por Seeed y
+> otros detectores (sección 12).
 
 Scripts: `analisis/validar_respiracion.py` y `analisis/detectar_apnea.py`, con los mismos
 parámetros para todas las capturas. Salidas: `pruebas/resultados/validacion_respiracion/`
@@ -482,9 +486,10 @@ Valores después de los primeros 30 s (tabla completa en `deteccion.md`).
   más con una persona, es decir, al menos 2.5 veces más que la pared y 10 veces más que la cama
   vacía. El RMS de `fase_resp` también (0.002-0.003 contra 0.039 o más).
 
-### Conclusión
+### Resultados preliminares
 
-**Demostrado con estas capturas** (se repite en todas las que aplican):
+**Observado en todas las capturas que aplican** (sujeto a la revisión de la lectura del radar y
+del montaje, sección 12):
 
 1. Ninguna señal del radar sigue la frecuencia respiratoria en todo el rango 8-30 rpm, ni sentado
    ni acostado. A 30 rpm todos los métodos fallan por 10 rpm o más.
@@ -501,15 +506,15 @@ Valores después de los primeros 30 s (tabla completa en `deteccion.md`).
    alarma cada 1-3 minutos.
 5. Acostado, la mediana del módulo coincidió con el pacer a 8 y 15 rpm (una captura cada uno).
 
-**Respuesta:** con este módulo, en las condiciones probadas, **el radar no sigue la respiración ni
-detecta la apnea de forma confiable**. La mejor variante detectaría una apnea con ~10 s de retraso,
-pero daría del orden de una falsa alarma por cada uno o dos minutos de respiración normal, lo que
-en una noche sería inaceptable.
+**Estado:** con el detector probado y estas capturas, la detección de apnea no alcanza la
+confiabilidad necesaria: la mejor variante detectaría una apnea con ~10 s de retraso, pero con
+del orden de una falsa alarma por cada uno o dos minutos de respiración normal. Es un resultado
+preliminar (2 apneas, un tipo de detector); la decisión queda pendiente de la sección 12.
 
-### Recomendación para el firmware de la base
+### Recomendación provisional para el firmware de la base
 
-1. **El radar no dispara alarmas de apnea.** Ni el buzzer local ni Telegram se activan por el
-   radar. La alarma confiable del sistema es el botón del colgante.
+1. **Mientras la detección de apnea esté en evaluación, el radar no dispara alarmas de apnea.**
+   La alarma confiable del sistema es el botón del colgante.
 2. **El radar sí reporta "persona en cama" / "cama vacía"** con la actividad: mediana de
    |`fase_total`| (descartando las tramas en 0) en una ventana de 30 s. Umbral inicial **0.03**
    (cama vacía 0.004, pared 0.017, personas ≥ 0.042); hay que confirmarlo con más capturas de cama
@@ -524,7 +529,5 @@ en una noche sería inaceptable.
 5. Si hay "radar sin datos" (sección 7) o la tasa cae a ~8.5 tramas/s, el radar no está viendo
    nada: se informa como falla del radar, no como apnea ni como cama vacía.
 
-Esto cambia el alcance declarado del proyecto: el radar ya no detecta apnea. Queda registrado en
-`docs/fallos.md` y en los límites conocidos del README. Para volver a intentarlo harían falta más
-apneas (al menos 10, de distintas personas y duraciones) para elegir umbrales con una validación
-real, y probar una referencia que se reaprenda.
+El estado "en evaluación" está registrado en `docs/fallos.md` y en los límites conocidos del
+README.

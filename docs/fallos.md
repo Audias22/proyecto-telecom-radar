@@ -4,9 +4,9 @@ Principio general: **la alerta local de la base (buzzer y LED) no depende de la 
 alerta del colgante, la base suena aunque no haya WiFi, Firebase ni Telegram. Todo lo que va a la
 nube es un segundo aviso, con reintentos.
 
-Desde el 2026-10-09 el radar **no dispara alarmas de apnea**: las pruebas mostraron que no detecta
-la apnea de forma confiable (`radar.md`, sección 11). El radar informa "persona en cama" / "cama
-vacía" y datos informativos; la alarma confiable es el botón del colgante.
+La detección de apnea por radar está **en evaluación** (resultados preliminares en `radar.md`,
+sección 11). Mientras no se valide, la alarma confiable es el botón del colgante; el radar informa
+"persona en cama" / "cama vacía" y datos informativos.
 
 | # | Escenario | Cómo se detecta | Qué hace el sistema | Módulos |
 |---|---|---|---|---|
@@ -23,19 +23,18 @@ vacía" y datos informativos; la alarma confiable es el botón del colgante.
 
 ## Detalles y decisiones
 
-### Apnea (límite del sistema)
+### Apnea (en evaluación)
 
-- **Decisión del 2026-10-09:** el radar no detecta apnea en este sistema. Con la persona acostada
-  a ~50 cm (posición de uso real), el mejor detector probado (caída de la actividad) detectó la
-  apnea de prueba en una sola de las dos validaciones cruzadas, con ~10 s de retraso, y dio una
-  falsa alarma cada ~75 s de respiración normal. El `resp_rpm` del módulo siguió marcando
-  respiración durante las apneas. Detalle en `radar.md`, sección 11.
-- "Posible pausa respiratoria" queda como función experimental, desactivada por defecto: si se
-  activa, solo registra un evento de baja prioridad para revisión, nunca una alarma.
-- El tipo de evento `APNEA` se mantiene en el modelo de datos para esa función experimental; no se
-  usa para avisar al cuidador.
+- **Resultados preliminares del 2026-10-09** (2 apneas acostado, un solo tipo de detector): con la
+  persona acostada a ~50 cm, el mejor detector probado (caída de la actividad) detectó la apnea de
+  prueba en una de las dos validaciones cruzadas, con ~10 s de retraso, y dio una falsa alarma
+  cada ~75 s de respiración normal. El `resp_rpm` del módulo siguió marcando respiración durante
+  las apneas. Detalle en `radar.md`, sección 11. Se está revisando la lectura del radar, el
+  montaje y el detector antes de decidir.
+- Mientras no se valide, la apnea detectada por radar no dispara alarmas.
+- El tipo de evento `APNEA` se mantiene en el modelo de datos.
 
-Historia de la decisión:
+Historia:
 
 - Definición de trabajo inicial: presencia continua, distancia en rango y respiración ausente (o
   `resp_rpm` = 0) durante un tiempo umbral.
