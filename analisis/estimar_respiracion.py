@@ -53,6 +53,10 @@ FRACCION_HISTERESIS = 0.05
 
 SENALES = ("fase_resp", "fase_total_desenvuelta", "fase_total_integrada")
 
+# Columnas numéricas del CSV de capturar_serial.py (además de ms).
+COLUMNAS_CSV = ("valida", "presencia", "distancia_cm", "resp_rpm", "latido_bpm",
+                "fase_total", "fase_resp", "fase_latido")
+
 MUESTRAS_VENTANA = int(round(VENTANA_S * FS_HZ))
 MUESTRAS_PASO = int(round(PASO_S * FS_HZ))
 
@@ -64,22 +68,17 @@ CARPETA_RESULTADOS = Path(__file__).resolve().parent.parent / "pruebas" / "resul
 def cargar_csv(ruta):
     """Lee un CSV de capturar_serial.py y devuelve un dict de arreglos.
 
-    Claves: t (s desde la primera fila), fase_resp, fase_total, resp_rpm, presencia.
+    Claves: t (s desde la primera fila) y una por columna numérica del CSV (COLUMNAS_CSV).
     Ignora comentarios '#', filas incompletas y marcas de tiempo repetidas o que retroceden
     (por ejemplo, si la base se reinició durante la captura).
     """
-    columnas = {"t": [], "fase_resp": [], "fase_total": [], "resp_rpm": [], "presencia": []}
+    columnas = {"t": [], **{nombre: [] for nombre in COLUMNAS_CSV}}
     with open(ruta, encoding="utf-8") as archivo:
         filas = (linea for linea in archivo if not linea.startswith("#"))
         for fila in csv.DictReader(filas):
             try:
                 t = int(fila["ms"]) / 1000.0
-                valores = {
-                    "fase_resp": float(fila["fase_resp"]),
-                    "fase_total": float(fila["fase_total"]),
-                    "resp_rpm": float(fila["resp_rpm"]),
-                    "presencia": float(fila["presencia"]),
-                }
+                valores = {nombre: float(fila[nombre]) for nombre in COLUMNAS_CSV}
             except (TypeError, ValueError):
                 continue
             if math.isnan(valores["fase_resp"]) or (columnas["t"] and t <= columnas["t"][-1]):
