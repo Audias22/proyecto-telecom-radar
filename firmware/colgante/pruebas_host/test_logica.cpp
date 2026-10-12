@@ -15,6 +15,7 @@
 
 #include "bateria.h"
 #include "despertar.h"
+#include "duplicados.h"
 #include "espnow_tx.h"
 
 namespace {
@@ -363,6 +364,66 @@ void tiempoPeorCasoDocumentado() {
 }
 
 // --------------------------------------------------------------------------
+// 7b. Regla de duplicados de la base (comun/protocolo/duplicados.h)
+// --------------------------------------------------------------------------
+
+// Primer mensaje tras arrancar: la base lo procesa, el ACK se pierde y el colgante lo reenvia
+// con FLAG_ARRANQUE_FRIO + FLAG_REINTENTO y la misma secuencia. La base no debe procesarlo dos
+// veces, ni en los reintentos del canal guardado ni en el barrido.
+void duplicadoArranqueFrioConAckPerdido() {
+    const PaqueteEspNow original = construirPaquete(MSG_ALERTA, ID, 3900, 1, true);
+    duplicados::Estado base{true, 500};  // la base recuerda la vida anterior del colgante
+
+    VERIFICAR(duplicados::esNuevo(base, original.flags, original.secuencia));
+    base = duplicados::actualizar(base, true, original.secuencia);
+
+    for (uint8_t n = 1; n < ACK_REINTENTOS; ++n) {
+        const PaqueteEspNow p = intento(original, n, false);
+        VERIFICAR_IGUAL(p.flags & (FLAG_ARRANQUE_FRIO | FLAG_REINTENTO),
+                        FLAG_ARRANQUE_FRIO | FLAG_REINTENTO);
+        VERIFICAR(!duplicados::esNuevo(base, p.flags, p.secuencia));
+    }
+    const PaqueteEspNow barrido = intento(original, 0, true);
+    VERIFICAR((barrido.flags & FLAG_ARRANQUE_FRIO) != 0);
+    VERIFICAR(!duplicados::esNuevo(base, barrido.flags, barrido.secuencia));
+
+    // El siguiente mensaje del colgante sigue siendo nuevo (con o sin ARRANQUE_FRIO, que se
+    // mantiene mientras no haya llegado ningun ACK).
+    VERIFICAR(duplicados::esNuevo(base, FLAG_ARRANQUE_FRIO, 2));
+    VERIFICAR(duplicados::esNuevo(base, 0, 2));
+}
+
+void duplicadoReglasGenerales() {
+    const duplicados::Estado vacio{false, 0};
+    // Sin historia: nuevo, aunque sea un reintento (el primer intento pudo perderse).
+    VERIFICAR(duplicados::esNuevo(vacio, 0, 7));
+    VERIFICAR(duplicados::esNuevo(vacio, FLAG_REINTENTO, 7));
+
+    const duplicados::Estado base{true, 500};
+    VERIFICAR(duplicados::esNuevo(base, 0, 501));
+    VERIFICAR(!duplicados::esNuevo(base, 0, 500));
+    VERIFICAR(!duplicados::esNuevo(base, FLAG_REINTENTO, 500));
+    VERIFICAR(!duplicados::esNuevo(base, FLAG_REINTENTO | FLAG_BARRIDO, 500));
+    VERIFICAR(!duplicados::esNuevo(base, 0, 499));
+
+    // Colgante reiniciado: secuencia 1 con ARRANQUE_FRIO es nueva, tambien si el primer intento
+    // se perdio y llega como reintento.
+    VERIFICAR(duplicados::esNuevo(base, FLAG_ARRANQUE_FRIO, 1));
+    VERIFICAR(duplicados::esNuevo(base, FLAG_ARRANQUE_FRIO | FLAG_REINTENTO, 1));
+    // Sin ARRANQUE_FRIO, una secuencia menor es duplicado.
+    VERIFICAR(!duplicados::esNuevo(base, 0, 1));
+
+    // Desborde de 65535 a 0.
+    VERIFICAR(duplicados::esNuevo(duplicados::Estado{true, 0xFFFF}, 0, 0));
+    VERIFICAR(!duplicados::esNuevo(duplicados::Estado{true, 0}, 0, 0xFFFF));
+
+    // El estado solo avanza con mensajes nuevos.
+    VERIFICAR_IGUAL(duplicados::actualizar(base, false, 499).ultima, 500);
+    VERIFICAR_IGUAL(duplicados::actualizar(base, true, 501).ultima, 501);
+    VERIFICAR(duplicados::actualizar(vacio, true, 3).conocido);
+}
+
+// --------------------------------------------------------------------------
 // 8. Decision de despertar (despertar::decidir)
 // --------------------------------------------------------------------------
 
@@ -545,6 +606,8 @@ int main() {
     ejecutar("canales: limites 0/1/13/14/255", canalesLimites);
     ejecutar("canales: recorrido 0..255", canalesRecorridoCompleto);
     ejecutar("tiempos: peor caso documentado 1.6 s", tiempoPeorCasoDocumentado);
+    ejecutar("duplicados: ARRANQUE_FRIO con ACK perdido no se procesa dos veces", duplicadoArranqueFrioConAckPerdido);
+    ejecutar("duplicados: reglas generales y desborde", duplicadoReglasGenerales);
     ejecutar("despertar: ALERTA por wake GPIO3", decisionAlertaPorBoton);
     ejecutar("despertar: pulsacion breve ya liberada sigue siendo ALERTA", decisionPulsacionBreveYaLiberada);
     ejecutar("despertar: HEARTBEAT por temporizador", decisionHeartbeatPorTemporizador);
