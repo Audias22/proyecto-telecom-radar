@@ -131,7 +131,8 @@ repositorio.
 - Cualquier error al limpiar o habilitar fuentes se informa por Serial, aplica una pausa de 1 s y
   evita entrar en deep sleep con una configuración incompleta. Cuando `dormir()` regresa, `loop()`
   reintenta solo la suspensión, sin retransmitir ni volver a sonar (ver Ciclo principal integrado).
-- El buzzer activo de GPIO10 se maneja directamente en nivel alto. La confirmación dura 120 ms y
+- El buzzer activo de GPIO10 suena con el pin en nivel alto (a través de un transistor NPN; ver
+  `pruebas_fisicas.md`). La confirmación dura 120 ms y
   el error son tres sonidos de 500 ms separados por 250 ms. El módulo no invoca estos sonidos al
   dormir ni durante un heartbeat; `main.cpp` los llama únicamente al terminar una alerta.
 - Arduino ESP32 3.3.7 habilita por defecto resistencias internas adecuadas al modo de wake dentro
@@ -261,7 +262,7 @@ Pendientes de confirmar con el circuito armado. Ningún cableado se ha probado t
 | Elemento | Conexión | Notas |
 |---|---|---|
 | Pulsador | GPIO3 ↔ GND | Activo en bajo con `INPUT_PULLUP`. GPIO0-GPIO5 son los únicos que despiertan de deep sleep; se evita GPIO2 (strapping). Puede necesitar pull-up externo. |
-| Buzzer activo | `+` a GPIO10, `-` a GND | Activo en nivel alto, manejado directo desde el pin. Medir su corriente: si supera lo que el GPIO puede entregar con seguridad, se necesita un transistor. |
+| Buzzer activo | `+` a 3V3, `-` al colector de un NPN; GPIO10 — 1 kΩ — base; emisor a GND; 10 kΩ de GPIO10 a GND | Activo en nivel alto. Transistor porque el buzzer consume unos 15-30 mA, en el límite del GPIO; directo al pin solo si mide 12 mA o menos. La de 10 kΩ evita que el pin flote en deep sleep. Diagrama en `pruebas_fisicas.md`. |
 | Divisor de batería | `OUT+` — 1 MΩ — GPIO1 — 470 kΩ — GND, con 10 nF de GPIO1 a GND | Ver "Circuito propuesto" arriba. Nunca la batería directa a GPIO1. |
 | Batería Li-ion 240 mAh | Soldada a los pads `BAT+` / `BAT-` del TP4056 | Respetar polaridad. Antes, cambiar R3 por 4.7 kΩ. |
 | Alimentación del ESP32-C3 | Desde `OUT+` / `OUT-` del TP4056 | Por definir a qué pin de la Super Mini (5V o 3V3) y con qué regulación. No está decidido en el repositorio. |
@@ -354,5 +355,7 @@ del firmware:
 - Definir cómo se alimenta la Super Mini desde `OUT+` / `OUT-`.
 - Armar botón, buzzer y divisor de batería, y confirmar los pines.
 - Diseñar e imprimir la carcasa y el cordón.
-- Ejecutar `pruebas_fisicas.md` y ajustar con mediciones: `BATERIA_BAJA_MV`, tiempos de ACK,
-  `CANAL_MAX` según el router, y necesidad de pull-up externo o transistor para el buzzer.
+- Primera prueba en protoboard con el receptor `firmware/pruebas/receptor_espnow`
+  (`pruebas_fisicas.md`, primera parte).
+- Ejecutar el resto de `pruebas_fisicas.md` y ajustar con mediciones: `BATERIA_BAJA_MV`, tiempos
+  de ACK, `CANAL_MAX` según el router, y necesidad de pull-up externo para el botón.
