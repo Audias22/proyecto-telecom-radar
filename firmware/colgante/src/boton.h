@@ -3,18 +3,22 @@
 
 #pragma once
 
+#include "config.h"
+
 namespace boton {
 
-// TODO: configurar PIN_BOTON como entrada. Por confirmar con el módulo si basta el pull-up
-// interno durante el deep sleep o hace falta una resistencia externa.
+// Configura el boton activo en bajo con el pull-up interno.
 void iniciar();
 
-// TODO: true si el despertar fue por el botón (y no por el timer del heartbeat).
+// True solamente si PIN_BOTON fue el GPIO que causo el ultimo despertar.
 bool despertoPorBoton();
 
+// Devuelve el estado estable actual. No representa una pulsacion nueva en cada llamada.
 bool presionado();
 
-// TODO: esperar a que se suelte, con límite de tiempo, para no volver a despertar en bucle.
-void esperarSoltar(unsigned long limite_ms);
+// Espera una liberacion estable sin superar limite_ms. Si se omite el argumento usa el limite
+// configurado. Devuelve false si el boton sigue presionado al agotar el tiempo; en ese caso no se
+// debe habilitar inmediatamente el despertar en nivel bajo porque provocaria un bucle.
+bool esperarSoltar(unsigned long limite_ms = BOTON_ESPERA_LIBERACION_MS);
 
 }  // namespace boton

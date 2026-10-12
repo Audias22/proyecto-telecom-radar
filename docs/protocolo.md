@@ -24,7 +24,7 @@ coinciden, manda el header y hay que corregir este documento.
 | 2 | `id_dispositivo` | uint8 | Id del colgante. En un ACK, id del colgante al que se responde. |
 | 3 | `flags` | uint8 | Bits, ver tabla siguiente |
 | 4-5 | `secuencia` | uint16 LE | Contador del colgante. El ACK repite la secuencia que confirma. |
-| 6-7 | `bateria_mv` | uint16 LE | Batería del colgante en mV. `0` en un ACK. |
+| 6-7 | `bateria_mv` | uint16 LE | Batería del colgante en mV. `0` en un ACK. En un mensaje del colgante, `0` = sin dato (falló la lectura); el colgante marca además `FLAG_BATERIA_BAJA` por precaución, así que la base debe informar "batería sin dato" en vez de un voltaje. |
 
 Flags en mensajes del colgante:
 
@@ -119,17 +119,33 @@ sleep pero se pierde al quitar la batería o reiniciar por completo.
 
 La base guarda, por cada `id_dispositivo`, la última secuencia procesada (en RAM).
 
-Al recibir un mensaje del colgante, la base:
+Al recibir un mensaje del colgante, la base (código: `firmware/comun/protocolo/duplicados.h`):
 
 1. Valida `version` y `tipo`.
-2. Si trae `FLAG_ARRANQUE_FRIO`, olvida la secuencia guardada para ese colgante y lo acepta como
+2. **Primero revisa el duplicado:** si trae `FLAG_REINTENTO` y la misma secuencia que la última
+   procesada de ese colgante, es un duplicado, **aunque traiga `FLAG_ARRANQUE_FRIO`**.
+3. Si trae `FLAG_ARRANQUE_FRIO`, olvida la secuencia guardada para ese colgante y lo acepta como
    nuevo.
-3. Compara con la última secuencia usando aritmética de 16 bits con signo, para tolerar el
+4. Si no tiene secuencia guardada de ese colgante, lo acepta como nuevo.
+5. Si no, compara con la última secuencia usando aritmética de 16 bits con signo, para tolerar el
    desborde de 65535 a 0:
    `nueva = (int16_t)(secuencia - ultima) > 0`.
-4. Si es nueva: procesa (alerta local, Firebase, Telegram) y guarda la secuencia.
-5. Si no es nueva: no vuelve a procesar.
-6. En ambos casos responde ACK. Si era repetida, con `FLAG_ACK_DUPLICADO`.
+6. Si es nueva: procesa (alerta local, Firebase, Telegram) y guarda la secuencia.
+7. Si no es nueva: no vuelve a procesar.
+8. En ambos casos responde ACK. Si era repetida, con `FLAG_ACK_DUPLICADO`.
+
+Por qué el paso 2 va antes que `FLAG_ARRANQUE_FRIO`: el colgante mantiene `FLAG_ARRANQUE_FRIO` en
+todos los reintentos y en el barrido de su primer mensaje tras arrancar, y en los mensajes
+siguientes mientras no reciba ningún ACK. Si la base procesó ese primer mensaje y se perdió el
+ACK, el reintento llega con `FLAG_ARRANQUE_FRIO | FLAG_REINTENTO` y la misma secuencia; con
+`FLAG_ARRANQUE_FRIO` primero, la base lo aceptaría dos veces.
+
+Caso límite conocido: si el colgante se reinicia, su nueva secuencia coincide con la última que
+la base guardó de la vida anterior (por ejemplo, ambas en 1) y el primer intento se pierde, el
+reintento se toma como duplicado y esa alerta no se procesa (la base sí responde ACK). Solo pasa
+si el colgante se reinició cuando había enviado exactamente un mensaje, o con ~65 000 mensajes
+de diferencia. Si se quiere eliminar, el colgante puede empezar la secuencia en un valor
+aleatorio tras un arranque en frío.
 
 Siempre se responde ACK aunque sea duplicado: el caso típico es que el ACK anterior se perdió y el
 colgante reintentó. Si no se le responde, terminaría barriendo canales y dando el patrón de error

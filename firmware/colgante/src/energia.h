@@ -6,14 +6,19 @@
 
 namespace energia {
 
-// TODO: beep corto de confirmación (alerta recibida por la base).
+// Beep corto de confirmacion (alerta recibida por la base).
 void beepConfirmacion();
 
-// TODO: tres beeps largos (la base no respondió en ningún canal).
+// Tres beeps largos (la base no respondio en ningun canal).
 void beepError();
 
-// TODO: habilitar despertar por PIN_BOTON en nivel bajo (esp_deep_sleep_enable_gpio_wakeup) y
-// por timer cada HEARTBEAT_INTERVALO_S, y entrar en deep sleep. No regresa.
+// True si el ultimo deep sleep se configuro como recuperacion de un boton que seguia presionado
+// y este arranque fue causado por su timer. Limpia estados RTC obsoletos tras otros reinicios.
+// El futuro flujo principal debe omitir radio y sonidos en ese wake y volver a llamar dormir().
+bool recuperandoBotonAtascado();
+
+// Espera de forma limitada la liberacion, configura las fuentes de wake y entra en deep sleep.
+// Normalmente no regresa; si alguna API de configuracion falla, informa por Serial y retorna.
 void dormir();
 
 }  // namespace energia
