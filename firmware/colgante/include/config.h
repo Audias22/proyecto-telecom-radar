@@ -51,6 +51,10 @@
 #define BUZZER_PAUSA_ERROR_MS        250UL
 #define BUZZER_ERROR_REPETICIONES      3U
 
+// Intervalo del heartbeat solo para pruebas en banco, en segundos. En 0 se usa el normal de
+// protocolo.h (HEARTBEAT_INTERVALO_S, 15 min). Volver a 0 antes de usar el colgante en serio.
+#define HEARTBEAT_PRUEBA_S 0U
+
 // Si el boton sigue bajo al dormir, se usa temporalmente solo el timer. Este intervalo corto
 // permite comprobar de nuevo la liberacion sin entrar en un ciclo de wake inmediato.
 #define BOTON_REVISION_ATASCADO_S      5U

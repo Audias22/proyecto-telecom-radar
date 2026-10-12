@@ -14,7 +14,11 @@ constexpr uint64_t MICROSEGUNDOS_POR_SEGUNDO = 1000000ULL;
 constexpr uint64_t MASCARA_BOTON = 1ULL << PIN_BOTON;
 
 static_assert(PIN_BUZZER != PIN_BOTON, "El buzzer y el boton no pueden compartir GPIO");
-static_assert(HEARTBEAT_INTERVALO_S > 0, "El intervalo de heartbeat debe ser mayor que cero");
+// HEARTBEAT_PRUEBA_S (config.h) acorta el intervalo para pruebas; en 0 rige el de protocolo.h.
+constexpr uint32_t INTERVALO_HEARTBEAT_S =
+    HEARTBEAT_PRUEBA_S > 0 ? HEARTBEAT_PRUEBA_S : HEARTBEAT_INTERVALO_S;
+
+static_assert(INTERVALO_HEARTBEAT_S > 0, "El intervalo de heartbeat debe ser mayor que cero");
 static_assert(BOTON_REVISION_ATASCADO_S > 0,
               "El intervalo de revision del boton debe ser mayor que cero");
 static_assert(BOTON_REVISION_LECTURA_MS > BOTON_ANTIRREBOTE_MS,
@@ -113,7 +117,7 @@ void dormir() {
         en_recuperacion ? BOTON_REVISION_LECTURA_MS : BOTON_ESPERA_LIBERACION_MS;
     const bool boton_liberado = boton::esperarSoltar(espera_liberacion_ms);
     const uint32_t intervalo_s =
-        boton_liberado ? HEARTBEAT_INTERVALO_S : BOTON_REVISION_ATASCADO_S;
+        boton_liberado ? INTERVALO_HEARTBEAT_S : BOTON_REVISION_ATASCADO_S;
 
     if (!limpiarFuentesDespertar() || !habilitarTemporizador(intervalo_s)) {
         esperarTrasError();
@@ -130,6 +134,10 @@ void dormir() {
         Serial.println("energia: boton presionado; se reintentara la liberacion por timer");
     }
 
+    if (HEARTBEAT_PRUEBA_S > 0) {
+        Serial.printf("energia: heartbeat de prueba cada %u s\n",
+                      static_cast<unsigned>(INTERVALO_HEARTBEAT_S));
+    }
     esp_deep_sleep_start();
 }
 
