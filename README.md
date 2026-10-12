@@ -11,6 +11,9 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 | Marcos Estuardo Franco Hernandez | 1190-22-5604 |
 | Brenner Yubiny Granados Pinto | 1190-22-898 |
 
+Desde el 12 de octubre de 2026, el desarrollo y la integración del proyecto los hace Rudi Audias
+Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad.
+
 ---
 
 ## Estado general del proyecto
@@ -20,7 +23,7 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 | Componente | Estado | Notas |
 |---|---|---|
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
-| Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
+| Colgante (botón + ESP32) | Firmware listo, sin probar en hardware | Firmware de Abraham revisado y fusionado el 12 oct (compila; 37 casos de prueba en PC); nadie lo ha cargado todavía en un ESP32-C3. ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
 | Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
@@ -171,6 +174,11 @@ Instrucciones en `web/README.md`.
 ### 9 agosto 2026
 - Definición final del proyecto y documento de propuesta completado
 
+### 12 octubre 2026
+- Noche completa de sueño con el radar y decisión del detector para la base (`docs/radar.md`, sección 13)
+- Revisión del firmware del colgante y fusión a `main`: espera al monitor USB solo en arranque en frío, regla de duplicados con `FLAG_ARRANQUE_FRIO` corregida en `docs/protocolo.md` y llevada a `firmware/comun/protocolo/duplicados.h`, con 2 casos de prueba nuevos
+- Desde esta fecha llevo solo el desarrollo y la integración
+
 ---
 
 ## Avance — Abraham (colgante)
@@ -186,6 +194,9 @@ Instrucciones en `web/README.md`.
 - Pruebas automatizadas en PC (`firmware/colgante/pruebas_host/`): 35 casos y 538 verificaciones aprobados en Windows y Linux; decisión de despertar aislada en `src/despertar.h`. El firmware compila con PlatformIO (`a4102da`)
 - Documentación del colgante completada: configuración, conexiones propuestas, dependencias con la base y lista de pruebas físicas (`firmware/colgante/pruebas_fisicas.md`)
 - Nada probado todavía en hardware: falta la batería, armar el circuito, cambiar R3 del TP4056, carcasa y cordón. Para probar el enlace se necesita `espnow_rx` de la base (ver "Integración con la base" en `firmware/colgante/README.md`)
+
+### Entrega (registrada el 12 octubre 2026)
+- Entregó el firmware completo del colgante (botón, deep sleep, ESP-NOW con ACK y barrido de canales, batería simulada) y las pruebas en PC (`firmware/colgante/pruebas_host/`, 35 casos y 538 verificaciones), escritos y probados sin hardware. Fusionado a `main` el 12 de octubre tras la revisión de Audias
 
 ---
 
