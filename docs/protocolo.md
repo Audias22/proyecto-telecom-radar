@@ -24,7 +24,7 @@ coinciden, manda el header y hay que corregir este documento.
 | 2 | `id_dispositivo` | uint8 | Id del colgante. En un ACK, id del colgante al que se responde. |
 | 3 | `flags` | uint8 | Bits, ver tabla siguiente |
 | 4-5 | `secuencia` | uint16 LE | Contador del colgante. El ACK repite la secuencia que confirma. |
-| 6-7 | `bateria_mv` | uint16 LE | Batería del colgante en mV. `0` en un ACK. |
+| 6-7 | `bateria_mv` | uint16 LE | Batería del colgante en mV. `0` en un ACK. En un mensaje del colgante, `0` = sin dato (falló la lectura); el colgante marca además `FLAG_BATERIA_BAJA` por precaución, así que la base debe informar "batería sin dato" en vez de un voltaje. |
 
 Flags en mensajes del colgante:
 
