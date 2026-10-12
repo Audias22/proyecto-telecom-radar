@@ -26,6 +26,9 @@ pip install -r requirements.txt
 | `test_estimar_respiracion.py` | Pruebas de `estimar_respiracion.py` con señales sintéticas |
 | `validar_respiracion.py` | Compara los estimadores contra las capturas con conteo manual (espectros y tabla de errores) |
 | `detectar_apnea.py` | Detector de apnea por caída de amplitud; evalúa detección y falsas alarmas en todas las capturas |
+| `detector_apnea.py` | Detector de apnea v2 (medidas por segundo y máquina de estados), portable al ESP32 |
+| `evaluar_detector_apnea.py` | Evalúa el detector v2 con validación cruzada contra el criterio de éxito |
+| `analizar_noche.py` | Noche completa: vista por minuto, segmentos, criterio de cama vacía, falsas alarmas y respiración en el sueño |
 
 ### Capturar
 
@@ -75,6 +78,17 @@ python detectar_apnea.py
 Usan las capturas listadas al principio de cada script (con su conteo manual o el intervalo de
 apnea) y escriben en `pruebas/resultados/validacion_respiracion/` y
 `pruebas/resultados/deteccion_apnea/`.
+
+### Analizar una noche
+
+```
+python analizar_noche.py ..\pruebas\crudos\2026-10-12_024855_noche_cama.csv
+```
+
+Los eventos anotados (número de lectura) y los parámetros son constantes al principio del script.
+Escribe `resumen.md`, `noche.png`, `alarmas.png` y `respiracion.png` en
+`pruebas/resultados/noche_<captura>/`. Detalle en `docs/radar.md`, sección 13. En la consola de
+Windows, si falla al imprimir caracteres como ≥, usar `set PYTHONIOENCODING=utf-8`.
 
 ### Pruebas
 

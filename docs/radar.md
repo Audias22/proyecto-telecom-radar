@@ -529,6 +529,10 @@ preliminar (2 apneas, un tipo de detector); la decisión queda pendiente de la s
 5. Si hay "radar sin datos" (sección 7) o la tasa cae a ~8.5 tramas/s, el radar no está viendo
    nada: se informa como falla del radar, no como apnea ni como cama vacía.
 
+> Actualización (sección 13): en una noche real el radar pasó a ~8.6 tramas/s (sin objetivo)
+> durante casi la mitad del sueño con la persona en la cama. La tasa baja **no** es una falla; la
+> falla es "radar sin datos". La recomendación final está en la sección 13.6.
+
 El estado "en evaluación" está registrado en `docs/fallos.md` y en los límites conocidos del
 README.
 
@@ -681,3 +685,200 @@ Para decidir con datos, en el montaje y uso recomendados:
 
 El detector y sus parámetros quedan fijos antes de la sesión (actividad, ventana de 10 s, umbral
 0.7, 20 s, referencia de 60 s), y la sesión se usa solo para evaluarlos.
+
+## 13. Noche completa de sueño real y decisión para el firmware
+
+Captura: `pruebas/crudos/2026-10-12_024855_noche_cama.csv` (7 h 45 min, 324 443 filas). Script:
+`analisis/analizar_noche.py`; resultados en `pruebas/resultados/noche_2026-10-12_024855_noche_cama/`
+(`resumen.md` con todas las tablas, `noche.png`, `alarmas.png`, `respiracion.png`). Ningún
+parámetro se ajustó con esta noche: todos vienen de las secciones 11 y 12, y las variantes del
+detector (25 y 30 s) se fijaron antes de correrlo.
+
+**Condiciones**: radar más alto que la cama, inclinado hacia el pecho (parecido al montaje de
+Seeed, sin medir). Durante la noche se movió y terminó apuntando más al frente (no se sabe cuándo).
+Sin ventilador. Una persona que durmió casi toda la noche boca abajo y se dio vueltas. Se asume que
+no hubo apneas: toda alarma durante el sueño cuenta como falsa.
+
+### 13.1 Vista de la noche (`noche.png`)
+
+- **La captura tiene 7 huecos** sin filas (1 059 s en total, todos después de las 6 h; el mayor de
+  473 s). `ms` sigue creciendo, así que la base no se reinició: se perdió el registro en la
+  computadora o el USB, no el radar. Se excluyen de todo el análisis y el detector corre por
+  separado en cada tramo continuo.
+- **El radar pierde el objetivo durante tramos largos con la persona dormida**: presencia 0 y
+  ~8.6 tramas/s (sin tramas de fase con dato), incluido un tramo de ~1.6 h seguidas (de 3.7 a
+  5.3 h). Es el 48 % del sueño con datos (3.69 h con objetivo de 7.03 h).
+- **Cambio de nivel de la distancia**: el mayor salto (mediana de 30 min antes y después) está a
+  las **3 h 10 min**, de ~40 a ~80 cm. Antes la distancia estuvo en 35-65 cm; después pasó por
+  80-140 cm, luego el tramo sin objetivo, 109-115 cm entre 5.3 y 6 h y 75-90 cm hasta el final.
+  Es compatible con que el sensor se movió alrededor de las 3.2 h, pero un cambio de postura
+  también cambia la distancia: **no se puede confirmar cuándo se movió**.
+- Antes y después de las 3.2 h la actividad mediana con objetivo es la misma (0.049 y 0.048),
+  pero los minutos con objetivo y actividad < 0.03 pasan de 11 % a 20 %, y los minutos sin objetivo
+  de 40 % a 53 %: la señal empeora después del cambio (tendencia).
+- `resp_rpm` y `latido_bpm` del módulo pasan la mayor parte del tiempo en 0, también con objetivo
+  (13.5).
+
+### 13.2 Segmentos
+
+| Segmento | Tramo | Criterio |
+|---|---|---|
+| De pie (preparación) | 0:00-0:04:09 | antes del primer evento anotado |
+| Vacío | 0:04:09-0:07:51 | lectura ~3100 (sale) a ~5800 (vuelve) |
+| De pie, a ~1.5 m a un costado | 0:07:51-0:11:15 | lectura ~5800 a ~7800 |
+| Vacío | 0:11:15-0:13:10 | lectura ~7800 a ~9600 |
+| De pie (vuelve) | 0:13:10-0:13:29 | lectura ~9600 a ~9900 |
+| En cama despierta | 0:13:29-0:24:00 | de "se acuesta" al inicio del sueño |
+| Dormida | 0:24:00-7:44:00 | 440 min (7.03 h con datos) |
+| En cama despierta | último minuto | despierta y detiene la captura |
+
+- Los eventos se pasan de número de lectura (fila) a tiempo con la columna `ms`.
+- **Inicio del sueño**: primer tramo de 10 minutos seguidos, después de acostarse, sin ningún minuto
+  con actividad mediana > 0.1 (los minutos sin objetivo no cuentan como movimiento). 0.1 está por
+  encima de la respiración tranquila acostado (0.04-0.07, sección 11) y por debajo del movimiento
+  de acomodarse (0.2-0.3). Da las 0:24, 10.5 min después de acostarse ("unos minutos" con el
+  celular). Es una estimación: no hay registro del momento real en que se durmió.
+- Como los eventos son aproximados, para evaluar se descartan ±30 s alrededor de cada cambio.
+
+Las señales coinciden con los eventos: actividad de cuarto vacío (0.005) entre la primera salida y
+el regreso, y actividad de 0.1-0.3 al acostarse. Con la persona de pie a un costado, el radar no
+la vio la mayor parte del tiempo (estaba fuera del cono).
+
+### 13.3 Criterio de cama vacía (actividad de 30 s ≥ 0.03)
+
+Por segundo; sin objetivo del radar (sin tramas de fase con dato) cuenta como "sin persona".
+
+| Segmento | Segundos | Aciertos | Persona y el radar sin objetivo | Persona con objetivo y actividad < 0.03 |
+|---|---|---|---|---|
+| Vacío | 216 | **94.9 %** | – | – |
+| De pie | 334 | 31.7 % | 67.7 % | 0.6 % |
+| En cama despierta | 580 | 56.9 % | 43.1 % | 0 % |
+| **Dormida** | 25 136 | **45.5 %** | 43.2 % | 11.3 % |
+
+- **Sin nadie, el criterio acierta** (95 %, igual que en la sección 11). Con este montaje no da
+  falsos "persona".
+- **Con la persona dormida falla más de la mitad del tiempo.** El 43 % es porque el radar no tiene
+  objetivo (el criterio no puede hacer nada: no hay fase) y el 11 % porque la actividad con
+  objetivo queda por debajo de 0.03 (por ejemplo, de 0.85 a 1.0 h, actividad ~0.012 con presencia
+  1: entre la cama vacía, 0.004, y la pared, 0.017).
+- Es decir: "actividad ≥ 0.03" significa "hay una persona"; lo contrario **no** significa "cama
+  vacía".
+
+### 13.4 Falsas alarmas del detector de apnea durante el sueño (`alarmas.png`)
+
+Detector v2 sin cambios (actividad, ventana 10 s, umbral 0.7, referencia 60 s). Contexto de cada
+alarma, fijado antes de verlas, mirando desde 60 s antes del inicio de la caída: **sin objetivo**
+(hubo segundos sin dato), **movimiento** (la actividad pasó de 2 × la referencia) o **quieto**.
+
+| Duración mínima | Falsas alarmas | **Por hora de sueño** (IC 95 %) | Por hora con objetivo | Movimiento | Quieto | Sin objetivo |
+|---|---|---|---|---|---|---|
+| 20 s (v2) | 43 | **6.1** (4.4-8.2) | 11.7 | 4 | 24 | 15 |
+| 25 s | 36 | **5.1** (3.6-7.1) | 9.8 | 4 | 18 | 14 |
+| 30 s | 35 | **5.0** (3.5-6.9) | 9.5 | 4 | 17 | 14 |
+
+Las 3 apneas de las capturas anteriores (retraso desde el inicio de la apnea; criterio ≤ 30 s) y
+falsas alarmas en las 12 capturas cortas sin apnea:
+
+| Duración mínima | acostado1 | acostado2 | sentado | A tiempo | Falsas en capturas cortas |
+|---|---|---|---|---|---|
+| 20 s | +26 s | +29 s | +26 s | **3/3** | 4 (3.2 cada 10 min) |
+| 25 s | +31 s | +34 s | no detecta | 0/3 | 3 (2.4) |
+| 30 s | +36 s | no detecta | no detecta | 0/3 | 2 (1.6) |
+
+- **Ninguna variante es usable como alarma**: entre 5 y 6 falsas alarmas por hora de sueño, de 10 a
+  12 por hora en que el radar ve a la persona (≈ 2 cada 10 min, el doble del criterio de la
+  sección 12.4). Una noche de 7 h daría 35-43 avisos falsos.
+- **Alargar la duración casi no ayuda y pierde las apneas**: de 20 a 30 s las falsas alarmas bajan
+  solo ~19 % (43 → 35), mientras la detección pasa de 3/3 a tiempo a 0/3 a tiempo (1/3 tarde).
+  La duración mínima más el retardo de la ventana dejan las variantes de 25 y 30 s fuera del límite
+  de 30 s casi por construcción.
+- **Dónde caen** (con 20 s): la mayoría en **tramos quietos** (24), pocas tras un cambio de postura
+  (4). Se agrupan en dos rachas: 3:00-3:28 (7 alarmas, alrededor del posible movimiento del
+  sensor) y 6:37-6:56 (13 en 20 min, con la actividad oscilando entre 0.01 y 0.1). 15 tienen una
+  pérdida de objetivo cerca: el v2 conserva el inicio de la caída mientras no hay dato, así que el
+  tiempo sin objetivo cuenta como "caída". Aun quitando esas 15 quedan 28 (4 por hora de sueño,
+  IC 95 % 2.6-5.8).
+
+### 13.5 Respiración durante el sueño (`respiracion.png`)
+
+Ventanas de 30 s (sin solaparse) en el sueño con objetivo en todas las tramas: 307 de ~843 (36 %).
+
+| Estimación | Mediana | P10-P90 | En 0 | 10-20 rpm |
+|---|---|---|---|---|
+| Módulo (`resp_rpm`, mediana por ventana) | **0** | 0-16 | **57 %** | 23 % |
+| Propia: FFT de `fase_resp` | 13.7 | 9.2-18.2 | 0 % | 81 % |
+| Propia: cruces de `fase_resp` | 15.4 | 12.5-21.0 | 0 % | 83 % |
+
+- **El módulo no da un valor la mayor parte del sueño**: aun con objetivo, el 56 % de las tramas
+  de `resp_rpm` están en 0; cuando da un valor, la mediana es 13 rpm (plausible). Por hora, las
+  ventanas en 0 van de 17 % a 91 %. No hay registro de la postura por hora, así que no se puede
+  atribuir a "boca abajo" con certeza; es consistente con que la persona estuvo boca abajo casi toda
+  la noche y con que Seeed solo garantiza la medición en reposo (tendencia).
+- **Lo propio da valores plausibles (13.7-15.4 rpm), pero eso no lo valida**: con la pared dio
+  15-21 rpm (sección 8) y no siguió el pacer en 8-30 rpm (secciones 9 y 11). Que caiga en 10-20 rpm
+  es lo esperable de un filtro con esa banda, haya o no respiración que seguir.
+- En el 64 % restante del sueño no hay estimación: el radar no tenía objetivo o lo perdió en algún
+  momento de la ventana.
+
+### 13.6 Recomendación final para el firmware de la base
+
+1. **Persona en cama**: actividad = mediana de |`fase_total`| sin las tramas en 0, ventana de 30 s,
+   umbral **0.03**. Tres estados para el panel:
+   - actividad ≥ 0.03: **"persona detectada"**;
+   - radar con datos pero sin objetivo (presencia 0, ~8.6 tramas/s) o actividad < 0.03:
+     **"sin persona detectada"**, que **no** es "cama vacía" ni dispara nada;
+   - "radar sin datos" (sección 7): falla del radar, aviso de mantenimiento.
+
+   Esperado: con el cuarto vacío, ~95 % de acierto; con una persona dormida en un montaje como
+   este, "persona detectada" solo ~45 % del tiempo. La regla 8 de `fallos.md` ("persona fuera de la
+   cama") queda como estado informativo, nunca como alarma.
+2. **"Posible pausa respiratoria"**: **desactivada por defecto y nunca como alarma.** Si se activa
+   para registrar eventos de revisión: actividad, ventana 10 s, umbral 0.7, 20 s, referencia de
+   60 s (v2 sin cambios; 25 y 30 s no se usan porque pierden las apneas sin bajar casi las falsas
+   alarmas). Su ficha:
+   - Falsas alarmas esperadas: **~6 por hora de sueño** en esta noche (~12 por hora con objetivo);
+     3.2 cada 10 min en las capturas cortas despiertas.
+   - Detección medida: **3 de 3 apneas** de 20-30 s, a los 26-29 s, en capturas cortas
+     supervisadas (acostado boca arriba a ~50 cm o sentado). No medida en este montaje ni dormida;
+     con 3 apneas la sensibilidad real podría ser de apenas ~30 % (sección 12.4).
+   - Al perder el objetivo, el firmware debe reiniciar el conteo de la caída en vez de seguir
+     sumando tiempo sin dato. Es un cambio de diseño que sale de esta noche y no se evaluó.
+3. **La alarma confiable de apnea sigue siendo el botón del colgante.**
+4. `resp_rpm`, `latido_bpm`, la distancia y la actividad se siguen enviando como datos informativos
+   ("estimación del módulo, no validada"); el panel debe mostrar "sin dato" cuando el módulo da 0 o
+   no hay objetivo, no "0 rpm".
+
+### 13.7 Límites conocidos
+
+- **Posición boca abajo y vueltas**: el radar perdió a la persona el 48 % del sueño, el módulo dio
+  0 rpm en el 57 % de las ventanas con objetivo y la actividad quedó bajo 0.03 en el 11 % del
+  sueño.
+- **Sensor que se mueve**: el cambio de nivel a las ~3.2 h coincide con más tiempo sin objetivo y
+  con una racha de falsas alarmas. El radar debe ir fijo (soporte atornillado, no apoyado) y con el
+  ángulo medido.
+- **Movimiento**: solo 4 de 43 falsas alarmas siguieron a un movimiento; el problema principal son
+  los tramos quietos con una actividad que oscila por debajo de la referencia.
+- Una sola noche, una persona, montaje sin medir y huecos de captura después de las 6 h.
+
+### 13.8 Qué es demostrado y qué es tendencia
+
+**Demostrado con esta noche** (el conteo alcanza y la conclusión no depende de los detalles):
+
+1. Con este montaje y una persona dormida (casi toda la noche boca abajo), el radar no tuvo
+   objetivo durante ~la mitad del sueño. Una actividad baja o la falta de objetivo no prueban que la
+   cama esté vacía.
+2. Con el cuarto vacío, el criterio de actividad 0.03 no dio falsos "persona" (95 % de acierto,
+   coherente con la sección 11).
+3. El detector v2 da del orden de 5-6 falsas alarmas por hora de sueño en las tres variantes (35-43
+   alarmas; aun el extremo bajo del intervalo de confianza pasa de 3 por hora). No sirve como
+   alarma.
+4. Las variantes de 25 y 30 s no detectan a tiempo ninguna de las 3 apneas anteriores.
+
+**Tendencias** (una noche, sin registro de postura ni del momento en que se movió el sensor):
+
+5. El sensor se movió alrededor de las 3.2 h y eso empeoró la señal.
+6. La pérdida de objetivo y los 0 del módulo se deben sobre todo a la postura boca abajo.
+7. La respiración durante el sueño estuvo en 13-15 rpm (las estimaciones propias son plausibles,
+   pero no están validadas).
+8. La detección real de apneas durante el sueño no se midió. Para medirla sigue haciendo falta la
+   sesión de la sección 12.5, con el radar fijo y el ángulo medido.

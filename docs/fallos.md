@@ -4,9 +4,9 @@ Principio general: **la alerta local de la base (buzzer y LED) no depende de la 
 alerta del colgante, la base suena aunque no haya WiFi, Firebase ni Telegram. Todo lo que va a la
 nube es un segundo aviso, con reintentos.
 
-La detección de apnea por radar está **en evaluación** (resultados preliminares en `radar.md`,
-sección 11). Mientras no se valide, la alarma confiable es el botón del colgante; el radar informa
-"persona en cama" / "cama vacía" y datos informativos.
+La detección de apnea por radar **no se usa como alarma** (`radar.md`, sección 13: noche completa
+de sueño real). La alarma confiable es el botón del colgante; el radar informa "persona detectada" /
+"sin persona detectada" y datos informativos.
 
 | # | Escenario | Cómo se detecta | Qué hace el sistema | Módulos |
 |---|---|---|---|---|
@@ -17,13 +17,13 @@ sección 11). Mientras no se valide, la alarma confiable es el botón del colgan
 | 5 | Caída de Firebase (o token vencido) | Error HTTP o tiempo agotado; 401 si el token venció | Con 401, vuelve a iniciar sesión. Otros errores: igual que caída de WiFi, a la cola. Telegram no depende de Firebase, así que el aviso al cuidador sale aunque Firebase falle. | base: `firebase_cliente`, `cola_offline` |
 | 6 | Base apagada (corte de luz, cable suelto) | La base no puede avisar. El panel ve `ultimo_contacto` con más de 3 min. El colgante no recibe ACK. | Panel muestra "base desconectada". El colgante da el patrón de error, así la persona sabe que el botón no funcionó. Al volver, la base compara la hora con su último `ultimo_contacto`, crea un evento `BASE_DESCONECTADA` con la duración y avisa por Telegram. | base, panel |
 | 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga (no en cada heartbeat). Sin mensajes: evento `COLGANTE_AUSENTE` y Telegram; el panel lo marca ausente por `ultimo_heartbeat`. | base: `espnow_rx`, `telegram`; colgante: `bateria` |
-| 8 | Persona fuera de la cama | Actividad (mediana de \|`fase_total`\| en 30 s) por debajo de 0.03. **No** con la bandera `presencia` del radar, que sigue en 1 con la cama vacía (`radar.md`, sección 11) | Estado "cama vacía" en el panel. No es una alarma. | base: `radar` |
+| 8 | Persona no detectada en la cama | Actividad (mediana de \|`fase_total`\| en 30 s) por debajo de 0.03, o radar sin objetivo. **No** con la bandera `presencia` del radar, que sigue en 1 con la cama vacía (`radar.md`, sección 11) | Estado "sin persona detectada" en el panel, **no** "cama vacía": en una noche real el radar no vio a la persona dormida ~55 % del tiempo (`radar.md`, sección 13.3). No es una alarma. | base: `radar` |
 | 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía ni se usa para detectar apnea. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave, evento `RADAR_SIN_DATOS` y Telegram. El panel también lo nota porque dejan de llegar lecturas. | base: `radar` |
 | 10 | Reinicio inesperado (watchdog, brownout, fallo) | Al arrancar, `esp_reset_reason()` distinto de encendido normal | Watchdog activo sobre `loop()` para que un bloqueo termine en reinicio y no en una base colgada. Al arrancar se reporta el motivo por Telegram. Se pierden las secuencias en RAM (el siguiente mensaje de cada colgante se acepta como nuevo, a lo sumo una alerta repetida) y la cola offline. | base: `main` |
 
 ## Detalles y decisiones
 
-### Apnea (en evaluación)
+### Apnea (no se usa como alarma)
 
 - **Resultados preliminares del 2026-10-09** (2 apneas acostado, un solo tipo de detector): con la
   persona acostada a ~50 cm, el mejor detector probado (caída de la actividad) detectó la apnea de
@@ -36,7 +36,12 @@ sección 11). Mientras no se valide, la alarma confiable es el botón del colgan
   establecimiento). El detector v2 (actividad, 10 s, umbral 0.7, 20 s) detectó las 3 apneas en
   26-29 s, pero con 3.2 falsas alarmas cada 10 min; el criterio es ≤ 1. No cumple con estos datos.
   Falta una sesión de ~50 min en el montaje recomendado (sección 12.5) para decidir.
-- Mientras no se valide, la apnea detectada por radar no dispara alarmas.
+- **Noche completa del 2026-10-12** (`radar.md`, sección 13): con una persona dormida (casi toda la
+  noche boca abajo) el detector v2 dio ~6 falsas alarmas por hora de sueño (5 con 25 o 30 s, que
+  además dejan de detectar a tiempo las 3 apneas anteriores), y el radar no tuvo objetivo ~48 % del
+  sueño. **Decisión: la apnea por radar no dispara alarmas.** "Posible pausa respiratoria" queda
+  como registro experimental desactivado por defecto (sección 13.6).
+- La apnea detectada por radar no dispara alarmas.
 - El tipo de evento `APNEA` se mantiene en el modelo de datos.
 
 Historia:

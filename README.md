@@ -19,7 +19,7 @@ Periodo: 9 de agosto – 24 de octubre de 2026
 
 | Componente | Estado | Notas |
 |---|---|---|
-| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado y acostado: distingue cama vacía; detección de apnea **en evaluación** (resultados preliminares en `docs/radar.md`, sección 11) |
+| Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
 | Colgante (botón + ESP32) | Componentes comprados; batería y flux pedidos, sin llegar | ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón. Estructura del firmware y protocolo definidos |
 | Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
@@ -37,7 +37,7 @@ El sistema tiene dos vías de detección que trabajan juntas, más una unidad ba
 **1. Vía automática — Radar (60 GHz FMCW)**
 Un módulo MR60BHA2 se coloca cerca de la cama y mide el micro-movimiento del pecho de la persona, sin cámara y sin contacto. Funciona en oscuridad total y a través de sábanas o ropa. El módulo trae integrado un XIAO ESP32-C6 que procesa la señal.
 
-Estado de las pruebas (octubre 2026, **en evaluación**, `docs/radar.md`, sección 11): el radar distingue una persona en la cama de una cama vacía. La estimación de la frecuencia respiratoria y la detección de apnea todavía no están validadas: con los primeros detectores y pocas capturas los resultados preliminares no alcanzan la confiabilidad necesaria, y se está revisando la lectura del radar, el montaje y el detector antes de decidir.
+Estado de las pruebas (octubre 2026, `docs/radar.md`, secciones 11-13): con el cuarto vacío el radar no confunde objetos con una persona, pero en una noche real perdió a la persona dormida (boca abajo) cerca de la mitad del tiempo, así que informa "persona detectada" / "sin persona detectada", no "cama vacía". La frecuencia respiratoria no está validada y el mejor detector de apnea dio ~6 falsas alarmas por hora de sueño: **la apnea por radar no dispara alarmas**.
 
 - Rango confiable de medición: 0.4 a 2 metros
 - Cono de detección: aproximadamente 80° horizontal y 80° vertical
@@ -78,7 +78,8 @@ El sistema vigila sin cámara, lo que permite instalarlo en el dormitorio — el
 - El radar no cubre 360°, solo su cono de detección
 - No se recomienda usar varios radares juntos para cubrir 360° (interferencia mutua entre módulos de 60 GHz)
 - Si la base se apaga, el aviso por Telegram no sale en ese momento (no hay servidor propio); el panel lo muestra y el colgante avisa con el patrón de error
-- **Detección de apnea por radar en evaluación.** Resultados preliminares (2 apneas, un solo tipo de detector): no se siguió la respiración real (8-30 rpm) y el detector probado dio demasiadas falsas alarmas. Mientras no se valide, una apnea solo se avisa con el botón (`docs/radar.md`, sección 11; `docs/fallos.md`)
+- **La apnea por radar no dispara alarmas.** No se siguió la respiración real (8-30 rpm) y en una noche completa el mejor detector dio ~6 falsas alarmas por hora de sueño. Una apnea solo se avisa con el botón (`docs/radar.md`, sección 13; `docs/fallos.md`)
+- Durmiendo boca abajo, o si el radar se mueve, el radar puede no ver a la persona durante horas; "sin persona detectada" no significa cama vacía
 - La bandera de presencia del propio radar sigue en 1 con la cama vacía (detecta almohada y cobijas); la base usa su propia medida de actividad para saber si hay una persona
 
 ---
