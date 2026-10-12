@@ -38,6 +38,21 @@ void iniciarRegistros() {
                   PROTOCOLO_VERSION);
 }
 
+despertar::Reinicio leerReinicio() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_DEEPSLEEP:
+            return despertar::Reinicio::DEEP_SLEEP;
+        case ESP_RST_POWERON:
+        case ESP_RST_EXT:
+        case ESP_RST_SW:
+        case ESP_RST_USB:
+        case ESP_RST_JTAG:
+            return despertar::Reinicio::ENCENDIDO;
+        default:
+            return despertar::Reinicio::OTRO;
+    }
+}
+
 despertar::Causa leerCausaDespertar() {
     switch (esp_sleep_get_wakeup_cause()) {
         case ESP_SLEEP_WAKEUP_TIMER:
@@ -54,8 +69,7 @@ despertar::Causa leerCausaDespertar() {
 despertar::Decision determinarAccion() {
     despertar::Entradas entradas{};
     entradas.recuperando_boton_atascado = energia::recuperandoBotonAtascado();
-    entradas.reinicio = esp_reset_reason() == ESP_RST_DEEPSLEEP ? despertar::Reinicio::DEEP_SLEEP
-                                                                : despertar::Reinicio::OTRO;
+    entradas.reinicio = leerReinicio();
     entradas.causa = leerCausaDespertar();
     entradas.gpio_boton_desperto = boton::despertoPorBoton();
     return despertar::decidir(entradas);
@@ -66,8 +80,14 @@ void registrarDecision(despertar::Motivo motivo) {
         case despertar::Motivo::RECUPERACION_BOTON_ATASCADO:
             registrar("main: recuperacion de boton atascado; radio y sonidos omitidos");
             break;
-        case despertar::Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP:
-            registrar("main: arranque o reinicio fuera de deep sleep; no se transmite");
+        case despertar::Motivo::ENCENDIDO:
+            registrar("main: arranque en frio; heartbeat para registrarse en la base");
+            break;
+        case despertar::Motivo::REINICIO_POR_FALLO:
+            if (REGISTROS_SERIAL_HABILITADOS != 0) {
+                Serial.printf("main: reinicio por fallo (motivo %d); no se transmite\n",
+                              static_cast<int>(esp_reset_reason()));
+            }
             break;
         case despertar::Motivo::GPIO_AJENO:
             registrar("main: despertar GPIO ajeno a GPIO3; no se transmite");

@@ -25,11 +25,13 @@ despertar, el bit de GPIO3 y la recuperación del botón atascado, y delega la d
 - Antes de interpretar el despertar se consulta `energia::recuperandoBotonAtascado()`. En esa
   ruta no se lee la batería, no se enciende el radio y no se emiten sonidos; solamente se vuelve
   al procedimiento de suspensión, que revisa de forma limitada si GPIO3 ya fue liberado.
-- Solo un reinicio cuyo motivo sea `ESP_RST_DEEPSLEEP` puede originar una transmisión. El timer
-  genera `MSG_HEARTBEAT` cada 15 minutos. El encendido en frío, un reinicio inesperado y cualquier
-  otra causa vuelven a dormir sin transmitir, evitando alertas falsas. Una pulsación realizada
-  durante ese arranque inicial no se interpreta como alerta. El primer mensaje posterior conserva
-  `FLAG_ARRANQUE_FRIO`, responsabilidad de `espnow_tx`.
+- Un despertar desde deep sleep (`ESP_RST_DEEPSLEEP`) puede originar ALERTA o HEARTBEAT; el timer
+  genera `MSG_HEARTBEAT` cada 15 minutos. Al encender (`ESP_RST_POWERON`, botón RST, reinicio por
+  USB o por software) se envía un `MSG_HEARTBEAT` con `FLAG_ARRANQUE_FRIO`, para que la base
+  registre el colgante de inmediato; no suena. Una pulsación hecha durante ese arranque no se
+  interpreta como alerta. Un reinicio por fallo (brownout, watchdog, panic) vuelve a dormir sin
+  transmitir: con la batería al límite, el pico del radio podría causar otro brownout y un ciclo
+  de reinicios.
 - Un despertar por GPIO genera una sola `MSG_ALERTA` cuando el estado retenido de wake identifica
   GPIO3. Si el botón continúa bajo, `presionado()` confirma que el nivel sea estable; si ya fue
   liberado durante el arranque, se acepta igualmente el evento retenido para no perder una alerta
@@ -226,8 +228,8 @@ pio device monitor -d firmware/colgante
 Mientras el colgante duerme, el puerto USB desaparece. Para cargar firmware, mantener BOOT
 presionado al conectar si el puerto no aparece.
 
-Después de cargar, el primer arranque no transmite (no viene de deep sleep): solo duerme. La
-primera ALERTA sale al presionar el botón con el equipo ya dormido, y el primer HEARTBEAT a los
+Después de cargar, el colgante envía un HEARTBEAT con `FLAG_ARRANQUE_FRIO` y se duerme. La
+primera ALERTA sale al presionar el botón con el equipo ya dormido, y el siguiente HEARTBEAT a los
 15 minutos.
 
 ## Configuración

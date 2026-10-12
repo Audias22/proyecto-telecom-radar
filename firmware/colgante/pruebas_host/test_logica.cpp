@@ -470,14 +470,25 @@ void decisionHeartbeatPorTemporizador() {
                       Accion::HEARTBEAT, Motivo::TEMPORIZADOR);
 }
 
-void decisionArranqueFrioNoTransmite() {
-    // Encendido, reset por boton EN, watchdog, brownout, panic: todo lo que no sea deep sleep.
+void decisionEncendidoEnviaHeartbeat() {
+    // Encendido, boton EN/RST, reinicio por USB o software: HEARTBEAT para que la base registre
+    // el colgante de inmediato, sin importar la causa de despertar ni el bit del boton.
+    verificarDecision(entradas(false, Reinicio::ENCENDIDO, Causa::OTRA, false), Accion::HEARTBEAT,
+                      Motivo::ENCENDIDO);
+    verificarDecision(entradas(false, Reinicio::ENCENDIDO, Causa::GPIO, true), Accion::HEARTBEAT,
+                      Motivo::ENCENDIDO);
+    verificarDecision(entradas(false, Reinicio::ENCENDIDO, Causa::TEMPORIZADOR, false),
+                      Accion::HEARTBEAT, Motivo::ENCENDIDO);
+}
+
+void decisionReinicioPorFalloNoTransmite() {
+    // Brownout, watchdog, panic: no se enciende el radio para no provocar un ciclo de reinicios.
     verificarDecision(entradas(false, Reinicio::OTRO, Causa::OTRA, false), Accion::NINGUNA,
-                      Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP);
+                      Motivo::REINICIO_POR_FALLO);
     verificarDecision(entradas(false, Reinicio::OTRO, Causa::GPIO, true), Accion::NINGUNA,
-                      Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP);
+                      Motivo::REINICIO_POR_FALLO);
     verificarDecision(entradas(false, Reinicio::OTRO, Causa::TEMPORIZADOR, false),
-                      Accion::NINGUNA, Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP);
+                      Accion::NINGUNA, Motivo::REINICIO_POR_FALLO);
 }
 
 void decisionRecuperacionBotonAtascadoNoTransmite() {
@@ -509,9 +520,9 @@ void decisionValoresDesconocidos() {
     verificarDecision(entradas(false, Reinicio::DEEP_SLEEP, causa_desconocida, true),
                       Accion::NINGUNA, Motivo::CAUSA_NO_OPERATIVA);
     verificarDecision(entradas(false, reinicio_desconocido, Causa::GPIO, true), Accion::NINGUNA,
-                      Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP);
+                      Motivo::REINICIO_POR_FALLO);
     verificarDecision(entradas(false, reinicio_desconocido, Causa::TEMPORIZADOR, false),
-                      Accion::NINGUNA, Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP);
+                      Accion::NINGUNA, Motivo::REINICIO_POR_FALLO);
 }
 
 void decisionTablaCompleta() {
@@ -526,13 +537,14 @@ void decisionTablaCompleta() {
         Motivo motivo;
     };
     constexpr Reinicio DS = Reinicio::DEEP_SLEEP;
+    constexpr Reinicio EN = Reinicio::ENCENDIDO;
     constexpr Reinicio OT = Reinicio::OTRO;
     constexpr Causa TMR = Causa::TEMPORIZADOR;
     constexpr Causa GPIO = Causa::GPIO;
     constexpr Causa OTRA = Causa::OTRA;
     constexpr Accion NADA = Accion::NINGUNA;
     constexpr Motivo REC = Motivo::RECUPERACION_BOTON_ATASCADO;
-    constexpr Motivo FRIO = Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP;
+    constexpr Motivo FALLO = Motivo::REINICIO_POR_FALLO;
     const Fila tabla[] = {
         {true, DS, TMR, false, NADA, REC},
         {true, DS, TMR, true, NADA, REC},
@@ -540,6 +552,12 @@ void decisionTablaCompleta() {
         {true, DS, GPIO, true, NADA, REC},
         {true, DS, OTRA, false, NADA, REC},
         {true, DS, OTRA, true, NADA, REC},
+        {true, EN, TMR, false, NADA, REC},
+        {true, EN, TMR, true, NADA, REC},
+        {true, EN, GPIO, false, NADA, REC},
+        {true, EN, GPIO, true, NADA, REC},
+        {true, EN, OTRA, false, NADA, REC},
+        {true, EN, OTRA, true, NADA, REC},
         {true, OT, TMR, false, NADA, REC},
         {true, OT, TMR, true, NADA, REC},
         {true, OT, GPIO, false, NADA, REC},
@@ -552,14 +570,20 @@ void decisionTablaCompleta() {
         {false, DS, GPIO, true, Accion::ALERTA, Motivo::BOTON},
         {false, DS, OTRA, false, NADA, Motivo::CAUSA_NO_OPERATIVA},
         {false, DS, OTRA, true, NADA, Motivo::CAUSA_NO_OPERATIVA},
-        {false, OT, TMR, false, NADA, FRIO},
-        {false, OT, TMR, true, NADA, FRIO},
-        {false, OT, GPIO, false, NADA, FRIO},
-        {false, OT, GPIO, true, NADA, FRIO},
-        {false, OT, OTRA, false, NADA, FRIO},
-        {false, OT, OTRA, true, NADA, FRIO},
+        {false, EN, TMR, false, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, EN, TMR, true, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, EN, GPIO, false, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, EN, GPIO, true, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, EN, OTRA, false, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, EN, OTRA, true, Accion::HEARTBEAT, Motivo::ENCENDIDO},
+        {false, OT, TMR, false, NADA, FALLO},
+        {false, OT, TMR, true, NADA, FALLO},
+        {false, OT, GPIO, false, NADA, FALLO},
+        {false, OT, GPIO, true, NADA, FALLO},
+        {false, OT, OTRA, false, NADA, FALLO},
+        {false, OT, OTRA, true, NADA, FALLO},
     };
-    VERIFICAR_IGUAL(sizeof(tabla) / sizeof(tabla[0]), 2 * 2 * 3 * 2);
+    VERIFICAR_IGUAL(sizeof(tabla) / sizeof(tabla[0]), 2 * 3 * 3 * 2);
     unsigned alertas = 0;
     unsigned heartbeats = 0;
     for (const Fila& f : tabla) {
@@ -570,9 +594,9 @@ void decisionTablaCompleta() {
         heartbeats += despertar::decidir(entradas(f.recuperando, f.reinicio, f.causa, f.boton))
                                   .accion == Accion::HEARTBEAT ? 1u : 0u;
     }
-    // Solo una combinacion transmite ALERTA y solo dos transmiten HEARTBEAT.
+    // Solo una combinacion transmite ALERTA. HEARTBEAT: las dos de timer y las seis de encendido.
     VERIFICAR_IGUAL(alertas, 1);
-    VERIFICAR_IGUAL(heartbeats, 2);
+    VERIFICAR_IGUAL(heartbeats, 8);
 }
 
 }  // namespace
@@ -611,12 +635,13 @@ int main() {
     ejecutar("despertar: ALERTA por wake GPIO3", decisionAlertaPorBoton);
     ejecutar("despertar: pulsacion breve ya liberada sigue siendo ALERTA", decisionPulsacionBreveYaLiberada);
     ejecutar("despertar: HEARTBEAT por temporizador", decisionHeartbeatPorTemporizador);
-    ejecutar("despertar: arranque frio o reinicio no transmite", decisionArranqueFrioNoTransmite);
+    ejecutar("despertar: encendido envia HEARTBEAT", decisionEncendidoEnviaHeartbeat);
+    ejecutar("despertar: reinicio por fallo no transmite", decisionReinicioPorFalloNoTransmite);
     ejecutar("despertar: recuperacion de boton atascado no transmite", decisionRecuperacionBotonAtascadoNoTransmite);
     ejecutar("despertar: wake GPIO ajeno no transmite", decisionGpioAjeno);
     ejecutar("despertar: causa no operativa no transmite", decisionCausaNoOperativa);
     ejecutar("despertar: valores de enum desconocidos no transmiten", decisionValoresDesconocidos);
-    ejecutar("despertar: tabla completa de 24 combinaciones", decisionTablaCompleta);
+    ejecutar("despertar: tabla completa de 36 combinaciones", decisionTablaCompleta);
 
     std::printf("\nCasos: %d, fallidos: %d. Verificaciones: %d, fallidas: %d\n", casos,
                 casos_fallidos, verificaciones, fallos_verificacion);

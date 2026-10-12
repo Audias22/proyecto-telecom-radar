@@ -107,6 +107,10 @@ Detalles:
 5. Antes de dormir se configura el despertar por botón y por timer (`HEARTBEAT_INTERVALO_S`).
 6. Si el botón sigue presionado al terminar, se espera a que se suelte antes de dormir, para no
    despertar de inmediato en bucle.
+7. Al encender (o tras un reset por el botón RST, USB o software) el colgante envía un HEARTBEAT
+   con `FLAG_ARRANQUE_FRIO`, así la base lo registra de inmediato en lugar de esperar al primer
+   heartbeat por timer. Tras un reinicio por fallo (brownout, watchdog, panic) no transmite, para
+   no entrar en un ciclo de reinicios si la batería no aguanta el pico del radio.
 
 El heartbeat sigue el mismo flujo con `tipo = MSG_HEARTBEAT`, pero sin sonido en ningún caso:
 un heartbeat perdido no debe despertar a la persona. Si falla, el colgante solo vuelve a dormir;

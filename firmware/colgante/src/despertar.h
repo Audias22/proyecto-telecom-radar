@@ -18,17 +18,19 @@ enum class Accion {
 // Motivo de la decision. main.cpp lo usa solamente para el registro por Serial.
 enum class Motivo {
     RECUPERACION_BOTON_ATASCADO,  // wake por timer de recuperacion: radio y sonidos omitidos
-    ARRANQUE_FUERA_DE_DEEP_SLEEP,  // encendido, reinicio, watchdog, brownout, etc.
+    ENCENDIDO,                     // arranque en frio: heartbeat para que la base lo registre
+    REINICIO_POR_FALLO,            // watchdog, brownout, panic, causa desconocida: no transmite
     TEMPORIZADOR,                  // wake por timer: heartbeat periodico
     BOTON,                         // wake GPIO causado por el pin del boton
     GPIO_AJENO,                    // wake GPIO que no corresponde al pin del boton
     CAUSA_NO_OPERATIVA,            // cualquier otra causa de despertar
 };
 
-// Equivalente host de esp_reset_reason(): solo importa si el arranque vino de deep sleep.
+// Equivalente host de esp_reset_reason().
 enum class Reinicio {
-    DEEP_SLEEP,
-    OTRO,
+    DEEP_SLEEP,  // despertar normal
+    ENCENDIDO,   // encendido, boton EN/RST, reinicio por USB o por software
+    OTRO,        // brownout, watchdog, panic o desconocido
 };
 
 // Equivalente host de esp_sleep_get_wakeup_cause().
@@ -53,12 +55,19 @@ struct Decision {
 // No recibe el nivel actual del boton a proposito. El estado del wake GPIO queda retenido por el
 // RTC; si la pulsacion termino durante el arranque, exigir que el pin siga bajo descartaria una
 // alerta legitima.
+//
+// Al encender se envia un HEARTBEAT (con FLAG_ARRANQUE_FRIO) para que la base registre el
+// colgante de inmediato. Tras un reinicio por fallo no se transmite: con la bateria al limite, el
+// pico de corriente del radio podria provocar otro brownout y un ciclo de reinicios.
 constexpr Decision decidir(const Entradas& entradas) {
     if (entradas.recuperando_boton_atascado) {
         return {Accion::NINGUNA, Motivo::RECUPERACION_BOTON_ATASCADO};
     }
+    if (entradas.reinicio == Reinicio::ENCENDIDO) {
+        return {Accion::HEARTBEAT, Motivo::ENCENDIDO};
+    }
     if (entradas.reinicio != Reinicio::DEEP_SLEEP) {
-        return {Accion::NINGUNA, Motivo::ARRANQUE_FUERA_DE_DEEP_SLEEP};
+        return {Accion::NINGUNA, Motivo::REINICIO_POR_FALLO};
     }
     if (entradas.causa == Causa::TEMPORIZADOR) {
         return {Accion::HEARTBEAT, Motivo::TEMPORIZADOR};
