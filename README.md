@@ -23,7 +23,7 @@ Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad
 | Componente | Estado | Notas |
 |---|---|---|
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
-| Colgante (botón + ESP32) | Firmware listo, sin probar en hardware | Firmware de Abraham revisado y fusionado el 12 oct (compila; 37 casos de prueba en PC); nadie lo ha cargado todavía en un ESP32-C3. ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
+| Colgante (botón + ESP32) | Firmware listo, sin probar en hardware | Firmware de Abraham revisado y fusionado el 12 oct (compila; 39 casos de prueba en PC); receptor de prueba y guía de protoboard listos para la primera prueba; nadie lo ha cargado todavía en un ESP32-C3. ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
 | Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
@@ -178,6 +178,7 @@ Instrucciones en `web/README.md`.
 - Noche completa de sueño con el radar y decisión del detector para la base (`docs/radar.md`, sección 13)
 - Revisión del firmware del colgante y fusión a `main`: espera al monitor USB solo en arranque en frío, regla de duplicados con `FLAG_ARRANQUE_FRIO` corregida en `docs/protocolo.md` y llevada a `firmware/comun/protocolo/duplicados.h`, con 2 casos de prueba nuevos
 - Desde esta fecha llevo solo el desarrollo y la integración
+- Preparación de la primera prueba del colgante en hardware: receptor ESP-NOW de prueba para un ESP32 clásico (`firmware/pruebas/receptor_espnow`), HEARTBEAT al encender, secuencia inicial aleatoria, intervalo de heartbeat corto para pruebas, y guía de conexión y lista de pruebas en `firmware/colgante/pruebas_fisicas.md`
 
 ---
 

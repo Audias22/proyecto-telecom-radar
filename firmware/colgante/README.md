@@ -303,6 +303,8 @@ Prueban la lógica pura en un PC, sin ESP32-C3 ni base.
 | `pio run -e colgante` (PlatformIO 6.1.19, arduino-esp32 3.3.7) | Compila sin advertencias del proyecto. RAM 10.8 %, Flash 71.7 % |
 | Revisión del 12 de octubre de 2026 (Audias): pruebas host en Windows (g++ MinGW) | 37 casos y 562 verificaciones aprobados (se agregaron los 2 casos de duplicados) |
 | Revisión del 12 de octubre de 2026: `pio run -e colgante` | Compila sin advertencias. RAM 10.8 %, Flash 71.7 % |
+| Preparación de la prueba en hardware (12 de octubre de 2026): pruebas host | 39 casos y 599 verificaciones aprobados (HEARTBEAT al encender, secuencia inicial aleatoria) |
+| Preparación de la prueba en hardware: `pio run -e colgante` | Compila sin advertencias, también con `HEARTBEAT_PRUEBA_S = 30`. RAM 10.8 %, Flash 71.7 % |
 
 Que compile y pase las pruebas host no demuestra que el colgante funcione: no se ha probado radio,
 alcance, ACK de una base real, deep sleep, botón, buzzer, ADC, batería ni consumo. La lista de
