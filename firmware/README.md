@@ -7,6 +7,7 @@ Código de los dos microcontroladores, cada uno como proyecto PlatformIO indepen
 | `base-radar/` | XIAO ESP32-C6 (kit MR60BHA2) | Lee el radar, recibe al colgante, alerta local, Firebase y Telegram |
 | `colgante/` | ESP32-C3 Super Mini | Botón de auxilio, deep sleep, envío por ESP-NOW |
 | `comun/` | | Librería compartida: `protocolo.h` |
+| `pruebas/receptor_espnow/` | ESP32 clásico (DevKitC WROOM-32) | Herramienta de banco: hace de base para probar el colgante |
 
 Ambos usan la plataforma pioarduino (arduino-esp32 v3) con la versión fija en `platformio.ini`.
 

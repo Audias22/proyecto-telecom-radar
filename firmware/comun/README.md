@@ -10,6 +10,7 @@ Código compartido por los dos firmwares.
   colgante.
 
 Los proyectos `base-radar` y `colgante` la incluyen con
-`lib_deps = symlink://../comun/protocolo` en su `platformio.ini`, así que el archivo existe en un
+`lib_deps = symlink://../comun/protocolo` en su `platformio.ini` (el receptor de prueba
+`pruebas/receptor_espnow`, con `symlink://../../comun/protocolo`), así que el archivo existe en un
 solo lugar. Cualquier cambio aquí afecta a ambos firmwares: hay que recompilar y volver a cargar
 los dos.
