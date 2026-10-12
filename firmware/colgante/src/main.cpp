@@ -24,9 +24,14 @@ void iniciarRegistros() {
     }
 
     Serial.begin(115200);
-    const unsigned long inicio = millis();
-    while (!Serial && millis() - inicio < REGISTROS_SERIAL_ESPERA_MS) {
-        delay(10);
+
+    // Solo se espera al monitor USB en un arranque en frio. Al despertar de deep sleep, sin PC
+    // conectada la espera duraria siempre REGISTROS_SERIAL_ESPERA_MS y retrasaria la alerta.
+    if (esp_reset_reason() != ESP_RST_DEEPSLEEP) {
+        const unsigned long inicio = millis();
+        while (!Serial && millis() - inicio < REGISTROS_SERIAL_ESPERA_MS) {
+            delay(10);
+        }
     }
 
     Serial.printf("%s v%s (protocolo v%d)\n", FIRMWARE_NOMBRE, FIRMWARE_VERSION,

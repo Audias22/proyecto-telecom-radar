@@ -8,6 +8,7 @@
 
 // Registros de diagnostico por USB CDC. En 0, main no inicializa Serial ni emite sus registros;
 // se recomienda deshabilitarlos en la operacion normal para reducir tiempo despierto y consumo.
+// La espera al monitor USB solo se hace en el arranque en frio, nunca al despertar de deep sleep.
 #define REGISTROS_SERIAL_HABILITADOS 1
 #define REGISTROS_SERIAL_ESPERA_MS   2000UL
 

@@ -244,7 +244,7 @@ primera ALERTA sale al presionar el botón con el equipo ya dormido, y el primer
 | Valor | Actual | Para el dispositivo real |
 |---|---|---|
 | `BATERIA_MODO_SIMULADO` | `1` (envía 3900 mV fijos) | `0`, después de armar y medir el divisor |
-| `REGISTROS_SERIAL_HABILITADOS` | `1` (espera hasta 2 s el USB) | `0` en operación normal, para reducir tiempo despierto y consumo |
+| `REGISTROS_SERIAL_HABILITADOS` | `1` (espera hasta 2 s el USB solo en el arranque en frío) | `0` en operación normal, para reducir tiempo despierto y consumo |
 | `PIN_BOTON`, `PIN_BATERIA_ADC`, `PIN_BUZZER` | GPIO3, GPIO1, GPIO10 | Confirmar con el circuito armado |
 
 Las constantes del enlace (canal, tiempos, reintentos, heartbeat, umbral de batería) están en
