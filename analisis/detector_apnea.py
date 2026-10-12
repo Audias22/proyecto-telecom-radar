@@ -21,7 +21,7 @@ Máquina de estados del detector, una vez por segundo:
       actividad para todas las medidas porque es la que separa personas de objetos quietos
       (la proporción de banda, por ejemplo, da valores parecidos con una pared).
     - Bajo: armado y medida < umbral × referencia (y, si se pide, módulo <= MODULO_MAX_RPM).
-    - Alarma: bajo durante DURACION_MIN_S seguidos.
+    - Alarma: bajo durante DURACION_MIN_S seguidos (configurable por detector).
     - Mientras está bajo, la referencia se congela; si lleva DESCONGELAR_S bajo, se descarta la
       historia y se vuelve a aprender (evita quedar en alarma indefinidamente por una referencia
       vieja).
@@ -103,10 +103,11 @@ def calcular_medidas(datos, ventana_s):
 class DetectorApnea:
     """Máquina de estados; recibe una medida por segundo (ver la documentación del módulo)."""
 
-    def __init__(self, medida, umbral, usar_modulo=False):
+    def __init__(self, medida, umbral, usar_modulo=False, duracion_min_s=DURACION_MIN_S):
         self.medida = medida
         self.umbral = umbral
         self.usar_modulo = usar_modulo
+        self.duracion_min_s = duracion_min_s
         self.historia = deque()            # medida en los segundos normales
         self.historia_actividad = deque()  # actividad en esos mismos segundos (para el armado)
         self.bajo_desde = None
@@ -129,7 +130,7 @@ class DetectorApnea:
             if self.bajo_desde is None:
                 self.bajo_desde = t
             duracion = t - self.bajo_desde
-            if not self.en_alarma and duracion >= DURACION_MIN_S:
+            if not self.en_alarma and duracion >= self.duracion_min_s:
                 self.en_alarma = True
                 alarma = (t, self.bajo_desde)
             if duracion >= DESCONGELAR_S:
@@ -148,12 +149,12 @@ class DetectorApnea:
         return alarma, self.en_alarma, referencia
 
 
-def correr(medidas, medida, umbral, usar_modulo=False):
+def correr(medidas, medida, umbral, usar_modulo=False, duracion_min_s=DURACION_MIN_S):
     """Corre el detector sobre las medidas por segundo de una captura.
 
     Devuelve (alarmas, segundos_en_alarma, referencias por segundo).
     """
-    detector = DetectorApnea(medida, umbral, usar_modulo)
+    detector = DetectorApnea(medida, umbral, usar_modulo, duracion_min_s)
     alarmas, en_alarma, referencias = [], 0, []
     for i, t in enumerate(medidas["t"]):
         alarma, activa, referencia = detector.evaluar(t, medidas[medida][i], medidas["actividad"][i],

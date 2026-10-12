@@ -93,7 +93,8 @@ class Evaluador:
 
     def correr(self, captura, config):
         medidas = self.medidas_de(captura, config["ventana_s"])
-        return da.correr(medidas, config["medida"], config["umbral"], config["usar_modulo"])
+        return da.correr(medidas, config["medida"], config["umbral"], config["usar_modulo"],
+                         config.get("duracion_min_s", da.DURACION_MIN_S))
 
     def apnea(self, clave, config):
         """(retraso de la detección o None, instantes de falsas alarmas) en una captura con apnea."""
