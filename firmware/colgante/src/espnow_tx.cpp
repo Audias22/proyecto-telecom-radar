@@ -39,6 +39,7 @@ struct AckRecibido {
 RTC_DATA_ATTR uint16_t secuencia_rtc = 0;
 RTC_DATA_ATTR uint8_t canal_rtc = CANAL_POR_DEFECTO;
 RTC_DATA_ATTR bool primer_mensaje_rtc = true;
+RTC_DATA_ATTR bool secuencia_sorteada_rtc = false;
 
 StaticQueue_t estructura_cola_ack;
 uint8_t almacenamiento_cola_ack[CAPACIDAD_COLA_ACK * sizeof(AckRecibido)];
@@ -99,11 +100,24 @@ void prepararEstadoRtc() {
         secuencia_rtc = 0;
         canal_rtc = CANAL_POR_DEFECTO;
         primer_mensaje_rtc = true;
+        secuencia_sorteada_rtc = false;
     } else if (!espnow_tx::logica::canalValido(canal_rtc)) {
         canal_rtc = CANAL_POR_DEFECTO;
     }
 
     estado_rtc_revisado = true;
+}
+
+// Tras un arranque en frio la secuencia empieza en un valor aleatorio, para que casi nunca
+// coincida con la ultima que la base guardo de la vida anterior del colgante (caso limite de
+// docs/protocolo.md, seccion 5). Se sortea con WiFi encendido: esp_random() solo da numeros
+// realmente aleatorios cuando el radio esta activo.
+void sortearSecuencia() {
+    if (secuencia_sorteada_rtc) {
+        return;
+    }
+    secuencia_rtc = espnow_tx::logica::secuenciaInicial(esp_random());
+    secuencia_sorteada_rtc = true;
 }
 
 bool macBaseValida() {
@@ -231,6 +245,7 @@ void iniciar() {
         detener();
         return;
     }
+    sortearSecuencia();
     const esp_err_t error_desconexion = esp_wifi_disconnect();
     if (error_desconexion != ESP_OK && error_desconexion != ESP_ERR_WIFI_NOT_CONNECT) {
         informarError("desconectar WiFi del router", error_desconexion);

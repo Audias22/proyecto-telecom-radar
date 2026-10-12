@@ -33,7 +33,7 @@ Flags en mensajes del colgante:
 | 0 | `FLAG_BATERIA_BAJA` | `bateria_mv` < `BATERIA_BAJA_MV` |
 | 1 | `FLAG_REINTENTO` | Retransmisión de un mensaje ya enviado (misma secuencia) |
 | 2 | `FLAG_BARRIDO` | Enviado durante el barrido de canales |
-| 3 | `FLAG_ARRANQUE_FRIO` | Primer mensaje tras encender o reiniciar; la secuencia volvió a empezar |
+| 3 | `FLAG_ARRANQUE_FRIO` | Primer mensaje tras encender o reiniciar; la secuencia empezó de nuevo en un valor aleatorio |
 | 4-7 | | Reservados, en 0 |
 
 Flags en el ACK:
@@ -119,7 +119,10 @@ la base detecta la ausencia por `COLGANTE_AUSENTE_S`.
 ## 5. Duplicados y número de secuencia
 
 El colgante guarda `secuencia` en memoria RTC (`RTC_DATA_ATTR`), que se conserva durante el deep
-sleep pero se pierde al quitar la batería o reiniciar por completo.
+sleep pero se pierde al quitar la batería o reiniciar por completo. Tras un arranque en frío la
+secuencia empieza en un valor aleatorio de 16 bits, sacado del generador por hardware del
+ESP32-C3 (`esp_random()`) con el radio ya encendido, que es cuando da números realmente
+aleatorios.
 
 La base guarda, por cada `id_dispositivo`, la última secuencia procesada (en RAM).
 
@@ -144,12 +147,12 @@ siguientes mientras no reciba ningún ACK. Si la base procesó ese primer mensaj
 ACK, el reintento llega con `FLAG_ARRANQUE_FRIO | FLAG_REINTENTO` y la misma secuencia; con
 `FLAG_ARRANQUE_FRIO` primero, la base lo aceptaría dos veces.
 
-Caso límite conocido: si el colgante se reinicia, su nueva secuencia coincide con la última que
-la base guardó de la vida anterior (por ejemplo, ambas en 1) y el primer intento se pierde, el
-reintento se toma como duplicado y esa alerta no se procesa (la base sí responde ACK). Solo pasa
-si el colgante se reinició cuando había enviado exactamente un mensaje, o con ~65 000 mensajes
-de diferencia. Si se quiere eliminar, el colgante puede empezar la secuencia en un valor
-aleatorio tras un arranque en frío.
+Caso límite: si el colgante se reinicia, su nueva secuencia coincide con la última que la base
+guardó de la vida anterior y el primer intento se pierde, el reintento se toma como duplicado y
+ese mensaje no se procesa (la base sí responde ACK). Con la secuencia inicial aleatoria la
+coincidencia tiene una probabilidad de 1 en 65 536 por arranque, y además tiene que perderse el
+primer intento. Como el primer mensaje tras encender es un HEARTBEAT (sección 4, punto 7), en ese
+caso lo que se pierde es un heartbeat, no una alerta.
 
 Siempre se responde ACK aunque sea duplicado: el caso típico es que el ACK anterior se perdió y el
 colgante reintentó. Si no se le responde, terminaría barriendo canales y dando el patrón de error

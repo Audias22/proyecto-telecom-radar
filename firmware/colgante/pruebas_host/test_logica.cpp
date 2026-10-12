@@ -63,6 +63,7 @@ using espnow_tx::logica::ackValido;
 using espnow_tx::logica::canalValido;
 using espnow_tx::logica::construirPaquete;
 using espnow_tx::logica::prepararFlags;
+using espnow_tx::logica::secuenciaInicial;
 
 constexpr uint8_t ID = 2;
 constexpr uint8_t FLAGS_COLGANTE =
@@ -423,6 +424,31 @@ void duplicadoReglasGenerales() {
     VERIFICAR(duplicados::actualizar(vacio, true, 3).conocido);
 }
 
+// Tras arrancar, el colgante empieza en una secuencia aleatoria. El caso limite de la regla
+// (primer intento perdido y secuencia igual a la ultima de la vida anterior) solo ocurre si el
+// sorteo cae justo en ultima - 1: 1 de 65 536 valores.
+void duplicadoSecuenciaAleatoriaTrasArranque() {
+    VERIFICAR_IGUAL(secuenciaInicial(0x00000000u), 0x0000);
+    VERIFICAR_IGUAL(secuenciaInicial(0x12345678u), 0x1234 ^ 0x5678);
+    VERIFICAR_IGUAL(secuenciaInicial(0xFFFF0000u), 0xFFFF);
+    VERIFICAR_IGUAL(secuenciaInicial(0x0000FFFFu), 0xFFFF);
+    // Cambiar solo la mitad alta tambien cambia la secuencia.
+    VERIFICAR(secuenciaInicial(0x00010000u) != secuenciaInicial(0x00000000u));
+
+    const duplicados::Estado base{true, 1};  // la vida anterior envio un solo mensaje
+    unsigned colisiones = 0;
+    for (uint32_t sorteo = 0; sorteo <= 0xFFFFu; ++sorteo) {
+        const uint16_t primera = static_cast<uint16_t>(secuenciaInicial(sorteo) + 1);
+        const PaqueteEspNow p = intento(construirPaquete(MSG_HEARTBEAT, ID, 3900, primera, true), 1,
+                                        false);  // el primer intento se perdio
+        if (!duplicados::esNuevo(base, p.flags, p.secuencia)) {
+            ++colisiones;
+            VERIFICAR_IGUAL(p.secuencia, base.ultima);
+        }
+    }
+    VERIFICAR_IGUAL(colisiones, 1);
+}
+
 // --------------------------------------------------------------------------
 // 8. Decision de despertar (despertar::decidir)
 // --------------------------------------------------------------------------
@@ -632,6 +658,7 @@ int main() {
     ejecutar("tiempos: peor caso documentado 1.6 s", tiempoPeorCasoDocumentado);
     ejecutar("duplicados: ARRANQUE_FRIO con ACK perdido no se procesa dos veces", duplicadoArranqueFrioConAckPerdido);
     ejecutar("duplicados: reglas generales y desborde", duplicadoReglasGenerales);
+    ejecutar("duplicados: secuencia aleatoria tras arrancar, colision 1/65536", duplicadoSecuenciaAleatoriaTrasArranque);
     ejecutar("despertar: ALERTA por wake GPIO3", decisionAlertaPorBoton);
     ejecutar("despertar: pulsacion breve ya liberada sigue siendo ALERTA", decisionPulsacionBreveYaLiberada);
     ejecutar("despertar: HEARTBEAT por temporizador", decisionHeartbeatPorTemporizador);

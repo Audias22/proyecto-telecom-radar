@@ -69,8 +69,9 @@ despertar, el bit de GPIO3 y la recuperación del botón atascado, y delega la d
 - Después de un arranque que no sea desde deep sleep, los paquetes llevan `FLAG_ARRANQUE_FRIO`
   hasta que llega un ACK de aplicación válido. Aceptar una trama en `esp_now_send()` no basta para
   limpiar el indicador: así una pérdida total de ACK no deja a la base comparando la secuencia
-  reiniciada contra un valor antiguo. El canal y la secuencia sobreviven al deep sleep; un reinicio
-  normal vuelve a iniciar la secuencia.
+  reiniciada contra un valor antiguo. El canal y la secuencia sobreviven al deep sleep. Tras un
+  arranque en frío la secuencia empieza en un valor aleatorio (`esp_random()`, sorteado con WiFi
+  ya encendido para que el generador por hardware sea realmente aleatorio).
 - El callback de recepción solo copia a una cola estática paquetes de exactamente 8 bytes que
   provienen de la MAC configurada. El flujo principal acepta el ACK únicamente si coinciden
   versión, tipo `MSG_ACK`, id del colgante, secuencia y canal. ACK ajenos o tardíos no prolongan
@@ -331,11 +332,9 @@ cumpla lo siguiente. En esta rama `espnow_rx` todavía es un esqueleto (`TODO`).
   `FLAG_REINTENTO` (y `FLAG_BARRIDO` en el barrido). La base debe responder ACK también a los
   duplicados, con `FLAG_ACK_DUPLICADO`, y no repetir la alerta.
 - **Arranque en frío.** El colgante mantiene `FLAG_ARRANQUE_FRIO` en todos los intentos (también
-  en los reintentos) hasta recibir un ACK válido. Si la base aplica literalmente "con
-  `FLAG_ARRANQUE_FRIO`, olvidar la secuencia y aceptar como nuevo" (`docs/protocolo.md`, sección
-  5), cada reintento de ese primer mensaje se procesaría como una alerta nueva. Conviene que la
-  base trate como duplicado un mensaje con `FLAG_ARRANQUE_FRIO` y `FLAG_REINTENTO` cuya secuencia
-  sea igual a la última aceptada. Se debe acordar con el responsable de la base.
+  en los reintentos) hasta recibir un ACK válido, y empieza la secuencia en un valor aleatorio. La
+  base revisa el duplicado antes de aplicar `FLAG_ARRANQUE_FRIO` (`docs/protocolo.md`, sección 5;
+  código en `firmware/comun/protocolo/duplicados.h`).
 - **Batería.** `bateria_mv = 0` significa lectura no disponible, no 0 V; llega con
   `FLAG_BATERIA_BAJA`. Mientras `BATERIA_MODO_SIMULADO = 1`, todos los mensajes llevan 3900 mV y el
   paquete no indica que sean simulados: la base y el panel no deben tratarlos como telemetría real.

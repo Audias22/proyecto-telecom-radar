@@ -32,6 +32,12 @@ constexpr uint8_t prepararFlags(uint8_t flags, bool reintento, bool barrido) {
     return flags | (reintento ? FLAG_REINTENTO : 0) | (barrido ? FLAG_BARRIDO : 0);
 }
 
+// Secuencia de partida tras un arranque en frio, a partir de un valor de 32 bits del generador
+// por hardware. Mezcla las dos mitades para no depender solo de los bits bajos.
+constexpr uint16_t secuenciaInicial(uint32_t aleatorio) {
+    return static_cast<uint16_t>(aleatorio ^ (aleatorio >> 16));
+}
+
 constexpr PaqueteEspNow construirPaquete(TipoMensaje tipo, uint8_t id_dispositivo,
                                          uint16_t bateria_mv, uint16_t secuencia,
                                          bool arranque_frio) {

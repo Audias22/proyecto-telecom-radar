@@ -18,7 +18,7 @@ No usa `secrets.h` ni ningún archivo `.cpp` del firmware. No necesita un framew
 cada caso imprime `[ OK  ]` o `[FALLO]`, y el programa termina con código `0` solo si todos los
 casos pasan.
 
-Estado actual: **38 casos y 592 verificaciones**. Además, dos `static_assert` comprueban en
+Estado actual: **39 casos y 599 verificaciones**. Además, dos `static_assert` comprueban en
 compilación que `decidir()` produce ALERTA y HEARTBEAT en sus casos principales.
 
 ## Casos
@@ -33,7 +33,7 @@ compilación que `decidir()` produce ALERTA y HEARTBEAT en sus casos principales
 | ACK | Aceptado con y sin `FLAG_ACK_DUPLICADO` y en secuencias límite; rechazado por versión, tipo (ALERTA, HEARTBEAT, 0, 4, eco del propio paquete), id y secuencia (incluido el byte-swap) |
 | Canales | `0` y `14..255` inválidos; `1..13` válidos (barrido completo `0..255`); `CANAL_POR_DEFECTO` válido |
 | Tiempos | Peor caso `3×100 + 13×2×50 = 1600 ms`, como en `docs/protocolo.md` |
-| Duplicados | El primer mensaje tras arrancar conserva `FLAG_ARRANQUE_FRIO` en reintentos y barrido, y si la base ya lo procesó (ACK perdido) lo toma como duplicado; sin historia, nuevo; reintento de la última secuencia, duplicado; secuencia 1 con `FLAG_ARRANQUE_FRIO` tras reiniciar, nueva; desborde 65535 → 0 |
+| Duplicados | El primer mensaje tras arrancar conserva `FLAG_ARRANQUE_FRIO` en reintentos y barrido, y si la base ya lo procesó (ACK perdido) lo toma como duplicado; sin historia, nuevo; reintento de la última secuencia, duplicado; secuencia 1 con `FLAG_ARRANQUE_FRIO` tras reiniciar, nueva; desborde 65535 → 0; `secuenciaInicial` mezcla las dos mitades del valor aleatorio y, recorriendo los 65 536 sorteos, solo uno choca con la última secuencia de la base |
 | Despertar | ALERTA por wake GPIO con el bit de GPIO3; pulsación breve ya liberada sigue siendo ALERTA; HEARTBEAT por temporizador; HEARTBEAT al encender (cualquier causa y bit del botón); ninguna transmisión en reinicio por fallo, en recuperación de botón atascado (con prioridad sobre cualquier otra entrada), en wake GPIO ajeno ni en causa no operativa; valores de enum desconocidos no transmiten; tabla explícita de las 36 combinaciones con acción y motivo |
 
 ### Decisión de despertar
