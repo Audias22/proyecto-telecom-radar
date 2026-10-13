@@ -34,7 +34,7 @@ Detalles del código fuente que condicionan el diseño:
 | Baudios | 115200 | `_UART_BAUD` de la librería | Confirmado |
 | LED RGB WS2812 | GPIO1 (D1) | mapa de pines del README de la librería (v1.1.0-rc1) y ejemplo `LightRGB` | No probado |
 | Sensor de luz BH1750 | GPIO22/23 (SDA/SCL) | igual | No probado |
-| Puerto Grove | D0 (GPIO0) y D10 (GPIO18) | igual | Libres; propuestos para buzzer y LED, falta probarlos |
+| Puerto Grove | D0 (GPIO0) y D10 (GPIO18) | igual | D10: buzzer de la base (`firmware/base-radar/README.md`); D0 libre |
 
 ## 3. Tramas que manda el radar
 

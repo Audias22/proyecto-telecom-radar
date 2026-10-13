@@ -193,5 +193,6 @@ tiempo ahorra.
   la base puede perder tramas ESP-NOW.
 - Cuando la base pierde WiFi y está reintentando conectarse, su radio cambia de canal mientras
   busca el router. Durante ese tiempo el colgante puede no encontrarla. Ver `docs/fallos.md`.
-- Por confirmar con el módulo: el XIAO ESP32-C6 tiene selector de antena (interna/externa). Hay que
-  verificar cuál usa el kit MR60BHA2 y configurarla al arrancar.
+- Antena: el XIAO ESP32-C6 del kit tiene una antena externa por U.FL (confirmado en el kit). La
+  base pone `WIFI_ANT_CONFIG` (GPIO14) en alto antes de iniciar WiFi (`BASE_ANTENA_EXTERNA` en
+  `firmware/base-radar/include/config.h`).

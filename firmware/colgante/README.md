@@ -319,7 +319,8 @@ verificación para el hardware está en `pruebas_fisicas.md`.
 ## Integración con la base
 
 El colgante depende de que el firmware de la base (`firmware/base-radar`, módulo `espnow_rx`)
-cumpla lo siguiente. En esta rama `espnow_rx` todavía es un esqueleto (`TODO`).
+cumpla lo siguiente. `espnow_rx` ya está implementado en la base (fase local: canal fijo 1, sin
+WiFi); guía de prueba en `firmware/base-radar/README.md`.
 
 - **MAC STA.** La base debe imprimir al arrancar la MAC de su interfaz STA, que es la que va en
   `BASE_MAC`. El colgante descarta toda trama cuya MAC de origen no sea exactamente esa, así que
