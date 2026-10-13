@@ -160,36 +160,29 @@ tras el arranque en frío.
 **9. Potencia de transmisión**
 
 En la primera prueba el RSSI fue de -84 a -92 dBm a solo 20 cm
-(`pruebas/resultados/2026-10-12_colgante_banco.md`). La antena del Super Mini está mal adaptada y
-a plena potencia la señal puede salir peor. Esta prueba elige `COLGANTE_TX_POTENCIA_QDBM`
-(`config.h`, unidades de 0.25 dBm, rango 8-84).
+(`pruebas/resultados/2026-10-12_colgante_banco.md`). Se sospechaba que bajar la potencia mejoraría
+la señal de la antena del Super Mini. Esta prueba elige `COLGANTE_TX_POTENCIA_QDBM` (`config.h`,
+unidades de 0.25 dBm, rango 8-84).
 
-- Hacer, para cada potencia de la tabla:
+- Para cada potencia de la tabla:
   1. Poner el valor en `COLGANTE_TX_POTENCIA_QDBM`, compilar y cargar (con
      `HEARTBEAT_PRUEBA_S = 30U`).
-  2. Colgante a 20 cm del receptor, siempre en la misma posición y orientación, sin tocarlo.
-     Esperar 10 heartbeats (unos 5 minutos) y anotar el RSSI de cada uno.
-  3. Repetir a 3 m, con línea de vista.
-  4. Promediar los 10 valores y anotar el mínimo, el máximo y cuántos llegaron con `REINTENTO`.
-- Mismo canal (1) y mismo lugar en todas las mediciones; no cambiar de sitio el receptor.
-- Elegir la potencia con mejor RSSI promedio a 3 m. Si dos quedan parecidas (menos de 3 dB de
+  2. Colgante a ~3 m del receptor, con línea de vista, siempre en la misma posición y orientación,
+     sin tocarlo. Receptor elevado, en el canal 1, sin moverlo entre mediciones.
+  3. Anotar el RSSI de cada heartbeat (al menos 10), el promedio, el mínimo, el máximo y cuántos
+     llegaron con `REINTENTO`.
+- Elegir la potencia con mejor RSSI promedio. Si dos quedan parecidas (menos de 3 dB de
   diferencia), preferir la más baja: consume menos.
-- [ ] Tabla llena y valor elegido en `config.h`.
+- [x] Tabla llena y valor elegido en `config.h`. (2026-10-12: `80`. La potencia alta dio ~6 dB más
+      que la baja; en esta placa bajar a 8.5 dBm no mejora la señal)
 
-| Potencia (qdBm) | dBm | Distancia | RSSI promedio (dBm) | Mínimo | Máximo | Con `REINTENTO` (de 10) | Notas |
+| Potencia (qdBm) | dBm | Distancia | Heartbeats | RSSI promedio (dBm) | Mínimo | Máximo | Con `REINTENTO` |
 |---|---|---|---|---|---|---|---|
-| 34 | 8.5 | 20 cm | | | | | |
-| 34 | 8.5 | 3 m | | | | | |
-| 44 | 11 | 20 cm | | | | | |
-| 44 | 11 | 3 m | | | | | |
-| 52 | 13 | 20 cm | | | | | |
-| 52 | 13 | 3 m | | | | | |
-| 60 | 15 | 20 cm | | | | | |
-| 60 | 15 | 3 m | | | | | |
-| 78 | 19.5 | 20 cm | | | | | |
-| 78 | 19.5 | 3 m | | | | | |
-| 84 | 21 | 20 cm | | | | | |
-| 84 | 21 | 3 m | | | | | |
+| 34 | 8.5 | 3 m | 20 | -91.1 | -94 | -89 | 0 |
+| 80 | 20 | 3 m | 14 | -85.4 | -87 | -85 | 0 |
+
+Aparte: la altura y la orientación cambian mucho el RSSI. Con el receptor más alto y lejos de la
+mesa, a 0.6-1 m, el RSSI pasó de ~-90 a ~-74/-80 dBm.
 
 ## Lista completa (colgante terminado)
 
