@@ -157,6 +157,40 @@ tras el arranque en frío.
 - [x] Ninguna línea `ALERTA` aparece sin haber presionado (dejarlo 10 minutos sin tocar: solo
       heartbeats). (2026-10-12: 20 heartbeats, ninguna alerta)
 
+**9. Potencia de transmisión**
+
+En la primera prueba el RSSI fue de -84 a -92 dBm a solo 20 cm
+(`pruebas/resultados/2026-10-12_colgante_banco.md`). La antena del Super Mini está mal adaptada y
+a plena potencia la señal puede salir peor. Esta prueba elige `COLGANTE_TX_POTENCIA_QDBM`
+(`config.h`, unidades de 0.25 dBm, rango 8-84).
+
+- Hacer, para cada potencia de la tabla:
+  1. Poner el valor en `COLGANTE_TX_POTENCIA_QDBM`, compilar y cargar (con
+     `HEARTBEAT_PRUEBA_S = 30U`).
+  2. Colgante a 20 cm del receptor, siempre en la misma posición y orientación, sin tocarlo.
+     Esperar 10 heartbeats (unos 5 minutos) y anotar el RSSI de cada uno.
+  3. Repetir a 3 m, con línea de vista.
+  4. Promediar los 10 valores y anotar el mínimo, el máximo y cuántos llegaron con `REINTENTO`.
+- Mismo canal (1) y mismo lugar en todas las mediciones; no cambiar de sitio el receptor.
+- Elegir la potencia con mejor RSSI promedio a 3 m. Si dos quedan parecidas (menos de 3 dB de
+  diferencia), preferir la más baja: consume menos.
+- [ ] Tabla llena y valor elegido en `config.h`.
+
+| Potencia (qdBm) | dBm | Distancia | RSSI promedio (dBm) | Mínimo | Máximo | Con `REINTENTO` (de 10) | Notas |
+|---|---|---|---|---|---|---|---|
+| 34 | 8.5 | 20 cm | | | | | |
+| 34 | 8.5 | 3 m | | | | | |
+| 44 | 11 | 20 cm | | | | | |
+| 44 | 11 | 3 m | | | | | |
+| 52 | 13 | 20 cm | | | | | |
+| 52 | 13 | 3 m | | | | | |
+| 60 | 15 | 20 cm | | | | | |
+| 60 | 15 | 3 m | | | | | |
+| 78 | 19.5 | 20 cm | | | | | |
+| 78 | 19.5 | 3 m | | | | | |
+| 84 | 21 | 20 cm | | | | | |
+| 84 | 21 | 3 m | | | | | |
+
 ## Lista completa (colgante terminado)
 
 Para cuando estén disponibles la batería, el TP4056 modificado, la carcasa y la base con
