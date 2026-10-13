@@ -254,7 +254,7 @@ primera ALERTA sale al presionar el botón con el equipo ya dormido, y el siguie
 |---|---|---|
 | `BATERIA_MODO_SIMULADO` | `1` (envía 3900 mV fijos) | `0`, después de armar y medir el divisor |
 | `REGISTROS_SERIAL_HABILITADOS` | `1` (espera hasta 2 s el USB solo en el arranque en frío) | `0` en operación normal, para reducir tiempo despierto y consumo |
-| `COLGANTE_TX_POTENCIA_QDBM` | `34` (8.5 dBm; unidades de 0.25 dBm) | Elegir con la prueba de potencia de `pruebas_fisicas.md`. Se baja de la máxima porque la antena del Super Mini está mal adaptada y a plena potencia la señal sale peor |
+| `COLGANTE_TX_POTENCIA_QDBM` | `80` (20 dBm; unidades de 0.25 dBm) | `80`. Elegido con la prueba 9 de `pruebas_fisicas.md`: a 3 m dio ~6 dB más de RSSI que con `34` (8.5 dBm) |
 | `HEARTBEAT_PRUEBA_S` | `0` (heartbeat cada 15 min, de `protocolo.h`) | `0`. Para pruebas en banco, un valor corto como `30` |
 | `PIN_BOTON`, `PIN_BATERIA_ADC`, `PIN_BUZZER` | GPIO3, GPIO1, GPIO10 | Confirmar con el circuito armado |
 

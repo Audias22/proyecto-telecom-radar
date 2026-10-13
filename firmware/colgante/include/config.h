@@ -21,12 +21,11 @@
 #define PIN_BUZZER       10
 
 // Potencia maxima de transmision, en unidades de 0.25 dBm (como esp_wifi_set_max_tx_power();
-// rango 8-84, es decir 2-21 dBm). La antena de chip del ESP32-C3 Super Mini esta mal adaptada,
-// un defecto conocido de estas placas: a la potencia maxima por defecto (~20 dBm) la etapa de
-// salida se satura y la senal sale peor. En banco dio -84 a -92 dBm a 20 cm
-// (pruebas/resultados/2026-10-12_colgante_banco.md). 34 = 8.5 dBm es el valor de partida; el
-// definitivo se elige midiendo el RSSI en el receptor (prueba de potencia de pruebas_fisicas.md).
-#define COLGANTE_TX_POTENCIA_QDBM 34
+// rango 8-84, es decir 2-21 dBm). Medido en banco con el ESP32-C3 Super Mini a ~3 m con linea de
+// vista (pruebas/resultados/2026-10-12_colgante_banco.md): 34 (8.5 dBm) dio -91.1 dBm de RSSI
+// promedio y 80 (20 dBm), -85.4 dBm. En esta placa bajar la potencia no mejora la senal; con 80 se
+// ganan ~6 dB. Aparte, la altura y la orientacion del receptor cambian mucho el RSSI.
+#define COLGANTE_TX_POTENCIA_QDBM 80
 
 // Medicion de bateria. El modo simulado queda habilitado mientras no exista hardware; su valor
 // sirve para desarrollar el flujo, no representa una medicion ni confirma que haya una bateria.
