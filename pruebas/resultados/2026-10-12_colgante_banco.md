@@ -1,6 +1,6 @@
 # Colgante: primera prueba en banco (2026-10-12)
 
-Pruebas 1 a 8 de la primera parte de `firmware/colgante/pruebas_fisicas.md`.
+Pruebas 1 a 9 de la primera parte de `firmware/colgante/pruebas_fisicas.md`.
 
 ## Montaje
 
@@ -47,13 +47,29 @@ completo de -69 a -95 dBm). A esa distancia se esperaría algo cercano a -40 dBm
 necesitó `REINTENTO` con -93 dBm. A esta distancia funciona, pero queda muy poco margen para el
 alcance real dentro de la casa.
 
-Causa probable: la antena de chip del ESP32-C3 Super Mini está mal adaptada. Es un defecto
-conocido de estas placas: con la potencia de transmisión al máximo, la etapa de salida se satura y
-la señal sale peor. Lo que se suele hacer es bajar la potencia máxima (alrededor de 8.5 dBm).
+Causa sospechada: la antena de chip del ESP32-C3 Super Mini, mal adaptada en estas placas. Se
+probó bajar la potencia máxima (prueba 9, abajo) y no mejoró la señal.
+
+## Prueba 9: potencia de transmisión
+
+Receptor ESP32 clásico elevado, colgante a ~3 m con línea de vista, canal 1, misma posición en las
+dos mediciones.
+
+| Potencia (qdBm) | dBm | Heartbeats | RSSI promedio (dBm) | Mínimo | Máximo | Con `REINTENTO` |
+|---|---|---|---|---|---|---|
+| 34 | 8.5 | 20 | -91.1 | -94 | -89 | 0 |
+| 80 | 20 | 14 | -85.4 | -87 | -85 | 0 |
+
+Conclusión: en esta placa la potencia alta da ~6 dB más. Bajar a 8.5 dBm no aplica;
+`COLGANTE_TX_POTENCIA_QDBM` queda en 80.
+
+La altura y la orientación cambian mucho el RSSI: con el receptor más alto y lejos de la mesa, a
+0.6-1 m, pasó de ~-90 a ~-74/-80 dBm. Conviene cuidar la
+ubicación de la base.
 
 ## Siguiente paso
 
-- Agregado `COLGANTE_TX_POTENCIA_QDBM` en `firmware/colgante/include/config.h`, valor inicial 34
-  (8.5 dBm).
-- Hacer la prueba de potencia de `pruebas_fisicas.md`: RSSI promedio de 10 heartbeats a 20 cm y a
-  3 m con varias potencias, para elegir el valor.
+- Hecho: `COLGANTE_TX_POTENCIA_QDBM` agregado en `firmware/colgante/include/config.h` y elegido
+  con la prueba 9 (80, 20 dBm).
+- Pendiente: la primera casilla de la prueba 8 (despertar en distintos momentos del intervalo).
+- Medir el alcance real dentro de la casa con la base en su ubicación definitiva.
