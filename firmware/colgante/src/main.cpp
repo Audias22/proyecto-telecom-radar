@@ -148,6 +148,7 @@ void intentarDormir() {
 }  // namespace
 
 void setup() {
+    energia::iniciarBuzzer();
     iniciarRegistros();
     boton::iniciar();
 

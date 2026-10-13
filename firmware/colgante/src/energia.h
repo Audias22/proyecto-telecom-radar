@@ -6,6 +6,10 @@
 
 namespace energia {
 
+// Deja el pin del buzzer en el nivel de apagado y suelta la retencion que dormir() le puso para
+// el deep sleep. Se llama lo antes posible en setup(), antes de cualquier sonido.
+void iniciarBuzzer();
+
 // Beep corto de confirmacion (alerta recibida por la base).
 void beepConfirmacion();
 

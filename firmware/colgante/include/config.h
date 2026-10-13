@@ -45,7 +45,12 @@
 #define BOTON_ANTIRREBOTE_MS          30UL
 #define BOTON_ESPERA_LIBERACION_MS  5000UL
 
-// Buzzer activo en nivel alto.
+// Buzzer: modulo de buzzer activo de 3 pines (VCC, I/O, GND) con transistor PNP S8550 y 1 kohm en
+// la base. VCC a 3V3 (no 5V: con 5V el PNP no se apaga con 3.3 V en I/O), GND a GND, I/O a
+// PIN_BUZZER. Suena con I/O en bajo. En 0, para un buzzer que suena con el pin en alto.
+#define BUZZER_ACTIVO_EN_BAJO 1
+
+// Duracion de los sonidos.
 #define BUZZER_CONFIRMACION_MS       120UL
 #define BUZZER_ERROR_MS              500UL
 #define BUZZER_PAUSA_ERROR_MS        250UL
