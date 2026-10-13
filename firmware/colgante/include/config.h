@@ -20,6 +20,14 @@
 #define PIN_BATERIA_ADC  1
 #define PIN_BUZZER       10
 
+// Potencia maxima de transmision, en unidades de 0.25 dBm (como esp_wifi_set_max_tx_power();
+// rango 8-84, es decir 2-21 dBm). La antena de chip del ESP32-C3 Super Mini esta mal adaptada,
+// un defecto conocido de estas placas: a la potencia maxima por defecto (~20 dBm) la etapa de
+// salida se satura y la senal sale peor. En banco dio -84 a -92 dBm a 20 cm
+// (pruebas/resultados/2026-10-12_colgante_banco.md). 34 = 8.5 dBm es el valor de partida; el
+// definitivo se elige midiendo el RSSI en el receptor (prueba de potencia de pruebas_fisicas.md).
+#define COLGANTE_TX_POTENCIA_QDBM 34
+
 // Medicion de bateria. El modo simulado queda habilitado mientras no exista hardware; su valor
 // sirve para desarrollar el flujo, no representa una medicion ni confirma que haya una bateria.
 #define BATERIA_MODO_SIMULADO          1

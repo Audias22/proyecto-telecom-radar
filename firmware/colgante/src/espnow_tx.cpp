@@ -10,6 +10,7 @@
 
 #include <cstring>
 
+#include "config.h"
 #include "espnow_tx.h"
 #include "secrets.h"
 
@@ -25,6 +26,8 @@ static_assert(CANAL_MIN >= 1 && CANAL_MIN <= CANAL_MAX,
               "El rango de canales ESP-NOW no es valido");
 static_assert(CANAL_POR_DEFECTO >= CANAL_MIN && CANAL_POR_DEFECTO <= CANAL_MAX,
               "El canal por defecto debe pertenecer al rango de barrido");
+static_assert(COLGANTE_TX_POTENCIA_QDBM >= 8 && COLGANTE_TX_POTENCIA_QDBM <= 84,
+              "COLGANTE_TX_POTENCIA_QDBM debe estar entre 8 y 84 (2-21 dBm)");
 static_assert(ACK_REINTENTOS > 0, "Debe existir al menos un intento en el canal guardado");
 static_assert(ACK_REINTENTOS_BARRIDO > 0,
               "Debe existir al menos un intento por canal durante el barrido");
@@ -118,6 +121,16 @@ void sortearSecuencia() {
     }
     secuencia_rtc = espnow_tx::logica::secuenciaInicial(esp_random());
     secuencia_sorteada_rtc = true;
+}
+
+// Limita la potencia de transmision (ver COLGANTE_TX_POTENCIA_QDBM en config.h). Solo tiene efecto
+// con WiFi ya iniciado. Si falla, se informa y se sigue con la potencia por defecto: transmitir
+// con mala senal es mejor que no transmitir una alerta.
+void limitarPotencia() {
+    const esp_err_t error = esp_wifi_set_max_tx_power(COLGANTE_TX_POTENCIA_QDBM);
+    if (error != ESP_OK) {
+        informarError("limitar la potencia de transmision", error);
+    }
 }
 
 bool macBaseValida() {
@@ -246,6 +259,7 @@ void iniciar() {
         return;
     }
     sortearSecuencia();
+    limitarPotencia();
     const esp_err_t error_desconexion = esp_wifi_disconnect();
     if (error_desconexion != ESP_OK && error_desconexion != ESP_ERR_WIFI_NOT_CONNECT) {
         informarError("desconectar WiFi del router", error_desconexion);
