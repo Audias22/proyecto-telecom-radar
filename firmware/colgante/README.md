@@ -131,8 +131,12 @@ repositorio.
 - Cualquier error al limpiar o habilitar fuentes se informa por Serial, aplica una pausa de 1 s y
   evita entrar en deep sleep con una configuración incompleta. Cuando `dormir()` regresa, `loop()`
   reintenta solo la suspensión, sin retransmitir ni volver a sonar (ver Ciclo principal integrado).
-- El buzzer activo de GPIO10 suena con el pin en nivel alto (a través de un transistor NPN; ver
-  `pruebas_fisicas.md`). La confirmación dura 120 ms y
+- El buzzer es un módulo de 3 pines con transistor PNP: suena con GPIO10 en nivel bajo
+  (`BUZZER_ACTIVO_EN_BAJO 1` en `config.h`; en `0` sirve para un buzzer activo en alto).
+  `energia::iniciarBuzzer()`, lo primero de `setup()`, escribe el nivel de apagado antes de
+  habilitar la salida y luego suelta la retención del deep sleep, así no hay pitido al encender
+  ni al despertar. Antes de `esp_deep_sleep_start()`, `dormir()` deja el pin apagado y lo retiene
+  con `gpio_hold_en()` más `gpio_deep_sleep_hold_en()` (en el ESP32-C3 hacen falta las dos). La confirmación dura 120 ms y
   el error son tres sonidos de 500 ms separados por 250 ms. El módulo no invoca estos sonidos al
   dormir ni durante un heartbeat; `main.cpp` los llama únicamente al terminar una alerta.
 - Arduino ESP32 3.3.7 habilita por defecto resistencias internas adecuadas al modo de wake dentro
@@ -140,8 +144,9 @@ repositorio.
   bajo; su valor y el consumo adicional deben validarse con el circuito real.
 
 Sin hardware no se han validado todavía el rebote real del pulsador, el despertar desde deep
-sleep, el consumo de la resistencia interna, la polaridad real del buzzer ni el comportamiento
-eléctrico ante una pulsación prolongada. Si el pull-up interno no mantiene un nivel estable en
+sleep, el consumo de la resistencia interna, la retención del buzzer apagado en deep sleep ni
+el comportamiento eléctrico ante una pulsación prolongada. La polaridad del módulo del buzzer
+(activo en bajo) sí se comprobó en banco. Si el pull-up interno no mantiene un nivel estable en
 deep sleep, habrá que añadir una resistencia externa sin cambiar la lógica activa en bajo.
 
 ## Batería y ADC
@@ -262,7 +267,7 @@ Pendientes de confirmar con el circuito armado. Ningún cableado se ha probado t
 | Elemento | Conexión | Notas |
 |---|---|---|
 | Pulsador | GPIO3 ↔ GND | Activo en bajo con `INPUT_PULLUP`. GPIO0-GPIO5 son los únicos que despiertan de deep sleep; se evita GPIO2 (strapping). Puede necesitar pull-up externo. |
-| Buzzer activo | `+` a 3V3, `-` al colector de un NPN; GPIO10 — 1 kΩ — base; emisor a GND; 10 kΩ de GPIO10 a GND | Activo en nivel alto. Transistor porque el buzzer consume unos 15-30 mA, en el límite del GPIO; directo al pin solo si mide 12 mA o menos. La de 10 kΩ evita que el pin flote en deep sleep. Diagrama en `pruebas_fisicas.md`. |
+| Módulo de buzzer activo (3 pines, PNP S8550 y 1 kΩ en la base) | `VCC` a 3V3, `GND` a GND, `I/O` a GPIO10 | Activo en bajo. `VCC` a 3V3 y no a 5 V: con 5 V el PNP no se apaga con 3.3 V en `I/O`. Sin resistencia de GPIO10 a GND (lo haría sonar siempre); el firmware retiene el pin en alto durante el deep sleep. Quitar la etiqueta "REMOVE SEAL AFTER WASHING", que baja mucho el volumen. Probado en banco. |
 | Divisor de batería | `OUT+` — 1 MΩ — GPIO1 — 470 kΩ — GND, con 10 nF de GPIO1 a GND | Ver "Circuito propuesto" arriba. Nunca la batería directa a GPIO1. |
 | Batería Li-ion 240 mAh | Soldada a los pads `BAT+` / `BAT-` del TP4056 | Respetar polaridad. Antes, cambiar R3 por 4.7 kΩ. |
 | Alimentación del ESP32-C3 | Desde `OUT+` / `OUT-` del TP4056 | Por definir a qué pin de la Super Mini (5V o 3V3) y con qué regulación. No está decidido en el repositorio. |

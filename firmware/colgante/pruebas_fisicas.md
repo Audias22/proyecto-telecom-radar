@@ -18,43 +18,33 @@ una casilla solo con la medición hecha; si algo falla, anotar qué se observó 
 | Elemento | Pin del C3 Super Mini | Conexión |
 |---|---|---|
 | Pulsador 12x12 | GPIO3 (serigrafía `3`) | Pulsador entre GPIO3 y GND. Pull-up interno; no hace falta resistencia |
-| Buzzer activo | GPIO10 (serigrafía `10`) | Mediante transistor NPN (abajo), con 10 kΩ de GPIO10 a GND |
-| Alimentación | USB-C | Sin batería por ahora. El buzzer se alimenta del pin `3V3` |
+| Buzzer (módulo de 3 pines) | GPIO10 (serigrafía `10`) | `VCC` a `3V3`, `GND` a `G`, `I/O` a GPIO10. Activo en bajo |
+| Alimentación | USB-C | Sin batería por ahora. El módulo del buzzer se alimenta del pin `3V3` |
 
 ```
-  Pulsador                         Buzzer activo con transistor NPN (2N2222, S8050 o BC547)
+  Pulsador                         Módulo de buzzer activo (3 pines)
 
-  GPIO3 ───┐                       3V3 ─────────────┬──────────────┐
-           │                                        │ (+)          │
-         [ ] pulsador                            [buzzer]       [1N4148]  solo si el buzzer
-           │                                        │ (−)          │       es magnético; el
-  GND ─────┘                                        ├──────────────┘       cátodo (raya) a 3V3
-                                                    │
-                                                    C
-  GPIO10 ──────┬────[ 1 kΩ ]──────────────────── B  NPN
-               │                                    E
-            [10 kΩ]                                 │
-               │                                    │
-  GND ─────────┴────────────────────────────────────┘
+  GPIO3 ───┐                       3V3 ──────── VCC
+           │                       GPIO10 ───── I/O    (en bajo suena, en alto se calla)
+         [ ] pulsador              G (GND) ──── GND
+           │
+  GND ─────┘
 ```
 
 - **Pulsador de 4 patas:** las patas van unidas por pares por dentro. Usar dos patas en
   diagonal: así siempre se conecta a través del interruptor y no por el par que ya está unido.
-- **¿Buzzer directo al pin o con transistor?** Con transistor. Un buzzer activo de 12 mm consume
-  unos 25-30 mA a 5 V y unos 15-25 mA a 3.3 V (cambia según el modelo; no tenemos su hoja de
-  datos). El GPIO del ESP32-C3 entrega unos 20 mA con la fuerza de salida por defecto. Estaríamos
-  en el límite: el pin cae de voltaje, el buzzer suena más débil y el pin trabaja forzado. El NPN
-  toma la corriente desde `3V3` y el GPIO solo da ~2.6 mA a la base a través de 1 kΩ.
-  - Directo solo si se mide antes: conectar el buzzer entre `3V3` y GND con el multímetro en
-    serie (en mA). Si marca 12 mA o menos, puede ir directo de GPIO10 (+) a GND (−).
-  - El firmware no cambia: GPIO10 en alto enciende el transistor y suena; en bajo, silencio.
-- **10 kΩ de GPIO10 a GND:** en deep sleep el pin queda flotando y el transistor podría
-  encenderse a medias (zumbido leve o consumo). La resistencia lo mantiene en bajo. Con el
-  buzzer directo al pin también va, entre GPIO10 y GND.
-- **Diodo 1N4148:** solo para un buzzer magnético (bobina; suele tener una etiqueta "remove
-  seal after washing" y no se ve el disco piezo). Protege al transistor del pico al apagar la
-  bobina. Un buzzer piezoeléctrico no lo necesita.
-- **Polaridad del buzzer:** la pata larga o la marca `+` va a `3V3`.
+- **Módulo del buzzer:** trae el buzzer activo, un transistor PNP S8550 (SMD marcado `2TY`) y
+  1 kΩ en la base. El GPIO solo maneja la base del transistor, así que no hace falta otro
+  transistor ni resistencias externas. Probado en banco: `I/O` a GND suena, `I/O` a 3V3 se calla.
+  Por eso el firmware tiene `BUZZER_ACTIVO_EN_BAJO 1` en `config.h`.
+- **`VCC` a `3V3`, no a 5 V:** el PNP se apaga cuando su base queda al mismo voltaje que su
+  emisor (`VCC`). Con `VCC` a 5 V, los 3.3 V del GPIO en alto siguen 1.7 V por debajo y el
+  transistor no se apaga: el buzzer sonaría siempre.
+- **Sin resistencia de GPIO10 a GND:** con este módulo, una resistencia a GND tira `I/O` hacia
+  bajo y lo haría sonar todo el tiempo. Para que el pin no flote en deep sleep, el firmware lo
+  deja en alto (apagado) y lo retiene con `gpio_hold_en()` y `gpio_deep_sleep_hold_en()`.
+- **Quitar la etiqueta "REMOVE SEAL AFTER WASHING"** que trae encima el buzzer: tapa el orificio
+  y baja mucho el volumen.
 - No usar GPIO2, GPIO8 ni GPIO9 (pines de arranque; GPIO8 es además el LED de la placa y GPIO9 el
   botón BOOT).
 
@@ -193,8 +183,10 @@ Para cuando estén disponibles la batería, el TP4056 modificado, la carcasa y l
 
 ### 2. Buzzer (GPIO10)
 
-- [ ] Circuito del buzzer de la prueba en protoboard (transistor o directo según la corriente
-      medida) pasado a la placa final, con la resistencia de 10 kΩ de GPIO10 a GND.
+- [ ] Módulo del buzzer pasado a la placa final con `VCC` a `3V3` (no 5 V) y sin resistencia de
+      GPIO10 a GND; etiqueta "REMOVE SEAL AFTER WASHING" quitada.
+- [ ] Ningún sonido durante el deep sleep ni al despertar o encender (retención de GPIO10 en
+      alto).
 - [ ] Alerta con ACK: un beep corto (~120 ms).
 - [ ] Alerta sin base: tres beeps largos (~500 ms con pausas de ~250 ms).
 - [ ] Heartbeat, con o sin ACK: ningún sonido.
