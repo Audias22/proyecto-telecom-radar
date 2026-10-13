@@ -24,7 +24,7 @@ Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad
 |---|---|---|
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
 | Colgante (botón + ESP32) | Firmware listo, sin probar en hardware | Firmware de Abraham revisado y fusionado el 12 oct (compila; 39 casos de prueba en PC); receptor de prueba y guía de protoboard listos para la primera prueba; nadie lo ha cargado todavía en un ESP32-C3. ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
-| Base + notificación | Módulo radar listo; resto sin código | Usa el XIAO ESP32-C6 del kit. Imprime CSV por serial para captura de datos |
+| Base + notificación | Fase local lista, sin probar con el colgante | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados) y maneja el LED WS2812 y el buzzer en D10. Sin WiFi, Firebase ni Telegram todavía. CSV del radar opcional para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
@@ -223,9 +223,17 @@ Instrucciones en `web/README.md`.
 | ESP32-C3 Super Mini (x2, para colgante y pruebas) | Electrónica DIY | Q75 c/u (Q150 total) | Por confirmar | Comprado |
 | Batería Li-ion 3.7V 240mAh (301645) | Tettsa | Q45 | Por confirmar | Pedido, sin llegar |
 | Módulo de carga TP4056 (con protección, USB-C) | Electrónica DIY | Q12.50 | Por confirmar | Comprado |
-| Buzzer activo | Electrónica DIY | Q12 | Por confirmar | Comprado |
+| Módulo de buzzer activo en bajo con PNP S8550 (azul), para el colgante | Electrónica DIY | Q12 | Por confirmar | Comprado |
 | Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
 | Pasta flux Miyako W-3, 50g | Tettsa | Q20 | Por confirmar | Pedido, sin llegar |
+
+Otros materiales en uso:
+
+- **Buzzer de la base**: módulo de buzzer activo sin transistor (negro, tipo KY-012), en D10 del
+  XIAO ESP32-C6. Suena con el pin en alto y toma la corriente directo del GPIO.
+- **Multímetro**: mide voltaje bien; el fusible de la escala de mA probablemente está quemado, así
+  que por ahora no sirve para medir corriente (consumo del colgante, corriente del buzzer, corriente
+  de carga del TP4056).
 
 **Subtotal Guatemala Digital (radar, orden #1493658):** **Q322.40** (incluye envío)
 
