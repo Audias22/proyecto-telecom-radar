@@ -77,7 +77,8 @@ tras el arranque en frío.
 - Buzzer: silencio (un heartbeat nunca suena).
 - Repetir 2 o 3 veces: `seq` cambia cada vez (es aleatoria) y siempre llega con
   `ARRANQUE_FRIO` y `NUEVO`.
-- [ ] Pasa. Anotar el tiempo `ack=... us` y el RSSI.
+- [x] Pasa. Anotar el tiempo `ack=... us` y el RSSI. (2026-10-12: 3 resets, `ack` ~280 us; RSSI
+      bajo, ver `pruebas/resultados/2026-10-12_colgante_banco.md`)
 
 **2. ALERTA con ACK**
 
@@ -85,15 +86,16 @@ tras el arranque en frío.
   una vez.
 - Receptor: `ALERTA id=1 seq=R+1 flags=- ... NUEVO ack=OK`. Ya no lleva `ARRANQUE_FRIO`, porque
   el heartbeat del arranque recibió su ACK. Una sola línea por pulsación.
-- [ ] Pasa en 5 pulsaciones seguidas; `seq` sube de 1 en 1.
+- [x] Pasa en 5 pulsaciones seguidas; `seq` sube de 1 en 1. (2026-10-12: 6 pulsaciones, `ack`
+      279-310 us)
 
 **3. Beep de confirmación**
 
 - Hacer: lo mismo que en la prueba 2, fijándose en el sonido.
 - Buzzer: un beep corto (~120 ms) poco después de soltar el botón.
-- [ ] Un solo beep corto por alerta, audible.
-- [ ] Mantener el botón presionado más de 5 s: una sola línea `ALERTA` en el receptor y un solo
-      beep; al soltar no sale otra alerta.
+- [x] Un solo beep corto por alerta, audible.
+- [x] Mantener el botón presionado más de 5 s: una sola línea `ALERTA` en el receptor y un solo
+      beep; al soltar no sale otra alerta. (2026-10-12: 8 s)
 
 **4. Colgante sin receptor (patrón de error)**
 
@@ -103,7 +105,9 @@ tras el arranque en frío.
   (1.6 s de reintentos y barrido más el arranque de WiFi).
 - Volver a conectar el receptor y presionar de nuevo: `ALERTA ... flags=- NUEVO ack=OK` y beep
   corto. La `seq` salta 2: la alerta sin respuesta también gastó un número.
-- [ ] Pasa. Anotar el tiempo aproximado hasta el patrón de error.
+- [x] Pasa. Anotar el tiempo aproximado hasta el patrón de error. (2026-10-12: pasa; el tiempo
+      no se anotó. La `seq` saltó 4 y no 2: además de la alerta, 3 heartbeats sin ACK durante la
+      desconexión)
 
 **5. Barrido cuando el receptor cambia de canal**
 
@@ -112,7 +116,9 @@ tras el arranque en frío.
 - Buzzer: beep corto, algo más tarde que en la prueba 2 (unos 0.8 s).
 - Presionar otra vez: `ALERTA ... flags=- ... NUEVO`. El colgante guardó el canal y ya no barre.
 - Volver al canal `1` y repetir: de nuevo una línea con `REINTENTO|BARRIDO` y luego normal.
-- [ ] Pasa en los canales 6, 13 y 1.
+- [x] Pasa en los canales 6, 13 y 1. (2026-10-12: el receptor recibe el mismo mensaje varias
+      veces desde canales vecinos durante el barrido, 3 copias en el 6 y 5 en el 13; solo la
+      primera es `NUEVO`)
 - Nota: los canales de 2.4 GHz se solapan. El colgante podría encontrar al receptor desde un
   canal vecino (5 o 7) con RSSI más bajo. Si después funciona sin barrer, no es un fallo; anotar
   el RSSI.
@@ -130,7 +136,7 @@ tras el arranque en frío.
   sonido. Es el caso corregido en la regla de duplicados.
 - 6c. Escribir `o` (la base "se reinicia") y presionar: `ALERTA ... NUEVO`, se acepta aunque la
   base no tenga historia.
-- [ ] En 6a y 6b hay un solo `NUEVO` por `seq`.
+- [x] En 6a y 6b hay un solo `NUEVO` por `seq`. (2026-10-12: 6c también pasa)
 
 **7. HEARTBEAT por timer (intervalo corto de prueba)**
 
@@ -138,7 +144,7 @@ tras el arranque en frío.
 - Receptor: una línea `HEARTBEAT ... flags=- ... NUEVO ack=OK` cada ~30 s (los `ms` de líneas
   seguidas difieren unos 30 000 más el tiempo despierto); `seq` sube de 1 en 1.
 - Buzzer: silencio.
-- [ ] Al menos 3 heartbeats seguidos. Anotar el intervalo real.
+- [x] Al menos 3 heartbeats seguidos. Anotar el intervalo real. (2026-10-12: ~30.1 s)
 
 **8. Despertar desde deep sleep**
 
@@ -146,9 +152,10 @@ tras el arranque en frío.
   Windows y el receptor no muestra nada. Presionar el pulsador en ese momento.
 - Receptor: `ALERTA ... NUEVO ack=OK` en menos de un segundo. Buzzer: beep corto.
 - Después de la alerta, los heartbeats siguen llegando cada ~30 s.
-- [ ] Pasa 5 veces en distintos momentos del intervalo.
-- [ ] Ninguna línea `ALERTA` aparece sin haber presionado (dejarlo 10 minutos sin tocar: solo
-      heartbeats).
+- [ ] Pasa 5 veces en distintos momentos del intervalo. (2026-10-12: las 6 alertas de la prueba 2
+      despertaron al colgante desde deep sleep, pero no se registró en qué momento del intervalo)
+- [x] Ninguna línea `ALERTA` aparece sin haber presionado (dejarlo 10 minutos sin tocar: solo
+      heartbeats). (2026-10-12: 20 heartbeats, ninguna alerta)
 
 ## Lista completa (colgante terminado)
 
