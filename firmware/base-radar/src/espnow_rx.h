@@ -33,6 +33,7 @@ bool siguienteMensaje(MensajeColgante &mensaje);
 // MAC de la base en modo STA (la que va en BASE_MAC del secrets.h del colgante).
 void macPropia(uint8_t mac[6]);
 
+// Canal en el que está la radio (0 si no se pudo leer). Va también en cada ACK.
 uint8_t canalActual();
 
 // Paquetes descartados por longitud, versión o tipo inválidos (sin ACK).

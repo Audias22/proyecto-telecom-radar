@@ -44,13 +44,10 @@ bool esPaqueteValido(const uint8_t *datos, int longitud) {
     return version == PROTOCOLO_VERSION && (tipo == MSG_ALERTA || tipo == MSG_HEARTBEAT);
 }
 
+// El ACK lleva el canal de la radio para que el colgante guarde ese y no el canal vecino en el que
+// pudo oírlo (docs/protocolo.md, sección 6).
 bool responderAck(const uint8_t *mac, const PaqueteEspNow &p, bool nuevo) {
-    const PaqueteEspNow ack = {PROTOCOLO_VERSION,
-                               MSG_ACK,
-                               p.id_dispositivo,
-                               static_cast<uint8_t>(nuevo ? 0 : FLAG_ACK_DUPLICADO),
-                               p.secuencia,
-                               0};
+    const PaqueteEspNow ack = ackConCanal(p.id_dispositivo, p.secuencia, !nuevo, canalActual());
     return asegurarPeer(mac) &&
            esp_now_send(mac, reinterpret_cast<const uint8_t *>(&ack), sizeof(ack)) == ESP_OK;
 }

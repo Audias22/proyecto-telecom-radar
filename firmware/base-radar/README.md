@@ -194,7 +194,9 @@ de la base y acceso al router (para ver o cambiar su canal y apagarlo).
    tiene guardado (el 1 tras encenderlo), el colgante no recibe ACK y barre. Presionar el botón:
    en la base debe salir `ALERTA ... flags=REINTENTO|BARRIDO ... canal=N NUEVO ack=OK`, la alerta
    local suena y el colgante da el beep corto. La siguiente pulsación llega con `flags=-`, ya en
-   el canal guardado. Si el router está en el canal 1, cambiarlo a otro (por ejemplo 6 u 11) en
+   el canal guardado. El ACK lleva el canal de la base, así que el colgante guarda ese aunque haya
+   oído el ACK en un canal vecino (en su monitor sale `ACK recibido en el canal X, se guarda el
+   canal de la base: N`). Si el router está en el canal 1, cambiarlo a otro (por ejemplo 6 u 11) en
    la configuración del router para probar el barrido.
 4. **Apagar el router**: tras unos segundos debe salir
    `wifi: desconectado de "...", canal N, ultimo RSSI ..., motivo ...` y luego intentos fallidos
