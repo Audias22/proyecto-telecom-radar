@@ -4,7 +4,7 @@
 #pragma once
 
 #define FIRMWARE_NOMBRE  "base-radar"
-#define FIRMWARE_VERSION "0.4.0"
+#define FIRMWARE_VERSION "0.5.0"
 
 // ---------------------------------------------------------------------------
 // Salida por serial

@@ -1,8 +1,12 @@
 // Firmware de la base (XIAO ESP32-C6 del kit MR60BHA2).
 //
 // Lee el radar, recibe al colgante por ESP-NOW (con ACK y filtro de duplicados), maneja el LED y
-// el buzzer de la base y se conecta al router por WiFi (BASE_WIFI_HABILITADO). Todavía sin
-// Firebase ni Telegram.
+// el buzzer de la base, se conecta al router por WiFi (BASE_WIFI_HABILITADO) y escribe en Firebase
+// (firebase_cliente, en su propia tarea: loop() solo encola). Todavía sin Telegram.
+//
+// A Firebase van: el estado cada ESTADO_INTERVALO_MS (lo maneja la tarea de red), una lectura
+// cada LECTURA_INTERVALO_MS, /colgantes/{id} en cada mensaje nuevo del colgante y un evento BOTON
+// en cada ALERTA nueva.
 //
 // Salida por serial. Todos los registros empiezan con '#', que analisis/capturar_serial.py
 // trata como comentario:
@@ -24,6 +28,7 @@
 #include "boton_silencio.h"
 #include "config.h"
 #include "espnow_rx.h"
+#include "firebase_cliente.h"
 #include "radar.h"
 #include "red_wifi.h"
 
@@ -65,7 +70,7 @@ static void ayuda() {
     Serial.println("# Comandos (letra y Enter):");
     Serial.println("#   b  buzzer fijo 10 s (medir el voltaje en D10)");
     Serial.println("#   s  silenciar la alerta local");
-    Serial.println("#   e  estado: MAC, canal, antena, WiFi y contadores");
+    Serial.println("#   e  estado: MAC, canal, antena, radar, WiFi, Firebase y contadores");
     Serial.println("#   h  esta ayuda");
     Serial.println("# Boton BOOT: silencia la alerta local (no presionarlo al reiniciar)");
 }
@@ -97,7 +102,18 @@ static void imprimirMensaje(const MensajeColgante &m) {
                   m.duplicado ? "DUPLICADO" : "NUEVO", m.ack_ok ? "OK" : "ERROR");
 }
 
-// Solo los mensajes nuevos disparan la alerta local; un duplicado ya se atendió.
+// La alerta local va primero y no depende de la red; la nube solo recibe una copia en la cola.
+static void enviarANube(const MensajeColgante &m) {
+    const PaqueteEspNow &p = m.paquete;
+    firebase_cliente::encolarColgante(p.id_dispositivo, p.bateria_mv, m.rssi);
+    if (p.tipo == MSG_ALERTA) {
+        char origen[16];
+        snprintf(origen, sizeof(origen), "colgante%u", p.id_dispositivo);
+        firebase_cliente::encolarEvento(EVENTO_BOTON, origen, "boton del colgante");
+    }
+}
+
+// Solo los mensajes nuevos disparan la alerta local y van a la nube; un duplicado ya se atendió.
 static void atenderMensaje(const MensajeColgante &m) {
     imprimirMensaje(m);
     if (m.duplicado) {
@@ -110,6 +126,7 @@ static void atenderMensaje(const MensajeColgante &m) {
     } else if ((m.paquete.flags & FLAG_BATERIA_BAJA) != 0) {
         alerta_local::activar(PATRON_AVISO);
     }
+    enviarANube(m);
 }
 
 static void atenderColgante() {
@@ -144,28 +161,87 @@ static void revisarSinDatos() {
     sin_datos_antes = sin_datos;
 }
 
-static void revisarPresencia(const LecturaRadar &l) {
-    static bool primera = true;
-    static bool presencia_antes = false;
-    if (!primera && l.presencia == presencia_antes) {
+// Los tres estados de docs/radar.md, 13.6 (el tercero, "radar sin datos", sale en
+// revisarSinDatos()). "Sin persona detectada" no es "cama vacía".
+enum EstadoCama : uint8_t { CAMA_DESCONOCIDO, CAMA_PERSONA, CAMA_SIN_OBJETIVO, CAMA_ACTIVIDAD_BAJA };
+
+static EstadoCama estadoCama(const EstadoPersona &e) {
+    if (e.persona) {
+        return CAMA_PERSONA;
+    }
+    return e.objetivo ? CAMA_ACTIVIDAD_BAJA : CAMA_SIN_OBJETIVO;
+}
+
+static void imprimirPersona(const EstadoPersona &e) {
+    if (e.persona) {
+        Serial.printf("persona detectada (actividad %.3f)", e.actividad);
+    } else if (e.objetivo) {
+        Serial.printf("sin persona detectada (actividad %.3f < %.2f)", e.actividad,
+                      RADAR_UMBRAL_PERSONA);
+    } else {
+        Serial.print("sin persona detectada (radar sin objetivo)");
+    }
+}
+
+// Registra los cambios de estado, evaluando la ventana de 30 s una vez por segundo.
+static void revisarPersona() {
+    static uint32_t ultima_ms = 0;
+    static EstadoCama antes = CAMA_DESCONOCIDO;
+    if (millis() - ultima_ms < 1000) {
         return;
     }
-    Serial.printf("# [%9lu ms] radar: %s\n", (unsigned long)l.millis_medicion,
-                  l.presencia ? "persona detectada" : "sin persona detectada");
-    presencia_antes = l.presencia;
-    primera = false;
+    ultima_ms = millis();
+    const EstadoPersona e = radar::estadoPersona();
+    if (estadoCama(e) == antes) {
+        return;
+    }
+    antes = estadoCama(e);
+    Serial.printf("# [%9lu ms] radar: ", millis());
+    imprimirPersona(e);
+    Serial.println();
+}
+
+// Valores del módulo de la última trama: NAN si no llegaron. formato_nube omite los que no
+// corresponden (sin objetivo, 0 o fuera de rango).
+static LecturaNube armarLecturaNube() {
+    const EstadoPersona e = radar::estadoPersona();
+    const LecturaRadar u = radar::ultimaLectura();
+    LecturaNube l;
+    l.millis_medicion = millis();
+    l.persona = e.persona;
+    l.objetivo = e.objetivo;
+    l.actividad = e.objetivo ? e.actividad : NAN;
+    l.distancia_cm = e.objetivo ? u.distancia_cm : NAN;
+    l.resp_rpm = u.resp_rpm;
+    l.latido_bpm = u.latido_bpm;
+    return l;
+}
+
+// Una lectura cada LECTURA_INTERVALO_MS. Con el radar sin datos no se escribe nada: el hueco en
+// /lecturas es la señal (docs/modelo-datos.md, 1.1).
+static void enviarLecturaPeriodica() {
+    static uint32_t ultima_ms = 0;
+    if (millis() - ultima_ms < LECTURA_INTERVALO_MS) {
+        return;
+    }
+    ultima_ms = millis();
+    if (radar::sinDatos() || radar::tramasFase() == 0) {
+        return;
+    }
+    firebase_cliente::encolarLectura(armarLecturaNube());
 }
 
 static void atenderRadar() {
     radar::actualizar();
     LecturaRadar lectura;
     while (radar::siguienteLectura(lectura)) {
-        revisarPresencia(lectura);
         if (BASE_SALIDA_CSV) {
             imprimirLectura(lectura);
         }
     }
     revisarSinDatos();
+    revisarPersona();
+    enviarLecturaPeriodica();
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +271,13 @@ static void imprimirEstado() {
     Serial.printf("# Radar: %s, reinicios de UART %lu, patron de alerta %d\n",
                   radar::sinDatos() ? "sin datos" : "con datos",
                   (unsigned long)radar::reiniciosUart(), (int)alerta_local::patronActivo());
+    const EstadoPersona e = radar::estadoPersona();
+    Serial.print("# Radar: ");
+    imprimirPersona(e);
+    Serial.printf(", %u tramas con dato en 30 s; pico de la UART %u B (seguro < %u B)\n",
+                  e.muestras, (unsigned)radar::picoBufferUart(), (unsigned)radar::PICO_UART_SEGURO);
     red_wifi::imprimirEstado();
+    firebase_cliente::imprimirEstado();
 }
 
 static void ejecutarComando(char comando) {
@@ -255,6 +337,7 @@ void setup() {
         Serial.println("# ERROR: no se pudo iniciar WiFi/ESP-NOW; el colgante no podra comunicarse");
         alerta_local::activar(PATRON_AVISO);
     }
+    firebase_cliente::iniciar();  // la tarea de red espera sola a que haya WiFi
     imprimirEstado();
     ayuda();
     if (BASE_SALIDA_CSV) {

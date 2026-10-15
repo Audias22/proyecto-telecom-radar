@@ -1,53 +1,44 @@
 // firebase_cliente.h
-// Escritura en Firebase Realtime Database por la API REST sobre HTTPS.
-// Rutas y formato en docs/modelo-datos.md.
+// Escritura en Firebase Realtime Database por la API REST sobre HTTPS (docs/modelo-datos.md).
+//
+// Toda la red corre en una tarea FreeRTOS propia (TAREA_RED_* en config.h). loop() solo llama a
+// encolar*(), que copian la petición a una cola acotada (cola_peticiones.h) y vuelven enseguida:
+// loop() nunca espera a la red. La alerta local y el ACK al colgante no pasan por aquí.
+//
+// La tarea:
+//   - Inicia sesión con DISPOSITIVO_EMAIL / DISPOSITIVO_CLAVE (Firebase Auth, signInWithPassword),
+//     renueva el idToken con el refresh token (securetoken) antes de que venza y vuelve a iniciar
+//     sesión ante un 401.
+//   - Cada ESTADO_INTERVALO_MS escribe /dispositivos/{BASE_ID}/estado y lee de vuelta
+//     ultimo_contacto: es la referencia de hora del servidor para las claves de /lecturas.
+//   - Envía lo que haya en la cola: eventos, colgantes y lecturas, en ese orden.
+//   - HTTPS con verificación del certificado (bundle de CA de ESP-IDF), nunca sin verificar.
+// Solo trabaja con el WiFi conectado (red_wifi). Escribe con ?print=silent para no gastar
+// descarga, salvo la lectura de ultimo_contacto.
 
 #pragma once
 
 #include <stdint.h>
 
-#include "radar.h"
-
-enum TipoEvento : uint8_t {
-    EVENTO_APNEA,  // reservado: la base no lo crea (docs/fallos.md, "Tipos de evento")
-    EVENTO_BOTON,
-    EVENTO_BATERIA_BAJA,
-    EVENTO_BASE_DESCONECTADA,
-    EVENTO_COLGANTE_AUSENTE,
-    EVENTO_RADAR_SIN_DATOS,
-};
+#include "formato_nube.h"
 
 namespace firebase_cliente {
 
-// TODO: iniciar sesión con DISPOSITIVO_EMAIL / DISPOSITIVO_CLAVE (API REST de Firebase Auth) y
-// guardar el idToken. Renovarlo antes de que venza (1 hora).
+// Arranca la tarea de red. No bloquea. Con FIREBASE_HABILITADO 0, o con secrets.h todavía con
+// los valores de ejemplo, no arranca nada y encolar*() no hacen nada.
 void iniciar();
 
-// TODO: renovar token y mantener la referencia de hora del servidor. No debe bloquear loop().
-void actualizar();
+// Una lectura para /lecturas/{BASE_ID}/{ts}. La clave ts se calcula con millis_medicion al
+// enviarla.
+void encolarLectura(const LecturaNube &lectura);
 
-// Hay token válido y referencia de hora del servidor.
-bool listo();
+// Un mensaje NUEVO del colgante: /colgantes/{id} con bateria_mv, ultimo_heartbeat, rssi y base.
+void encolarColgante(uint8_t id, uint16_t bateria_mv, int8_t rssi);
 
-// TODO: hora del servidor estimada en ms (referencia del servidor + millis() transcurridos).
-// Se usa como clave de /lecturas. Devuelve 0 si todavía no hay referencia.
-uint64_t horaServidorMs();
+// Un evento para /eventos (POST). origen: BASE_ID o "colganteN". detalle puede ser vacío.
+void encolarEvento(TipoEvento tipo, const char *origen, const char *detalle);
 
-// TODO: convertir el millis() de una medición a hora del servidor (para lecturas en cola).
-uint64_t millisAHoraServidor(uint32_t millis_medicion);
-
-// TODO: PUT /lecturas/{baseId}/{ts}. Devuelve false si falla (la lectura va a la cola).
-// Campos en docs/modelo-datos.md, sección 1.1: persona y objetivo obligatorios; actividad y
-// distancia solo con objetivo; resp_rpm y latido_bpm solo si el módulo da un valor > 0.
-bool enviarLectura(const LecturaRadar &lectura, uint64_t ts_ms, bool diferida);
-
-// TODO: PATCH /dispositivos/{baseId}/estado con ultimo_contacto = {".sv":"timestamp"}.
-bool enviarEstado(int8_t rssi_wifi);
-
-// TODO: PATCH /colgantes/{id}.
-bool actualizarColgante(uint8_t id, uint16_t bateria_mv, int8_t rssi);
-
-// TODO: POST /eventos.
-bool enviarEvento(TipoEvento tipo, const char *origen);
+// Comando "e": sesión, última escritura correcta, errores, cola y hora del servidor.
+void imprimirEstado();
 
 }  // namespace firebase_cliente
