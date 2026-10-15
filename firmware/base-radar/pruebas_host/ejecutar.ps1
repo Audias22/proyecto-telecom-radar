@@ -8,7 +8,8 @@ $flags = @(
   '-std=c++17', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
   '-I../include', '-I../src',
   'test_logica.cpp', '../src/ventana_actividad.cpp', '../src/formato_nube.cpp',
-  '../src/cola_peticiones.cpp', '-o', 'build/test_logica.exe'
+  '../src/cola_peticiones.cpp', '../src/cuerpo_http.cpp', '../src/vigilante_red.cpp',
+  '-o', 'build/test_logica.exe'
 )
 
 if (Get-Command g++ -ErrorAction SilentlyContinue) {

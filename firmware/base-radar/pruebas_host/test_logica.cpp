@@ -1,6 +1,7 @@
 // test_logica.cpp
 // Pruebas unitarias en host (PC) de la lógica pura de la base: ventana de actividad del radar
-// (persona / objetivo), JSON que se escribe en Firebase y cola de peticiones a la tarea de red.
+// (persona / objetivo), JSON que se escribe en Firebase, cola de peticiones a la tarea de red,
+// lector del cuerpo de las respuestas HTTP y vigilante de la tarea de red.
 //
 // Incluye los headers y .cpp reales (sin Arduino); no duplica su lógica. Los JSON esperados son
 // los mismos que escribe web/simulador/simulador.py, que pasó la verificación contra las reglas
@@ -12,8 +13,10 @@
 #include <cstring>
 
 #include "cola_peticiones.h"
+#include "cuerpo_http.h"
 #include "formato_nube.h"
 #include "ventana_actividad.h"
+#include "vigilante_red.h"
 
 namespace {
 
@@ -348,6 +351,233 @@ void enteros() {
 }
 
 // ---------------------------------------------------------------------------
+// Cuerpo de la respuesta HTTP
+// ---------------------------------------------------------------------------
+
+char cuerpo_destino[64];
+
+size_t alimentar(CuerpoHttp &c, const char *texto) {
+    return c.agregar(reinterpret_cast<const uint8_t *>(texto), std::strlen(texto));
+}
+
+// De a un byte, como puede llegar del socket TLS.
+void alimentarDeAUno(CuerpoHttp &c, const char *texto) {
+    for (size_t i = 0; texto[i] != '\0'; i++) {
+        c.agregar(reinterpret_cast<const uint8_t *>(texto + i), 1);
+    }
+}
+
+void cuerpoModo() {
+    // El 204 de ?print=silent llega sin Content-Length (medido): no hay cuerpo que esperar.
+    VERIFICAR(cuerpo_http::modo(204, -1, false) == CUERPO_VACIO);
+    VERIFICAR(cuerpo_http::modo(304, -1, false) == CUERPO_VACIO);
+    VERIFICAR(cuerpo_http::modo(101, -1, false) == CUERPO_VACIO);
+    VERIFICAR(cuerpo_http::modo(200, 13, false) == CUERPO_LARGO);
+    VERIFICAR(cuerpo_http::modo(401, 36, false) == CUERPO_LARGO);
+    VERIFICAR(cuerpo_http::modo(200, -1, true) == CUERPO_CHUNKED);  // Firebase Auth
+    VERIFICAR(cuerpo_http::modo(200, -1, false) == CUERPO_HASTA_CIERRE);
+}
+
+void cuerpoVacio() {
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_VACIO, -1);
+    VERIFICAR(c.completo());
+    VERIFICAR(alimentar(c, "basura") == 0);
+    VERIFICAR(c.largo() == 0);
+    c.iniciar(CUERPO_LARGO, 0);
+    VERIFICAR(c.completo());
+}
+
+void cuerpoLargo() {
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_LARGO, 13);
+    VERIFICAR(alimentar(c, "17912") == 5);
+    VERIFICAR(!c.completo());  // si no llega el resto, el lector corta por tiempo
+    VERIFICAR(alimentar(c, "34567890HTTP/1.1") == 8);  // no consume más allá del cuerpo
+    VERIFICAR(c.completo() && !c.recortado());
+    VERIFICAR_TEXTO(cuerpo_destino, "1791234567890");
+}
+
+void cuerpoChunked() {
+    const char *respuesta = "5\r\nhola \r\n6;ext=1\r\nmundo!\r\n0\r\n\r\n";
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_CHUNKED, -1);
+    VERIFICAR(alimentar(c, respuesta) == std::strlen(respuesta));
+    VERIFICAR(c.completo() && !c.invalido());
+    VERIFICAR_TEXTO(cuerpo_destino, "hola mundo!");
+
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentarDeAUno(c, "1A\r\nabcdefghijklmnopqrstuvwxyz\r\n0\r\n");
+    VERIFICAR(!c.completo());  // falta la línea vacía final
+    alimentarDeAUno(c, "\r\n");
+    VERIFICAR(c.completo());
+    VERIFICAR_TEXTO(cuerpo_destino, "abcdefghijklmnopqrstuvwxyz");
+}
+
+void cuerpoChunkedTrailerYLf() {
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "3\r\nabc\r\n0\r\nX-Algo: 1\r\n");
+    VERIFICAR(!c.completo());
+    alimentar(c, "\r\n");
+    VERIFICAR(c.completo());
+    VERIFICAR_TEXTO(cuerpo_destino, "abc");
+
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "2\nok\n0\n\n");  // solo LF
+    VERIFICAR(c.completo());
+    VERIFICAR_TEXTO(cuerpo_destino, "ok");
+}
+
+void cuerpoChunkedInvalido() {
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "zz\r\n");
+    VERIFICAR(c.invalido() && !c.completo());
+
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "3\r\nabcX\r\n");  // faltó el CRLF después de los datos
+    VERIFICAR(c.invalido());
+
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "123456789\r\n");  // tamaño absurdo
+    VERIFICAR(c.invalido());
+
+    c.iniciar(CUERPO_CHUNKED, -1);
+    alimentar(c, "\r\n");  // línea sin tamaño
+    VERIFICAR(c.invalido());
+}
+
+void cuerpoRecortado() {
+    char chico[8];
+    CuerpoHttp c(chico, sizeof(chico));
+    c.iniciar(CUERPO_LARGO, 20);
+    VERIFICAR(alimentar(c, "01234567890123456789") == 20);  // consume todo: conexión limpia
+    VERIFICAR(c.completo() && c.recortado());
+    VERIFICAR(c.largo() == 7);
+    VERIFICAR_TEXTO(chico, "0123456");
+}
+
+void cuerpoHastaCierre() {
+    CuerpoHttp c(cuerpo_destino, sizeof(cuerpo_destino));
+    c.iniciar(CUERPO_HASTA_CIERRE, -1);
+    alimentar(c, "{\"a\":1}");
+    VERIFICAR(!c.completo());
+    c.cerrada();
+    VERIFICAR(c.completo());
+    VERIFICAR_TEXTO(cuerpo_destino, "{\"a\":1}");
+
+    // Un cierre a mitad de un cuerpo con largo no lo completa.
+    c.iniciar(CUERPO_LARGO, 13);
+    alimentar(c, "179");
+    c.cerrada();
+    VERIFICAR(!c.completo());
+}
+
+// ---------------------------------------------------------------------------
+// Vigilante de la tarea de red
+// ---------------------------------------------------------------------------
+
+constexpr uint32_t MAX_MS = FIREBASE_PETICION_MAX_MS;
+constexpr uint32_t TRAS_CORTE_MS = FIREBASE_REINICIO_TRAS_CORTE_MS;
+
+void vigilanteTareaSana() {
+    VigilanteRed v;
+    v.latir(0);
+    // Una vuelta cada 500 ms (lo más lento de la tarea) y peticiones cortas: nunca actúa.
+    for (uint32_t t = 0; t < 10 * MAX_MS; t += 500) {
+        if (t % 5000 == 0) {
+            v.empezar("PUT", "lecturas/base01/1791234567890", t);
+            VERIFICAR(v.revisar(t + 300, false) == VIGILANTE_NADA);
+            VERIFICAR(!v.terminar(t + 400));
+        } else {
+            v.latir(t);
+        }
+        VERIFICAR(v.revisar(t + 450, false) == VIGILANTE_NADA);
+    }
+    VERIFICAR(v.cortes() == 0);
+}
+
+void vigilanteCortaYReinicia() {
+    VigilanteRed v;
+    v.latir(1000);
+    v.empezar("PATCH", "dispositivos/base01/estado", 1000);
+    VERIFICAR(v.peticion().activa);
+    VERIFICAR(v.revisar(1000 + MAX_MS - 1, false) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(1000 + MAX_MS, false) == VIGILANTE_CORTAR);
+    VERIFICAR(v.cortes() == 1);
+    // Un solo corte por petición; después se espera a que la tarea reaccione.
+    VERIFICAR(v.revisar(1000 + MAX_MS + 1000, false) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(1000 + MAX_MS + TRAS_CORTE_MS - 1, false) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(1000 + MAX_MS + TRAS_CORTE_MS, false) == VIGILANTE_REINICIAR);
+    VERIFICAR(v.cortes() == 1);
+}
+
+void vigilanteCorteRecupera() {
+    VigilanteRed v;
+    v.latir(0);
+    v.empezar("GET", "dispositivos/base01/estado/ultimo_contacto", 0);
+    VERIFICAR(v.revisar(MAX_MS, false) == VIGILANTE_CORTAR);
+    // El corte despierta a la tarea: termina con error y sigue.
+    VERIFICAR(v.terminar(MAX_MS + 200));
+    VERIFICAR(!v.peticion().activa);
+    // terminar() cuenta como vuelta de la tarea: pasado el plazo del reinicio no hace nada.
+    VERIFICAR(v.revisar(MAX_MS + TRAS_CORTE_MS, false) == VIGILANTE_NADA);
+    // Una petición nueva se vigila desde cero y se puede volver a cortar.
+    const uint32_t t = 200000;
+    v.empezar("POST", "eventos", t);
+    VERIFICAR(!v.terminar(t + 300));
+    v.empezar("POST", "eventos", t + 1000);
+    VERIFICAR(v.revisar(t + 1000 + MAX_MS, false) == VIGILANTE_CORTAR);
+    VERIFICAR(v.cortes() == 2);
+}
+
+void vigilanteAlertaPospone() {
+    VigilanteRed v;
+    v.latir(0);
+    v.empezar("PATCH", "colgantes/1", 0);
+    // El corte no espera a la alerta: no reinicia nada y es la recuperación normal.
+    VERIFICAR(v.revisar(MAX_MS, true) == VIGILANTE_CORTAR);
+    const uint32_t reinicio = MAX_MS + TRAS_CORTE_MS;
+    VERIFICAR(v.revisar(reinicio, true) == VIGILANTE_NADA);
+    VERIFICAR(v.reinicioPospuesto());
+    VERIFICAR(v.revisar(reinicio + 59000, true) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(reinicio + 60000, false) == VIGILANTE_REINICIAR);
+}
+
+void vigilanteTareaSinVueltas() {
+    VigilanteRed v;
+    v.latir(5000);
+    // Fuera de una petición no hay socket que cortar: se pasa directo al reinicio.
+    VERIFICAR(v.revisar(5000 + MAX_MS - 1, false) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(5000 + MAX_MS, true) == VIGILANTE_NADA);
+    VERIFICAR(v.reinicioPospuesto());
+    VERIFICAR(v.revisar(5000 + MAX_MS, false) == VIGILANTE_REINICIAR);
+    VERIFICAR(v.cortes() == 0);
+    v.latir(5000 + MAX_MS + 1);
+    VERIFICAR(!v.reinicioPospuesto());
+}
+
+void vigilanteVueltaMillis() {
+    VigilanteRed v;
+    const uint32_t inicio = 0xFFFFFFFFu - 10000;
+    v.latir(inicio);
+    v.empezar("PUT", "lecturas/base01/1791234567890", inicio);
+    VERIFICAR(v.revisar(inicio + 20000, false) == VIGILANTE_NADA);  // ya dio la vuelta
+    VERIFICAR(v.revisar(inicio + MAX_MS, false) == VIGILANTE_CORTAR);
+}
+
+void vigilanteRutaLarga() {
+    VigilanteRed v;
+    char ruta[100];
+    std::memset(ruta, 'x', sizeof(ruta) - 1);
+    ruta[sizeof(ruta) - 1] = '\0';
+    v.empezar("DEMASIADOLARGO", ruta, 0);
+    VERIFICAR(std::strlen(v.peticion().ruta) == sizeof(v.peticion().ruta) - 1);
+    VERIFICAR_TEXTO(v.peticion().metodo, "DEMASIA");
+}
+
+// ---------------------------------------------------------------------------
 // Cola de peticiones
 // ---------------------------------------------------------------------------
 
@@ -492,6 +722,21 @@ int main() {
     ejecutar("cola: confirmar tras una lectura pisada", colaConfirmarTrasPisada);
     ejecutar("cola: colgante reemplaza al pendiente del mismo id", colaColganteReemplaza);
     ejecutar("cola: mas colgantes que lugares", colaColgantesLlena);
+    ejecutar("cuerpo: modo segun codigo y cabeceras (204 sin largo)", cuerpoModo);
+    ejecutar("cuerpo: vacio y largo 0", cuerpoVacio);
+    ejecutar("cuerpo: Content-Length, no consume de mas", cuerpoLargo);
+    ejecutar("cuerpo: chunked entero y de a un byte", cuerpoChunked);
+    ejecutar("cuerpo: chunked con trailer y solo LF", cuerpoChunkedTrailerYLf);
+    ejecutar("cuerpo: chunked mal formado", cuerpoChunkedInvalido);
+    ejecutar("cuerpo: no cabe, se consume y se marca", cuerpoRecortado);
+    ejecutar("cuerpo: hasta que el servidor cierra", cuerpoHastaCierre);
+    ejecutar("vigilante: tarea sana, nunca actua", vigilanteTareaSana);
+    ejecutar("vigilante: corta a los 45 s y reinicia 30 s despues", vigilanteCortaYReinicia);
+    ejecutar("vigilante: el corte recupera la tarea", vigilanteCorteRecupera);
+    ejecutar("vigilante: la alerta local pospone el reinicio", vigilanteAlertaPospone);
+    ejecutar("vigilante: tarea sin vueltas fuera de una peticion", vigilanteTareaSinVueltas);
+    ejecutar("vigilante: vuelta de millis()", vigilanteVueltaMillis);
+    ejecutar("vigilante: metodo y ruta largos se recortan", vigilanteRutaLarga);
 
     std::printf("\n%d casos, %d verificaciones, %d casos fallidos\n", casos, verificaciones,
                 casos_fallidos);

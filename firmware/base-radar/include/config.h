@@ -170,9 +170,42 @@
 #define FIREBASE_ESPERA_ERROR_MS         5000UL
 #define FIREBASE_ESPERA_ERROR_MAXIMA_MS  60000UL
 
-// Tiempos de espera de cada petición HTTPS (la tarea de red espera; loop() nunca).
-#define FIREBASE_TIMEOUT_CONEXION_MS  10000
-#define FIREBASE_TIMEOUT_RESPUESTA_MS 10000
+// Límites de cada petición HTTPS, en las dos conexiones (Auth y base de datos). La tarea de red
+// espera; loop() nunca. Cada espera de arduino-esp32 3.3.7 está en docs/fallos.md, escenario 5.
+// - DNS: no se puede limitar desde aquí. lwIP lo corta solo (DNS_MAX_RETRIES 4, reintentos a
+//   1, 1, 2 y 3 s: ~7 s por servidor DNS).
+// - Conexión TCP (select del connect) y escritura TLS sin avance (socket_timeout de ssl_client):
+#define FIREBASE_TIMEOUT_CONEXION_MS   5000
+// - Handshake TLS. NetworkClientSecure trae 120 s por defecto.
+#define FIREBASE_TIMEOUT_TLS_MS        10000
+// - Cabeceras de la respuesta: tiempo máximo sin recibir nada (HTTPClient::setTimeout).
+#define FIREBASE_TIMEOUT_RESPUESTA_MS  6000
+// - Cuerpo de la respuesta: tiempo total. Se lee con cuerpo_http.h, no con
+//   HTTPClient::getString(), que no tiene límite.
+#define FIREBASE_TIMEOUT_CUERPO_MS     6000UL
+// Peor caso con un servidor DNS: DNS 7 + TCP 5 + TLS 10 + escritura 5 + cabeceras 6 + cuerpo 6
+// = 39 s, por debajo de FIREBASE_PETICION_MAX_MS.
+
+// Una conexión con keep-alive sin usar por más de esto se cierra antes de la petición siguiente.
+// El servidor de Firebase cierra las inactivas a los ~75 s (medido el 2026-10-14); reusar una que
+// está por cerrarse o que quedó medio abierta tras un corte del router termina en error.
+#define FIREBASE_REUSO_MAX_MS          45000UL
+
+// Respuesta más larga que se guarda. Las de Auth miden 1.5 kB (signInWithPassword) y 2.4 kB
+// (renovación del token); las de la base de datos, unos bytes.
+#define FIREBASE_RESPUESTA_MAX         4096
+
+// Vigilante de la tarea de red (src/vigilante_red.h). Una petición que pasa de
+// FIREBASE_PETICION_MAX_MS se corta cerrando su socket desde loop(). Si
+// FIREBASE_REINICIO_TRAS_CORTE_MS después sigue sin terminar, se reinicia la base (nunca con una
+// alerta local urgente activa: se pospone hasta que termine).
+#define FIREBASE_PETICION_MAX_MS          45000UL
+#define FIREBASE_REINICIO_TRAS_CORTE_MS   30000UL
+#define FIREBASE_VIGILANTE_PERIODO_MS     1000UL
+
+// 1: una línea por serial por cada petición HTTPS: método, ruta (sin token), código o error y
+//    duración. 0: solo los errores.
+#define FIREBASE_TRAZA  1
 
 // Una lectura que sale más de este tiempo después de medirse se marca diferida: true.
 #define LECTURA_DIFERIDA_MS  (2 * LECTURA_INTERVALO_MS)
