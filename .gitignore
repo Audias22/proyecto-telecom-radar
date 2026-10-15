@@ -9,6 +9,7 @@ compile_commands.json
 # Secretos y configuración local (cada quien crea su copia a partir del .example)
 secrets.h
 web/panel/config.js
+web/simulador/credenciales.local.json
 
 # VS Code: en cualquier carpeta (la extensión de PlatformIO crea .vscode/ con rutas de cada
 # computadora). Solo se versiona la lista de extensiones recomendadas de la raíz.

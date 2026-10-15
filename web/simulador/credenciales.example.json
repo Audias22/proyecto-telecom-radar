@@ -1,0 +1,13 @@
+{
+  "api_key": "api_key_web_del_proyecto",
+  "database_url": "https://monitor-respiracion-default-rtdb.firebaseio.com",
+  "base_id": "base01",
+  "base": {
+    "correo": "base01@monitor-respiracion.app",
+    "clave": "clave_de_la_cuenta_de_la_base"
+  },
+  "cuidador": {
+    "correo": "",
+    "clave": ""
+  }
+}
