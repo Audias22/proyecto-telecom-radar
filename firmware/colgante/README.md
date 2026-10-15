@@ -328,9 +328,12 @@ WiFi); guía de prueba en `firmware/base-radar/README.md`.
 - **Canal.** La base queda en el canal del router y el colgante lo encuentra con el barrido 1-13.
   El router debe estar en 2.4 GHz y en un canal de 1 a 13. La base debe usar
   `WiFi.setSleep(false)`. El colgante solo acepta un ACK recibido en el mismo canal en el que
-  transmitió.
+  transmitió, y guarda en RTC el canal que anuncia la base en el ACK (si es 1-13); si el ACK
+  trae `0` o un valor fuera de rango, guarda el canal en que lo recibió. Así no se queda en un
+  canal vecino en el que oyó el ACK por solape (`docs/protocolo.md`, sección 6).
 - **Formato del ACK.** 8 bytes según `protocolo.h`: `version = 1`, `tipo = MSG_ACK (3)`,
-  `id_dispositivo` y `secuencia` iguales a los del mensaje recibido, `bateria_mv = 0`, y
+  `id_dispositivo` y `secuencia` iguales a los del mensaje recibido, en `bateria_mv` el canal de
+  la radio de la base (`ackConCanal()` de `protocolo.h`; `0` = sin dato), y
   `FLAG_ACK_DUPLICADO` si la secuencia ya se había procesado. Enviado en unicast a la MAC de origen
   del colgante, que la base debe registrar como peer de ESP-NOW antes de responder.
 - **Tiempo de respuesta.** El colgante espera el ACK 100 ms en su canal guardado y 50 ms por canal

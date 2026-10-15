@@ -7,7 +7,7 @@ ESP32-C3, sin base física, sin Arduino y sin WiFi.
 
 - `firmware/comun/protocolo/protocolo.h` (paquete, flags, canales, tiempos).
 - `src/espnow_tx.h`, namespace `espnow_tx::logica` (`construirPaquete`, `ackValido`,
-  `prepararFlags`, `canalValido`).
+  `prepararFlags`, `canalValido`, `canalAGuardar`).
 - `src/bateria.h`, namespace `bateria::logica` (`esBaja`, `lecturaBateriaValida`,
   `lecturaAdcValida`, `convertirAdcABateria`).
 - `src/despertar.h`, `despertar::decidir()`: decisión ALERTA / HEARTBEAT / ninguna al arrancar.
@@ -18,19 +18,20 @@ No usa `secrets.h` ni ningún archivo `.cpp` del firmware. No necesita un framew
 cada caso imprime `[ OK  ]` o `[FALLO]`, y el programa termina con código `0` solo si todos los
 casos pasan.
 
-Estado actual: **39 casos y 599 verificaciones**. Además, dos `static_assert` comprueban en
+Estado actual: **43 casos y 649 verificaciones**. Además, dos `static_assert` comprueban en
 compilación que `decidir()` produce ALERTA y HEARTBEAT en sus casos principales.
 
 ## Casos
 
 | Área | Qué se verifica |
 |---|---|
-| Paquete | `sizeof == 8`, desplazamiento de cada campo, bytes exactos del ejemplo ALERTA y del ACK de `docs/protocolo.md`, secuencia en little-endian |
+| Paquete | `sizeof == 8`, desplazamiento de cada campo, bytes exactos del ejemplo ALERTA y del ACK con canal 7 de `docs/protocolo.md` (también armado con `ackConCanal`), secuencia en little-endian |
 | Construcción | Versión `1`, tipo ALERTA `1` / HEARTBEAT `2`, id `7`/`255`, secuencias `0`, `1`, `0x7FFF`, `0x8000`, `0xFFFF`; sin `FLAG_REINTENTO`, `FLAG_BARRIDO` ni bits reservados |
 | Batería | `0`, `3499` → baja; `3500`, `3900` → no baja; el flag del paquete coincide con `esBaja`; `0 mV` es el centinela inválido; límite ADC `1500/1501 mV`; divisor `1343 → 4200 mV` |
 | Flags | Valores de bits; `FLAG_ARRANQUE_FRIO` solo con `arranque_frio`; las cuatro combinaciones de `prepararFlags`; conserva flags previos; idempotencia |
 | Retransmisión | Los `ACK_REINTENTOS` intentos del canal guardado y los `13 × ACK_REINTENTOS_BARRIDO` del barrido conservan secuencia, versión, tipo, id y batería; `FLAG_REINTENTO` desde el segundo intento; barrido con `FLAG_REINTENTO | FLAG_BARRIDO`; el ACK de la secuencia original confirma cualquier retransmisión |
 | ACK | Aceptado con y sin `FLAG_ACK_DUPLICADO` y en secuencias límite; rechazado por versión, tipo (ALERTA, HEARTBEAT, 0, 4, eco del propio paquete), id y secuencia (incluido el byte-swap) |
+| Canal en el ACK | `ackConCanal` arma flags y canal; `canalAGuardar` guarda el canal que anuncia la base (1..13) aunque el ACK se oiga en otro canal (caso medido: base en 7, ACK oído en 6); con `0` o fuera de rango (`14`, `255`, `256`, `263`, `3900`, `0xFFFF`) guarda el canal de recepción; `263` no se trunca a 7 |
 | Canales | `0` y `14..255` inválidos; `1..13` válidos (barrido completo `0..255`); `CANAL_POR_DEFECTO` válido |
 | Tiempos | Peor caso `3×100 + 13×2×50 = 1600 ms`, como en `docs/protocolo.md` |
 | Duplicados | El primer mensaje tras arrancar conserva `FLAG_ARRANQUE_FRIO` en reintentos y barrido, y si la base ya lo procesó (ACK perdido) lo toma como duplicado; sin historia, nuevo; reintento de la última secuencia, duplicado; secuencia 1 con `FLAG_ARRANQUE_FRIO` tras reiniciar, nueva; desborde 65535 → 0; `secuenciaInicial` mezcla las dos mitades del valor aleatorio y, recorriendo los 65 536 sorteos, solo uno choca con la última secuencia de la base |
@@ -48,7 +49,8 @@ no recalcula el resultado con la lógica de producción.
 wake retenido por el RTC, de modo que una pulsación breve ya liberada no puede descartar la alerta.
 
 El caso `ack: campos no validados` documenta el comportamiento actual: `ackValido()` no revisa
-`bateria_mv` ni los bits reservados del ACK. No es un fallo del protocolo (que no exige descartarlos),
+el campo de canal (`bateria_mv`) ni los bits reservados del ACK; un canal fuera de rango solo hace
+que se guarde el canal de recepción. No es un fallo del protocolo (que no exige descartarlos),
 pero si se endurece la validación esta prueba debe actualizarse.
 
 ## Limitaciones

@@ -171,7 +171,8 @@ void recibir(const esp_now_recv_info_t* informacion, const uint8_t* datos, int l
     xQueueSend(cola_ack, &recibido, 0);
 }
 
-bool esperarAck(uint16_t secuencia, uint8_t canal, uint32_t espera_ms) {
+// Espera un ACK valido recibido en el canal en el que se transmitio y lo copia en ack.
+bool esperarAck(uint16_t secuencia, uint8_t canal, uint32_t espera_ms, PaqueteEspNow& ack) {
     TickType_t limite = pdMS_TO_TICKS(espera_ms);
     if (limite == 0) {
         limite = 1;
@@ -191,6 +192,7 @@ bool esperarAck(uint16_t secuencia, uint8_t canal, uint32_t espera_ms) {
 
         if (recibido.canal == canal &&
             espnow_tx::logica::ackValido(recibido.paquete, COLGANTE_ID, secuencia)) {
+            ack = recibido.paquete;
             return true;
         }
     }
@@ -202,7 +204,7 @@ PaqueteEspNow construirPaquete(TipoMensaje tipo, uint16_t bateria_mv, uint16_t s
 }
 
 bool enviarIntentos(const PaqueteEspNow& original, uint8_t canal, uint8_t intentos,
-                    uint32_t espera_ms, bool barrido) {
+                    uint32_t espera_ms, bool barrido, PaqueteEspNow& ack) {
     if (!fijarCanal(canal)) {
         return false;
     }
@@ -220,12 +222,24 @@ bool enviarIntentos(const PaqueteEspNow& original, uint8_t canal, uint8_t intent
 
         // Solo un ACK de aplicacion valido completa el intento. El resultado de esp_now_send()
         // indica que la trama fue aceptada para transmision, no que la base proceso el paquete.
-        if (esperarAck(paquete.secuencia, canal, espera_ms)) {
+        if (esperarAck(paquete.secuencia, canal, espera_ms, ack)) {
             return true;
         }
     }
 
     return false;
+}
+
+// Guarda en RTC el canal que anuncia la base en el ACK. Por el solape de canales el colgante
+// puede oir el ACK estando en un canal vecino; guardar ese canal hacia que el siguiente mensaje
+// llegara a la base pero su ACK no al colgante (docs/protocolo.md, seccion 6).
+void guardarCanal(const PaqueteEspNow& ack, uint8_t canal_recepcion) {
+    const uint8_t canal = espnow_tx::logica::canalAGuardar(ack, canal_recepcion);
+    if (canal != canal_recepcion) {
+        Serial.printf("espnow_tx: ACK recibido en el canal %u, se guarda el canal de la base: %u\n",
+                      canal_recepcion, canal);
+    }
+    canal_rtc = canal;
 }
 
 }  // namespace
@@ -323,15 +337,17 @@ ResultadoEnvio enviar(TipoMensaje tipo, uint16_t bateria_mv) {
     const PaqueteEspNow paquete = construirPaquete(tipo, bateria_mv, secuencia_rtc);
     xQueueReset(cola_ack);
 
-    if (enviarIntentos(paquete, canal_rtc, ACK_REINTENTOS, ACK_TIMEOUT_MS, false)) {
+    PaqueteEspNow ack{};
+    if (enviarIntentos(paquete, canal_rtc, ACK_REINTENTOS, ACK_TIMEOUT_MS, false, ack)) {
+        guardarCanal(ack, canal_rtc);
         primer_mensaje_rtc = false;
         return ENVIO_OK;
     }
 
     for (uint8_t canal = CANAL_MIN; canal <= CANAL_MAX; ++canal) {
         if (enviarIntentos(paquete, canal, ACK_REINTENTOS_BARRIDO,
-                           ACK_TIMEOUT_BARRIDO_MS, true)) {
-            canal_rtc = canal;
+                           ACK_TIMEOUT_BARRIDO_MS, true, ack)) {
+            guardarCanal(ack, canal);
             primer_mensaje_rtc = false;
             return ENVIO_OK_BARRIDO;
         }

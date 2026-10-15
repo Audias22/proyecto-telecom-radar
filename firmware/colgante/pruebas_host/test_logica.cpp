@@ -60,6 +60,7 @@ void ejecutar(const char* nombre, void (*caso)()) {
 }
 
 using espnow_tx::logica::ackValido;
+using espnow_tx::logica::canalAGuardar;
 using espnow_tx::logica::canalValido;
 using espnow_tx::logica::construirPaquete;
 using espnow_tx::logica::prepararFlags;
@@ -102,12 +103,18 @@ void bytesEjemploAlertaDocumentado() {
 }
 
 void bytesEjemploAckDocumentadoEsValido() {
-    // docs/protocolo.md: ACK correspondiente 01 03 02 00 2C 01 00 00.
-    const uint8_t recibido[8] = {0x01, 0x03, 0x02, 0x00, 0x2C, 0x01, 0x00, 0x00};
+    // docs/protocolo.md: ACK correspondiente con la base en el canal 7: 01 03 02 00 2C 01 07 00.
+    const uint8_t recibido[8] = {0x01, 0x03, 0x02, 0x00, 0x2C, 0x01, 0x07, 0x00};
     PaqueteEspNow p{};
     std::memcpy(&p, recibido, sizeof(p));
     VERIFICAR_IGUAL(p.secuencia, 300);
+    VERIFICAR_IGUAL(canalDeAck(p), 7);
     VERIFICAR(ackValido(p, 2, 300));
+
+    // ackConCanal() produce exactamente esos bytes.
+    uint8_t bytes[8];
+    aBytes(ackConCanal(2, 300, false, 7), bytes);
+    VERIFICAR(std::memcmp(bytes, recibido, sizeof(recibido)) == 0);
 }
 
 // --------------------------------------------------------------------------
@@ -324,11 +331,61 @@ void ackRechazadoPorSecuencia() {
 }
 
 void ackComportamientoObservadoCamposNoValidados() {
-    // Comportamiento actual documentado por la prueba: ackValido() no revisa bateria_mv ni
-    // los bits reservados de flags. El protocolo pide 0 / reservados en 0, pero no exige
-    // descartarlos. Si se decide endurecer la validacion, esta prueba debe actualizarse.
+    // Comportamiento actual documentado por la prueba: ackValido() no revisa el campo de canal
+    // (bateria_mv en ALERTA/HEARTBEAT) ni los bits reservados de flags. Un canal fuera de rango
+    // no invalida el ACK: solo hace que se guarde el canal de recepcion (canalAGuardar()). Si se
+    // decide endurecer la validacion, esta prueba debe actualizarse.
     VERIFICAR(ackValido(ack(PROTOCOLO_VERSION, MSG_ACK, ID, 0, 300, 3900), ID, 300));
     VERIFICAR(ackValido(ack(PROTOCOLO_VERSION, MSG_ACK, ID, 0xF0, 300), ID, 300));
+}
+
+// --------------------------------------------------------------------------
+// 6b. Canal anunciado por la base en el ACK
+// --------------------------------------------------------------------------
+
+void ackConCanalCampos() {
+    const PaqueteEspNow nuevo = ackConCanal(ID, 300, false, 7);
+    VERIFICAR(ackValido(nuevo, ID, 300));
+    VERIFICAR_IGUAL(nuevo.flags, 0);
+    VERIFICAR_IGUAL(canalDeAck(nuevo), 7);
+
+    const PaqueteEspNow duplicado = ackConCanal(ID, 300, true, 13);
+    VERIFICAR(ackValido(duplicado, ID, 300));
+    VERIFICAR_IGUAL(duplicado.flags, FLAG_ACK_DUPLICADO);
+    VERIFICAR_IGUAL(canalDeAck(duplicado), 13);
+
+    VERIFICAR_IGUAL(canalDeAck(ackConCanal(ID, 300, false, ACK_CANAL_SIN_DATO)), 0);
+}
+
+void ackCanalValidoSeGuarda() {
+    // Caso medido el 2026-10-14: base en el canal 7, ACK oido con el colgante en el 6.
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, 7), 6), 7);
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, 7), 8), 7);
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, 7), 7), 7);
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, true, 7), 5), 7);
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, CANAL_MIN), 2), CANAL_MIN);
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, CANAL_MAX), 12), CANAL_MAX);
+    for (uint8_t canal = CANAL_MIN; canal <= CANAL_MAX; ++canal) {
+        VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, canal), CANAL_MIN), canal);
+    }
+}
+
+void ackCanalSinDatoUsaCanalDeRecepcion() {
+    // Base anterior al cambio: el campo llega en 0 y se guarda el canal en que se oyo el ACK.
+    for (uint8_t canal = CANAL_MIN; canal <= CANAL_MAX; ++canal) {
+        VERIFICAR_IGUAL(canalAGuardar(ack(PROTOCOLO_VERSION, MSG_ACK, ID, 0, 300, 0), canal),
+                        canal);
+    }
+    VERIFICAR_IGUAL(canalAGuardar(ackConCanal(ID, 300, false, ACK_CANAL_SIN_DATO), 6), 6);
+}
+
+void ackCanalFueraDeRangoUsaCanalDeRecepcion() {
+    const uint16_t fuera_de_rango[] = {CANAL_MAX + 1, 14, 255, 256, 256 + 7, 3900, 0xFFFF};
+    for (uint16_t valor : fuera_de_rango) {
+        VERIFICAR_IGUAL(canalAGuardar(ack(PROTOCOLO_VERSION, MSG_ACK, ID, 0, 300, valor), 6), 6);
+    }
+    // 263 = 0x0107: si el canal se truncara a 8 bits se leeria como el canal 7.
+    VERIFICAR_IGUAL(canalDeAck(ack(PROTOCOLO_VERSION, MSG_ACK, ID, 0, 300, 256 + 7)), 263);
 }
 
 // --------------------------------------------------------------------------
@@ -653,6 +710,10 @@ int main() {
     ejecutar("ack: rechazado por identificador", ackRechazadoPorIdentificador);
     ejecutar("ack: rechazado por secuencia", ackRechazadoPorSecuencia);
     ejecutar("ack: campos no validados (comportamiento actual)", ackComportamientoObservadoCamposNoValidados);
+    ejecutar("ack canal: ackConCanal arma flags y canal", ackConCanalCampos);
+    ejecutar("ack canal: canal valido de la base se guarda", ackCanalValidoSeGuarda);
+    ejecutar("ack canal: 0 guarda el canal de recepcion", ackCanalSinDatoUsaCanalDeRecepcion);
+    ejecutar("ack canal: fuera de rango guarda el canal de recepcion", ackCanalFueraDeRangoUsaCanalDeRecepcion);
     ejecutar("canales: limites 0/1/13/14/255", canalesLimites);
     ejecutar("canales: recorrido 0..255", canalesRecorridoCompleto);
     ejecutar("tiempos: peor caso documentado 1.6 s", tiempoPeorCasoDocumentado);

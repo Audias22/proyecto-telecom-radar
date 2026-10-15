@@ -19,13 +19,19 @@ namespace espnow_tx {
 // unitarias en un entorno host con paquetes sinteticos.
 namespace logica {
 
-constexpr bool canalValido(uint8_t canal) {
+constexpr bool canalValido(uint16_t canal) {
     return canal >= CANAL_MIN && canal <= CANAL_MAX;
 }
 
 constexpr bool ackValido(const PaqueteEspNow& ack, uint8_t id_dispositivo, uint16_t secuencia) {
     return ack.version == PROTOCOLO_VERSION && ack.tipo == MSG_ACK &&
            ack.id_dispositivo == id_dispositivo && ack.secuencia == secuencia;
+}
+
+// Canal que se guarda en RTC tras un ACK valido: el que anuncia la base si esta en rango; si trae
+// 0 (sin dato) o un valor fuera de rango, el canal en el que se recibio el ACK.
+constexpr uint8_t canalAGuardar(const PaqueteEspNow& ack, uint8_t canal_recepcion) {
+    return canalValido(canalDeAck(ack)) ? static_cast<uint8_t>(canalDeAck(ack)) : canal_recepcion;
 }
 
 constexpr uint8_t prepararFlags(uint8_t flags, bool reintento, bool barrido) {
