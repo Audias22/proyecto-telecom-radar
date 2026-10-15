@@ -5,7 +5,7 @@ Configuración de Firebase y panel web del cuidador.
 | Archivo | Contenido |
 |---|---|
 | `firebase.json` | Qué se publica en Hosting, archivo de reglas, puertos de emuladores |
-| `.firebaserc.example` | Plantilla del id de proyecto. Copiar como `.firebaserc` |
+| `.firebaserc` | Id del proyecto de Firebase (`monitor-respiracion`); no es secreto |
 | `database.rules.json` | Reglas de seguridad de Realtime Database (ver `docs/modelo-datos.md`) |
 | `panel/` | Panel web (HTML/JS) que se publica con Firebase Hosting |
 

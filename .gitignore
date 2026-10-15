@@ -18,7 +18,6 @@ web/panel/config.js
 # Node / Firebase CLI
 node_modules/
 .firebase/
-.firebaserc
 firebase-debug.log
 firebase-debug.*.log
 database-debug.log
