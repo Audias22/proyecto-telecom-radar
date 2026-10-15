@@ -70,6 +70,15 @@ bool asegurarPeer(const uint8_t* mac) {
     return esp_now_add_peer(&peer) == ESP_OK;
 }
 
+// Canal en el que está la radio (0 si no se pudo leer). Se lee de la radio y no de canal_actual
+// porque el callback corre en la tarea de WiFi y canal_actual lo cambia loop().
+uint8_t canalRadio() {
+    uint8_t canal = ACK_CANAL_SIN_DATO;
+    wifi_second_chan_t secundario = WIFI_SECOND_CHAN_NONE;
+    esp_wifi_get_channel(&canal, &secundario);
+    return canal;
+}
+
 void encolar(const Registro& registro) {
     if (xQueueSend(cola, &registro, 0) != pdTRUE) {
         registros_perdidos = registros_perdidos + 1;
@@ -116,12 +125,8 @@ void recibir(const esp_now_recv_info_t* info, const uint8_t* datos, int longitud
         acks_a_omitir = acks_a_omitir - 1;
         r.ack_omitido = true;
     } else {
-        const PaqueteEspNow ack = {PROTOCOLO_VERSION,
-                                   MSG_ACK,
-                                   p.id_dispositivo,
-                                   static_cast<uint8_t>(nuevo ? 0 : FLAG_ACK_DUPLICADO),
-                                   p.secuencia,
-                                   0};
+        // Como la base: el ACK lleva el canal de la radio, no el canal en que llegó la trama.
+        const PaqueteEspNow ack = ackConCanal(p.id_dispositivo, p.secuencia, !nuevo, canalRadio());
         r.error_ack = asegurarPeer(r.mac)
                           ? esp_now_send(r.mac, reinterpret_cast<const uint8_t*>(&ack), sizeof(ack))
                           : ESP_ERR_ESPNOW_NOT_FOUND;

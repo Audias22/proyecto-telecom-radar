@@ -9,7 +9,8 @@ Qué hace:
 - Escucha en un canal fijo (al arrancar, `CANAL_POR_DEFECTO` = 1) sin asociarse a ningún router.
 - Recibe ALERTA y HEARTBEAT con el formato de `firmware/comun/protocolo/protocolo.h`, aplica la
   regla de `duplicados.h` y responde `MSG_ACK` dentro del mismo callback de recepción, antes de
-  imprimir nada. A un duplicado le responde con `FLAG_ACK_DUPLICADO`.
+  imprimir nada. A un duplicado le responde con `FLAG_ACK_DUPLICADO`. Como la base, el ACK lleva
+  el canal de su radio (`docs/protocolo.md`, sección 6) y el colgante guarda ese canal.
 - Imprime una línea por mensaje recibido.
 - Al arrancar imprime su MAC STA, ya en el formato de `secrets.h` del colgante.
 
