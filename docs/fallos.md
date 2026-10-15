@@ -42,9 +42,9 @@ de sueño real). La alarma confiable es el botón del colgante; el radar informa
   sueño. **Decisión: la apnea por radar no dispara alarmas.** "Posible pausa respiratoria" queda
   como registro experimental desactivado por defecto (sección 13.6).
 - La apnea detectada por radar no dispara alarmas ni crea eventos.
-- El tipo `APNEA` queda reservado en el modelo de datos (y en las reglas), pero la base no lo
-  crea. Si algún día se activa el registro experimental de la sección 13.6, sus eventos serían de
-  revisión, nunca una alarma.
+- El tipo `APNEA` queda reservado en el modelo de datos, pero la base no lo crea y las reglas lo
+  rechazan. Si algún día se activa el registro experimental de la sección 13.6, se agrega a las
+  reglas y sus eventos serían de revisión, nunca una alarma.
 
 Historia:
 

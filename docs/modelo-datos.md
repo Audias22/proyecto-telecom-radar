@@ -18,11 +18,13 @@ Reglas en `web/database.rules.json`. La base escribe por la API REST
     rssi              número   dBm con que la base recibió el último mensaje
     base              texto    base que lo recibió (opcional)
 
-/lecturas/{baseId}/{ts}
-    resp_rpm          número   respiraciones por minuto
-    latido_bpm        número   latidos por minuto
-    presencia         bool
-    distancia_cm      número
+/lecturas/{baseId}/{ts}                      una cada 5 s (sección 1.1)
+    persona           bool     true = "persona detectada": actividad de 30 s >= 0.03
+    objetivo          bool     el radar tuvo objetivo (tramas de fase con dato) en los últimos 30 s
+    actividad         número   mediana de |fase_total| en 30 s (opcional: solo con objetivo)
+    distancia_cm      número   distancia que da el radar (opcional: solo con objetivo)
+    resp_rpm          número   estimación del módulo, NO validada (opcional: solo si es > 0)
+    latido_bpm        número   estimación del módulo, NO validada (opcional: solo si es > 0)
     diferida          bool     true si se envió desde la cola offline (opcional)
 
 /eventos/{pushId}
@@ -39,8 +41,52 @@ Reglas en `web/database.rules.json`. La base escribe por la API REST
 /usuarios_panel/{uid}       = true       cuidadores con acceso al panel
 ```
 
-`APNEA` es un tipo reservado: las reglas lo aceptan, pero la base no lo crea. La apnea por radar
-no se usa como alarma ni genera eventos (`radar.md`, sección 13; `fallos.md`, "Tipos de evento").
+`APNEA` es un tipo reservado: el nombre no se usa para otra cosa, pero la base no lo crea y las
+reglas lo rechazan. La apnea por radar no se usa como alarma ni genera eventos (`radar.md`,
+sección 13; `fallos.md`, "Tipos de evento"). Si algún día se activa el registro experimental de
+"posible pausa respiratoria" (`radar.md`, 13.6), se agrega a las reglas en ese momento y sus
+eventos serían de revisión, nunca una alarma.
+
+`origen` es el `baseId` de la cuenta que crea el evento o `colganteN` (`colgante1`, ...).
+
+### 1.1 Qué guarda cada lectura y por qué
+
+Las mediciones de `radar.md` (secciones 9 a 13) dejan claro qué datos del radar sirven y cuáles
+no, y la lectura se arma con eso:
+
+- **`resp_rpm` y `latido_bpm` no son obligatorios.** Durante una noche real el módulo dio
+  `resp_rpm` = 0 en el 57 % de las ventanas con objetivo (13.5) y no siguió el pacer en 8-30 rpm
+  (9 y 11); siguió marcando respiración durante las apneas (11). Son una "estimación del módulo,
+  no validada": se envían solo cuando el módulo da un valor mayor que 0, y si no vienen el panel
+  muestra "sin dato", nunca "0 rpm" (13.6, punto 4). Que no estén cuando valen 0 también ahorra
+  espacio.
+- **`persona` es el dato principal**, con el criterio de `fallos.md`, escenario 8, y `radar.md`,
+  13.6: actividad (mediana de |`fase_total`| sin las tramas en 0) en una ventana deslizante de
+  30 s, umbral 0.03. Se evalúa en cada lectura (cada 5 s) sobre los últimos 30 s. `true` es
+  "persona detectada"; `false` es "sin persona detectada", que **no** es "cama vacía" ni dispara
+  nada (con la persona dormida el radar no la vio ~55 % del tiempo, 13.3).
+- **`objetivo`** separa las dos causas de "sin persona detectada": el radar sin objetivo (43 % del
+  sueño en 13.3) o con objetivo y actividad baja (11 %). Sirve para diagnosticar el montaje. Las
+  reglas exigen `objetivo` = `true` cuando `persona` es `true` (sin fase no hay actividad).
+- **`actividad`** se guarda (opcional, solo con objetivo) porque es el número del que sale
+  `persona`: permite revisar el umbral con datos reales sin reflashear la base. Se redondea a
+  3 decimales.
+- **`distancia_cm`** solo con objetivo: es el dato que mostró el movimiento del sensor (13.1).
+- **No se guarda la bandera `presencia` del módulo**: sigue en 1 con la cama vacía o apuntando a
+  una pared (`radar.md`, 5 y 11), así que confunde más de lo que informa. `objetivo` la reemplaza.
+- No se guardan las fases crudas (`fase_total`, `fase_resp`, `fase_latido`): llegan a ~16 por
+  segundo y no caben en el plan Spark; para análisis se capturan por serial (`radar.md`, 6).
+
+Si el radar no manda datos (escenario 9 de `fallos.md`), la base no escribe lecturas: el hueco en
+`/lecturas` y el evento `RADAR_SIN_DATOS` son la señal.
+
+Ejemplos:
+
+```
+"1791234567890":{"persona":true,"objetivo":true,"actividad":0.048,"distancia_cm":85,"resp_rpm":13,"latido_bpm":72}
+"1791234567895":{"persona":true,"objetivo":true,"actividad":0.051,"distancia_cm":84}
+"1791234567900":{"persona":false,"objetivo":false}
+```
 
 `/cuentas_dispositivo` y `/usuarios_panel` se llenan a mano desde la consola de Firebase y nadie
 los puede leer ni escribir desde fuera.
@@ -79,41 +125,62 @@ no recibió respuesta, puede quedar duplicado; para eventos se prefiere un dupli
 
 | Ruta | Lee | Escribe |
 |---|---|---|
-| `/dispositivos/{baseId}/estado` | panel y bases | solo la cuenta de esa base |
-| `/colgantes/{id}` | panel y bases | cualquier cuenta de base |
-| `/lecturas/{baseId}` | panel y bases | solo la cuenta de esa base |
-| `/eventos/{id}` (crear) | panel y bases | cuentas de base, solo si el evento no existe |
-| `/eventos/{id}/atendido`, `atendido_por`, `atendido_en` | | solo el panel, solo sobre eventos existentes, y `atendido` solo puede pasar a `true` |
+| `/dispositivos/{baseId}/estado` | panel; la cuenta de esa base | solo la cuenta de esa base |
+| `/colgantes/{id}` | panel | cualquier cuenta de base (`base` debe ser su propio `baseId`) |
+| `/lecturas/{baseId}` | panel; la cuenta de esa base | solo la cuenta de esa base (también borrar) |
+| `/eventos/{id}` (crear) | panel | cuentas de base, solo si el evento no existe y con `atendido` = `false` |
+| `/eventos/{id}/atendido`, `atendido_por`, `atendido_en` | | solo el panel, solo sobre eventos existentes; `atendido` solo puede pasar a `true` y los otros dos se escriben una vez |
 | `/cuentas_dispositivo`, `/usuarios_panel` | nadie | nadie (solo consola) |
 
 "Panel" significa una cuenta autenticada que está en `/usuarios_panel`. "Base" significa una cuenta
-autenticada que está en `/cuentas_dispositivo`. Una cuenta autenticada que no está en ninguna de
-las dos listas no puede leer nada.
+autenticada que está en `/cuentas_dispositivo`. Sin sesión no se lee ni se escribe nada, y una
+cuenta autenticada que no está en ninguna de las dos listas tampoco.
 
-Las reglas también validan tipos y rangos (`resp_rpm` 0-60, `latido_bpm` 0-250, `distancia_cm`
-0-1000, `rssi` -127 a 0, `tipo` dentro de la lista) y rechazan campos que no estén en este
-documento.
+La base solo lee lo que necesita: su propio `estado` (para la referencia de hora y para calcular
+cuánto estuvo apagada, escenario 6 de `fallos.md`) y sus propias lecturas (para el borrado de
+lecturas viejas, sección 4). No lee eventos, colgantes ni datos de otras bases.
+
+El cuidador solo lee y marca eventos como atendidos: no puede escribir estado, colgantes ni
+lecturas, ni crear o borrar eventos.
+
+Las reglas también validan:
+
+- Tipos y rangos: `actividad` 0-10, `resp_rpm` mayor que 0 y hasta 60, `latido_bpm` mayor que 0 y
+  hasta 250, `distancia_cm` 0-1000, `bateria_mv` 0-5000 (0 = sin dato, `protocolo.md`), `rssi`
+  -127 a 0, `tipo` dentro de la lista (sin `APNEA`), clave de lectura de 13 dígitos.
+- Las horas (`ultimo_contacto`, `ultimo_heartbeat`, `timestamp`, `atendido_en`) deben ser
+  exactamente la hora del servidor (`=== now`), es decir, escritas con `{".sv":"timestamp"}`. Una
+  base no puede inventar una hora.
+- `origen` de un evento es el `baseId` de quien lo crea o `colganteN`: una base no puede crear
+  eventos a nombre de otra.
+- Se rechazan campos que no estén en este documento.
 
 `estado.online` no es confiable por sí solo: una base apagada no puede escribir `false`. El panel
 considera desconectada la base si `ultimo_contacto` tiene más de 3 minutos (3 periodos de
 `estado`), sin importar el valor de `online`.
 
+Las reglas se prueban contra el proyecto real con `web/simulador/simulador.py verificar` (ver
+`web/README.md`).
+
 ## 4. Volumen y límites del plan Spark
 
 Límites del plan Spark para Realtime Database que importan aquí (verificar en
 https://firebase.google.com/pricing antes de la entrega): 1 GB almacenado, 10 GB de descarga al
-mes, 100 conexiones simultáneas.
+mes, 100 conexiones simultáneas. Todo lo de este documento cabe en Spark: no se usan Cloud
+Functions ni nada que requiera el plan Blaze.
 
 ### Almacenamiento
 
-Una lectura en JSON:
+Tamaño en JSON de los ejemplos de la sección 1.1:
 
-```
-"1791234567890":{"resp_rpm":16.5,"latido_bpm":72,"presencia":true,"distancia_cm":85}
-```
+| Lectura | Bytes |
+|---|---|
+| Con objetivo y valores del módulo | 114 |
+| Con objetivo, módulo en 0 (el caso más común dormido, 13.5) | 84 |
+| Sin objetivo | 50 |
 
-Son unos 84 bytes de texto. Firebase no publica el costo interno exacto por nodo, así que se
-estima un rango de 100 a 200 bytes por lectura.
+Firebase no publica el costo interno exacto por nodo, así que se estima de 100 a 200 bytes por
+lectura (el peor caso del JSON, redondeado hacia arriba, y el doble como margen).
 
 | Concepto | Valor |
 |---|---|
@@ -124,25 +191,28 @@ estima un rango de 100 a 200 bytes por lectura.
 | Meses hasta llenar 1 GB | ~10 a ~19 |
 
 Estado, colgantes y eventos son despreciables al lado de las lecturas (pocos nodos que se
-sobrescriben, y eventos que deberían ser raros).
+sobrescriben, y eventos que deberían ser raros). El simulador escribe al mismo ritmo que la base:
+una hora de simulador son 720 lecturas (~70-140 kB).
 
 Conclusión: a unos 100 MB por mes, el 1 GB no se llena durante el proyecto, así que no se
 implementa borrado de lecturas viejas. El tamaño real se revisa en la pestaña Uso de la consola
 después de una semana de pruebas y se anota en `pruebas/`.
 
 Mejora futura, para uso continuo más allá del proyecto: que la base borre una vez al día las
-lecturas de más de 30 días (consulta `orderByKey` con `endAt` y escribe `null`; las reglas ya
-permiten que la cuenta de la base borre en su propia ruta de `/lecturas`). Con eso el total se
-mantendría alrededor de 50-100 MB.
+lecturas de más de 30 días (consulta `orderBy="$key"` con `endAt` y `shallow`, y escribe `null`;
+las reglas permiten que la cuenta de la base lea y borre en su propia ruta de `/lecturas`). Con
+eso el total se mantendría alrededor de 50-100 MB.
 
 ### Descarga
 
-- 24 horas son 17 280 lecturas; a unos 84 bytes de JSON cada una, cerca de 1.5 MB por carga
-  completa del panel.
-  Con 10 GB al mes da para miles de cargas, pero el panel debe consultar con `limitToLast()` o un
-  rango de claves y nunca descargar todo `/lecturas`.
+- 24 horas son 17 280 lecturas; a 84-114 bytes de JSON cada una, de 1.5 a 2 MB por carga
+  completa del panel. Con 10 GB al mes da para miles de cargas, pero el panel debe consultar con
+  `limitToLast()` o un rango de claves y nunca descargar todo `/lecturas`.
+- Un panel abierto todo el día escuchando lecturas nuevas recibe ~2 MB por día (~60 MB al mes),
+  más la sobrecarga del protocolo y de TLS, que Firebase también cuenta como descarga.
 - Por defecto, la API REST devuelve en la respuesta los datos escritos, y eso cuenta como descarga.
-  La base debe escribir con `?print=silent` para que la respuesta venga vacía.
+  La base (y el simulador) escriben con `?print=silent` para que la respuesta venga vacía.
+- La base y el simulador leen una sola hora por minuto (`ultimo_contacto`, ~13 bytes).
 
 ### Peticiones de la base
 

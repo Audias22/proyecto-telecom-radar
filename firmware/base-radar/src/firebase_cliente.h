@@ -37,6 +37,8 @@ uint64_t horaServidorMs();
 uint64_t millisAHoraServidor(uint32_t millis_medicion);
 
 // TODO: PUT /lecturas/{baseId}/{ts}. Devuelve false si falla (la lectura va a la cola).
+// Campos en docs/modelo-datos.md, sección 1.1: persona y objetivo obligatorios; actividad y
+// distancia solo con objetivo; resp_rpm y latido_bpm solo si el módulo da un valor > 0.
 bool enviarLectura(const LecturaRadar &lectura, uint64_t ts_ms, bool diferida);
 
 // TODO: PATCH /dispositivos/{baseId}/estado con ultimo_contacto = {".sv":"timestamp"}.
