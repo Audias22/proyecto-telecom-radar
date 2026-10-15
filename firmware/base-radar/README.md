@@ -172,13 +172,22 @@ Con `e`, Firebase se ve así:
 
 ```
 # Firebase: sesion activa (uid AbC123...), inicios 1, renovaciones 0
-# Firebase: ultima escritura OK hace 3 s; OK 128, errores 1 (rechazadas 0), ultimo: HTTP -11 en lecturas/base01/1791234567890
+# Firebase: ultima escritura OK hace 3 s; OK 128, errores 1 (rechazadas 0)
+# Firebase: peticion en curso: PUT lecturas/base01/1791234597890, lleva 0.3 s (corte a los 45 s)
+# Firebase: ultima peticion: PATCH colgantes/1 -> HTTP 204 (231 ms), hace 2 s
+# Firebase: ultimo error: PUT lecturas/base01/1791234567890 -> error -11 read Timeout (6004 ms), hace 40 s
+# Firebase: vigilante: 0 cortes
 # Firebase: cola eventos 0/32, colgantes 0/8, lecturas 0/24 (lecturas descartadas 0, eventos sin lugar 0)
 # Firebase: hora del servidor sincronizada, ahora 1791234612345 ms (referencia de hace 21 s)
 # Memoria: heap libre 182340 B (minimo 140112 B), pila libre de la tarea de red 5120 B
 ```
 
 (Números de ejemplo: los reales salen de la prueba.)
+
+Con `FIREBASE_TRAZA 1` (`config.h`) cada petición HTTPS deja además una línea con método, ruta
+(sin token), código o error y duración, p. ej. `firebase: PATCH dispositivos/base01/estado -> HTTP
+204 (402 ms)`. Cada espera de la red tiene un límite corto y un vigilante corta una petición que
+pasa de 45 s; detalle en `docs/fallos.md`, "Bloqueo de la tarea de red".
 
 ## Configuración
 
@@ -212,10 +221,10 @@ Con `e`, Firebase se ve así:
 
 | | Usado | Total | % |
 |---|---|---|---|
-| RAM estática | 60 832 B | 327 680 B | 18.6 % |
-| Flash (partición de la app) | 1 230 864 B | 1 310 720 B | **93.9 %** |
+| RAM estática | 65 416 B | 327 680 B | 20.0 % |
+| Flash (partición de la app) | 1 235 438 B | 1 310 720 B | **94.3 %** |
 
-El TLS, `HTTPClient` y el bundle de CA (~69 kB) suman ~230 kB de flash; quedan ~78 kB libres. La
+El TLS, `HTTPClient` y el bundle de CA (~69 kB) suman ~230 kB de flash; quedan ~75 kB libres. La
 partición por defecto (`default.csv`) reparte los 4 MB en dos apps de 1.25 MB para OTA, que este
 proyecto no usa. Si Telegram (parte 2) no cabe, la salida es `board_build.partitions =
 no_ota.csv` en `platformio.ini` (una app de 2 MB). Cada conexión TLS usa además ~40-50 kB de
@@ -225,7 +234,8 @@ heap libre y el mínimo. Por confirmar con el módulo.
 ## Pruebas host
 
 `pruebas_host/` compila en el PC la lógica pura de la base (ventana de actividad, JSON de
-Firebase, cola de peticiones) con los `.cpp` reales y la ejecuta, sin ESP32:
+Firebase, cola de peticiones, lector del cuerpo HTTP y vigilante de la tarea de red) con los
+`.cpp` reales y la ejecuta, sin ESP32:
 
 ```
 powershell -File firmware\base-radar\pruebas_host\ejecutar.ps1
@@ -356,7 +366,7 @@ Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
    `firebase: sesion iniciada: ... (uid ...)`. Si sale `no se pudo iniciar sesion ... HTTP 400
    INVALID_LOGIN_CREDENTIALS`, revisar correo y clave; con `API key not valid`, la API key.
 2. **Estado**: enseguida aparece `/dispositivos/{BASE_ID}/estado` con `online: true`,
-   `ultimo_contacto` (ms), `rssi_wifi` y `version_firmware: "0.5.0"`. `ultimo_contacto` cambia
+   `ultimo_contacto` (ms), `rssi_wifi` y `version_firmware: "0.5.1"`. `ultimo_contacto` cambia
    cada minuto. Si sale `401 ... Permission denied` dos veces seguidas, el uid no está en
    `/cuentas_dispositivo` o no vale `BASE_ID`. Con `e`: `hora del servidor sincronizada`.
 3. **Lecturas**: en `/lecturas/{BASE_ID}` aparece una clave de 13 dígitos cada 5 s. Sin nadie
@@ -381,6 +391,14 @@ Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
    errores de escritura.
 8. **Sin bloqueos**: con `e`, `pico de la UART` debe quedar por debajo de 2800 B (no se perdieron
    tramas del radar durante el TLS), y `pila libre de la tarea de red` por encima de ~1 kB.
+9. **Internet cortado con el WiFi conectado** (la falla del 2026-10-14, `docs/fallos.md`):
+   desconectar el cable de internet del router (o cortar el internet del plan) sin apagar el WiFi.
+   Las líneas de traza deben seguir saliendo con errores y su texto (`read Timeout`, `sin
+   conexion`), nunca más de 45 s sin una línea; con `e`, `ultimo error` cambia y `peticion en
+   curso` nunca pasa de 45 s. Si llega a 45 s debe salir `VIGILANTE: ... se cierra su socket` y
+   `cliente TLS de la base de datos recreado`. Al volver internet, escrituras OK en menos de un
+   minuto y `hora del servidor sincronizada`. Probar también con una alerta del colgante sonando:
+   la base no se reinicia mientras dura.
 
 Resultados: anotarlos en `pruebas/resultados/`. Todo por confirmar con el módulo.
 
@@ -394,3 +412,6 @@ Resultados: anotarlos en `pruebas/resultados/`. Todo por confirmar con el módul
 - Que el botón BOOT sea accesible con la placa montada en el kit.
 - Firebase en hardware (guía de arriba): handshake TLS con el bundle de CA, keep-alive, heap
   libre con dos conexiones TLS, pila de la tarea de red y pico de la UART durante el TLS.
+- Que el handshake TLS con el bundle de CA quepa holgado en `FIREBASE_TIMEOUT_TLS_MS` (10 s) y
+  que el corte del vigilante (`shutdown()` del socket desde `loop()`) despierte a la tarea de red
+  en hardware (paso 9 de la guía de Firebase).
