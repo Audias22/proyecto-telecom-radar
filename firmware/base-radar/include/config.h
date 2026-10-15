@@ -148,11 +148,47 @@
 #define RADAR_CAPACIDAD_VENTANA     640
 
 // ---------------------------------------------------------------------------
-// Nube (todavía sin usar en la fase local)
+// Nube: Firebase Realtime Database (docs/modelo-datos.md)
 // ---------------------------------------------------------------------------
 
-// Periodo de envío de lecturas a Firebase.
-#define LECTURA_INTERVALO_MS  5000
+// La base escribe en Firebase solo con WiFi. Credenciales en secrets.h (FIREBASE_URL,
+// FIREBASE_API_KEY, DISPOSITIVO_EMAIL, DISPOSITIVO_CLAVE, BASE_ID).
+#define FIREBASE_HABILITADO  BASE_WIFI_HABILITADO
 
-// Periodo de actualización de /dispositivos/{baseId}/estado.
-#define ESTADO_INTERVALO_MS   60000
+// Periodo de envío de lecturas a /lecturas/{baseId}/{ts}.
+#define LECTURA_INTERVALO_MS  5000UL
+
+// Periodo de actualización de /dispositivos/{baseId}/estado. Tras cada envío se lee de vuelta
+// ultimo_contacto como referencia de hora del servidor (docs/modelo-datos.md, sección 2).
+#define ESTADO_INTERVALO_MS   60000UL
+
+// El idToken de Firebase Auth dura 1 h; se renueva con el refresh token 5 min antes.
+#define FIREBASE_MARGEN_RENOVACION_MS  300000UL
+
+// Tras un error de red o de servidor se espera antes de reintentar: 5 s y el doble en cada fallo
+// seguido, hasta 60 s. Un inicio de sesión rechazado (clave mala) espera el máximo.
+#define FIREBASE_ESPERA_ERROR_MS         5000UL
+#define FIREBASE_ESPERA_ERROR_MAXIMA_MS  60000UL
+
+// Tiempos de espera de cada petición HTTPS (la tarea de red espera; loop() nunca).
+#define FIREBASE_TIMEOUT_CONEXION_MS  10000
+#define FIREBASE_TIMEOUT_RESPUESTA_MS 10000
+
+// Una lectura que sale más de este tiempo después de medirse se marca diferida: true.
+#define LECTURA_DIFERIDA_MS  (2 * LECTURA_INTERVALO_MS)
+
+// Cola de peticiones de loop() a la tarea de red (src/cola_peticiones.h). Acotada:
+// - lecturas: 24 (2 min a una cada 5 s). Llena, se descarta la lectura más antigua.
+// - eventos: 32, aparte. Una lectura nunca desplaza a un evento.
+// - colgantes: una entrada por id (8 ids a la vez); un mensaje nuevo reemplaza al pendiente del
+//   mismo colgante, porque solo importa el último valor.
+// La cola offline completa (lecturas de horas sin red) es la parte 2 (src/cola_offline.h).
+#define COLA_LECTURAS_CAPACIDAD   24
+#define COLA_EVENTOS_CAPACIDAD    32
+#define COLA_COLGANTES_CAPACIDAD  8
+
+// Tarea FreeRTOS de la red (HTTPS). Misma prioridad que loopTask (1): el ESP32-C6 tiene un solo
+// núcleo y, con la misma prioridad, FreeRTOS reparte la CPU por turnos de 1 ms, así que el TLS
+// nunca deja a loop() sin correr. Pila: el handshake de mbedTLS usa unos 6-8 kB.
+#define TAREA_RED_PRIORIDAD  1
+#define TAREA_RED_PILA       12288
