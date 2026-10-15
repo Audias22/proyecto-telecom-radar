@@ -22,6 +22,16 @@ static const int TRAMAS_POR_LLAMADA = 16;
 
 static const size_t CAPACIDAD_COLA = 32;
 
+// Buffer de recepción de la UART: lo fija la librería en begin() con setRxBufferSize(32 kB)
+// (SeeedmmWave.cpp). Con objetivo el radar manda ~74 tramas/s (docs/radar.md, 12.2), unos
+// 1.7 kB/s, así que 32 kB son ~19 s de datos (2.8 s aun con la línea a 115200 baudios llena).
+// El límite real es otro: cada update() pasa todo lo que hay en la UART a la cola de tramas de la
+// librería, que guarda MMWaveMaxQueueSize = 120 tramas y descarta las más viejas (~1.6 s a
+// 74 tramas/s, unos 2.8 kB). Por eso loop() no puede quedarse más de ~1.5 s sin llamar a
+// actualizar(): la tarea de red corre con la misma prioridad que loop() (config.h, TAREA_RED_*)
+// y nunca la bloquea. picoBufferUart() lo confirma en hardware: debe quedar por debajo de
+// PICO_UART_SEGURO (radar.h).
+
 // La librería decodifica cada trama en handleType() y la guarda para sus getters. Se sobrescribe
 // solo para saber qué tipo llegó y cuándo, y para leer dos datos que los getters no distinguen:
 // - isHumanDetected() devuelve false tanto si no hay persona como si no llegó trama nueva.
@@ -70,6 +80,9 @@ static LecturaRadar cola[CAPACIDAD_COLA];
 static size_t cola_inicio = 0;
 static size_t cola_cantidad = 0;
 
+static VentanaActividad ventana;
+static size_t pico_uart = 0;
+
 static uint32_t tramas_fase = 0;
 static uint32_t reinicios = 0;
 static uint32_t ultimo_intento_ms = 0;
@@ -109,6 +122,7 @@ static void armarLectura(float fase_total, float fase_resp, float fase_latido) {
                enRango(distancia_cm, RADAR_DISTANCIA_MIN_CM, RADAR_DISTANCIA_MAX_CM) &&
                !isnan(fase_total) && !isnan(fase_resp) && !isnan(fase_latido);
     ultima = l;
+    ventana.agregar(l.millis_medicion, fase_total);
     tramas_fase++;
     encolar(l);
 }
@@ -165,7 +179,15 @@ void iniciar() {
     ultimo_intento_ms = millis();
 }
 
+static void medirBufferUart() {
+    const size_t esperando = static_cast<size_t>(serial_radar.available());
+    if (esperando > pico_uart) {
+        pico_uart = esperando;
+    }
+}
+
 void actualizar() {
+    medirBufferUart();
     for (int i = 0; i < TRAMAS_POR_LLAMADA; i++) {
         uint32_t antes = mmwave.tramas_totales;
         // update(0) lee lo que haya en el buffer de la UART sin esperar y procesa una sola trama
@@ -193,6 +215,10 @@ LecturaRadar ultimaLectura() {
     return ultima;
 }
 
+EstadoPersona estadoPersona() {
+    return ventana.evaluar(millis());
+}
+
 bool sinDatos() {
     return sin_datos;
 }
@@ -207,6 +233,10 @@ uint32_t tramasFase() {
 
 uint32_t tramasTotales() {
     return mmwave.tramas_totales;
+}
+
+size_t picoBufferUart() {
+    return pico_uart;
 }
 
 }  // namespace radar

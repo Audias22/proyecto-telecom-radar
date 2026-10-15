@@ -137,6 +137,16 @@
 #define RADAR_DISTANCIA_MIN_CM 0.0f
 #define RADAR_DISTANCIA_MAX_CM 300.0f
 
+// Criterio de "persona detectada" (docs/modelo-datos.md, 1.1; docs/radar.md, 13.6): mediana de
+// |fase_total| sin las tramas en 0, en una ventana deslizante de 30 s, umbral 0.03.
+#define RADAR_VENTANA_ACTIVIDAD_MS  30000UL
+#define RADAR_UMBRAL_PERSONA        0.03f
+// Muestras guardadas para la ventana. Con objetivo llegan ~16.2 tramas de fase por segundo
+// (docs/radar.md, 4 y 12.1): 30 s son ~490. 640 deja ~30 % de margen (21 tramas/s). Si llegaran
+// más, se pisan las más antiguas y la ventana queda algo más corta. Memoria: 640 x 8 B de muestras
+// + 640 x 4 B de copia para la mediana = 7.5 kB.
+#define RADAR_CAPACIDAD_VENTANA     640
+
 // ---------------------------------------------------------------------------
 // Nube (todavía sin usar en la fase local)
 // ---------------------------------------------------------------------------
