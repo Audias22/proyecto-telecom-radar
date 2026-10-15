@@ -193,6 +193,10 @@ tiempo ahorra.
   la base puede perder tramas ESP-NOW.
 - Cuando la base pierde WiFi y está reintentando conectarse, su radio cambia de canal mientras
   busca el router. Durante ese tiempo el colgante puede no encontrarla. Ver `docs/fallos.md`.
+- La base no fija canal cuando usa WiFi (`BASE_WIFI_HABILITADO 1`): queda en el del router. Los
+  peers de ESP-NOW se agregan con `channel = 0`, que en `esp_now.h` significa "el canal actual de
+  la interfaz", así que el ACK sale en el canal que tenga la radio aunque el router cambie de
+  canal. Con `BASE_WIFI_HABILITADO 0` (fase local) usa el canal fijo `BASE_CANAL_SIN_WIFI` (1).
 - Antena: el XIAO ESP32-C6 del kit tiene una antena externa por U.FL (confirmado en el kit). La
   base pone `WIFI_ANT_CONFIG` (GPIO14) en alto antes de iniciar WiFi (`BASE_ANTENA_EXTERNA` en
   `firmware/base-radar/include/config.h`).

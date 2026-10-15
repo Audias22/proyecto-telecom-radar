@@ -31,13 +31,16 @@ Reglas en `web/database.rules.json`. La base escribe por la API REST
     origen            texto    "base01", "colgante1", ...
     timestamp         número   hora del servidor (ms)
     atendido          bool     false al crearse; el panel lo pasa a true
-    detalle           texto    opcional, p. ej. "sin respiración por 25 s"
+    detalle           texto    opcional, p. ej. "sin conexión por 12 min"
     atendido_por      texto    uid de quien lo atendió (lo escribe el panel)
     atendido_en       número   hora del servidor (ms) en que se atendió (lo escribe el panel)
 
 /cuentas_dispositivo/{uid}  = "base01"   relaciona la cuenta de Auth de cada base con su baseId
 /usuarios_panel/{uid}       = true       cuidadores con acceso al panel
 ```
+
+`APNEA` es un tipo reservado: las reglas lo aceptan, pero la base no lo crea. La apnea por radar
+no se usa como alarma ni genera eventos (`radar.md`, sección 13; `fallos.md`, "Tipos de evento").
 
 `/cuentas_dispositivo` y `/usuarios_panel` se llenan a mano desde la consola de Firebase y nadie
 los puede leer ni escribir desde fuera.

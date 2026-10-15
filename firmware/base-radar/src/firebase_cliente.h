@@ -9,7 +9,7 @@
 #include "radar.h"
 
 enum TipoEvento : uint8_t {
-    EVENTO_APNEA,
+    EVENTO_APNEA,  // reservado: la base no lo crea (docs/fallos.md, "Tipos de evento")
     EVENTO_BOTON,
     EVENTO_BATERIA_BAJA,
     EVENTO_BASE_DESCONECTADA,

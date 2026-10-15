@@ -18,7 +18,7 @@ de sueño real). La alarma confiable es el botón del colgante; el radar informa
 | 6 | Base apagada (corte de luz, cable suelto) | La base no puede avisar. El panel ve `ultimo_contacto` con más de 3 min. El colgante no recibe ACK. | Panel muestra "base desconectada". El colgante da el patrón de error, así la persona sabe que el botón no funcionó. Al volver, la base compara la hora con su último `ultimo_contacto`, crea un evento `BASE_DESCONECTADA` con la duración y avisa por Telegram. | base, panel |
 | 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga (no en cada heartbeat). Sin mensajes: evento `COLGANTE_AUSENTE` y Telegram; el panel lo marca ausente por `ultimo_heartbeat`. | base: `espnow_rx`, `telegram`; colgante: `bateria` |
 | 8 | Persona no detectada en la cama | Actividad (mediana de \|`fase_total`\| en 30 s) por debajo de 0.03, o radar sin objetivo. **No** con la bandera `presencia` del radar, que sigue en 1 con la cama vacía (`radar.md`, sección 11) | Estado "sin persona detectada" en el panel, **no** "cama vacía": en una noche real el radar no vio a la persona dormida ~55 % del tiempo (`radar.md`, sección 13.3). No es una alarma. | base: `radar` |
-| 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía ni se usa para detectar apnea. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave, evento `RADAR_SIN_DATOS` y Telegram. El panel también lo nota porque dejan de llegar lecturas. | base: `radar` |
+| 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave, evento `RADAR_SIN_DATOS` y Telegram. El panel también lo nota porque dejan de llegar lecturas. | base: `radar` |
 | 10 | Reinicio inesperado (watchdog, brownout, fallo) | Al arrancar, `esp_reset_reason()` distinto de encendido normal | Watchdog activo sobre `loop()` para que un bloqueo termine en reinicio y no en una base colgada. Al arrancar se reporta el motivo por Telegram. Se pierden las secuencias en RAM (el siguiente mensaje de cada colgante se acepta como nuevo, a lo sumo una alerta repetida) y la cola offline. | base: `main` |
 
 ## Detalles y decisiones
@@ -41,8 +41,10 @@ de sueño real). La alarma confiable es el botón del colgante; el radar informa
   además dejan de detectar a tiempo las 3 apneas anteriores), y el radar no tuvo objetivo ~48 % del
   sueño. **Decisión: la apnea por radar no dispara alarmas.** "Posible pausa respiratoria" queda
   como registro experimental desactivado por defecto (sección 13.6).
-- La apnea detectada por radar no dispara alarmas.
-- El tipo de evento `APNEA` se mantiene en el modelo de datos.
+- La apnea detectada por radar no dispara alarmas ni crea eventos.
+- El tipo `APNEA` queda reservado en el modelo de datos (y en las reglas), pero la base no lo
+  crea. Si algún día se activa el registro experimental de la sección 13.6, sus eventos serían de
+  revisión, nunca una alarma.
 
 Historia:
 
@@ -66,7 +68,23 @@ Historia:
 Mientras la base busca el router, su radio cambia de canal y el colgante puede no encontrarla.
 Por eso los intentos de reconexión se espacian (espera creciente) en vez de buscar sin parar:
 entre intentos la base queda en un canal fijo y el barrido del colgante puede encontrarla.
-Por confirmar con el módulo: en qué canal queda la radio del ESP32-C6 entre intentos de reconexión.
+
+Implementado en `firmware/base-radar/src/red_wifi.cpp`:
+
+- La reconexión automática del framework está desactivada (`WiFi.setAutoReconnect(false)`). En
+  arduino-esp32 3.3.7 el framework igual reintenta una vez tras la primera desconexión
+  (`first_connect` en `STA.cpp`); la base corta ese reintento con `esp_wifi_disconnect()`.
+- Tras perder la conexión espera `WIFI_ESPERA_INICIAL_MS` (5 s) y cada intento fallido duplica
+  la espera hasta `WIFI_ESPERA_MAXIMA_MS` (120 s): 5, 10, 20, 40, 80, 120, 120... s. Un intento
+  que no termina en `WIFI_INTENTO_MAX_MS` (20 s) se corta. Al conectar, la cuenta vuelve a cero.
+- Cada conexión, desconexión (con canal, RSSI y motivo) e intento fallido sale por serial, y
+  también cada cambio de canal de la radio (`radio: canal X -> Y (wifi estado)`), leído cada
+  100 ms. Durante un intento se pueden escapar saltos más cortos que eso.
+
+Por confirmar con el módulo: en qué canal queda la radio del ESP32-C6 entre intentos de
+reconexión. Se mide con la prueba "apagar el router" del README de la base, mirando las líneas
+`radio: canal` en estado `esperando`. Si queda en el canal del router, el colgante la sigue
+encontrando sin barrer.
 
 ### Base apagada (escenario 6)
 
@@ -83,12 +101,13 @@ en el momento. Es un límite aceptado del diseño con plan Spark:
 
 | Tipo | Escenario | Lo crea |
 |---|---|---|
-| `APNEA` | 8 | base, al detectar respiración ausente con presencia |
 | `BOTON` | 1, 2 | base, al recibir una alerta nueva del colgante |
 | `BATERIA_BAJA` | 7 | base, al recibir `FLAG_BATERIA_BAJA` (una vez por descarga) |
 | `BASE_DESCONECTADA` | 6 | base, al volver, con la duración en `detalle` |
 | `COLGANTE_AUSENTE` | 7 | base, si pasa `COLGANTE_AUSENTE_S` sin mensajes del colgante |
 | `RADAR_SIN_DATOS` | 9 | base, si pasan N segundos sin lecturas válidas del radar |
+
+`APNEA` no aparece en la tabla: el radar no crea eventos de apnea (ver "Apnea" arriba).
 
 Todos los eventos se guardan en `/eventos` (ver `modelo-datos.md`) y se avisan por Telegram.
 `COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` se crean una sola vez por episodio: no se repiten mientras
