@@ -78,6 +78,16 @@
 // Duración del comando "b" del monitor serial: buzzer fijo para medir el voltaje en D10.
 #define PRUEBA_BUZZER_MS  10000UL
 
+// Botón para silenciar la alerta local: el botón BOOT del XIAO ESP32-C6.
+// Confirmado en el esquemático oficial (XIAO_ESP32_C6_v1.0_SCH_260114.pdf, hoja 4): la red BOOT
+// va a GPIO9 (pin 15 del ESP32-C6), con R17 de 10 kΩ a 3V3 y el pulsador K2 a GND, así que
+// presionado se lee en bajo. La wiki de Seeed también lo lista como "Boot: GPIO9".
+// GPIO9 es pin de arranque: si está presionado al reiniciar, el chip entra en modo de carga
+// (bootloader) y el firmware no corre. Solo se lee después del arranque.
+#define PIN_BOTON_SILENCIO  9
+// Tiempo que el nivel debe quedar estable para aceptar la pulsación.
+#define BOTON_ANTIRREBOTE_MS  30UL
+
 // ---------------------------------------------------------------------------
 // WiFi
 // ---------------------------------------------------------------------------

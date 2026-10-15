@@ -21,6 +21,7 @@
 #include <protocolo.h>
 
 #include "alerta_local.h"
+#include "boton_silencio.h"
 #include "config.h"
 #include "espnow_rx.h"
 #include "radar.h"
@@ -66,6 +67,7 @@ static void ayuda() {
     Serial.println("#   s  silenciar la alerta local");
     Serial.println("#   e  estado: MAC, canal, antena, WiFi y contadores");
     Serial.println("#   h  esta ayuda");
+    Serial.println("# Boton BOOT: silencia la alerta local (no presionarlo al reiniciar)");
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +169,18 @@ static void atenderRadar() {
 }
 
 // ---------------------------------------------------------------------------
+// Botón BOOT: silencia la alerta local
+// ---------------------------------------------------------------------------
+
+static void atenderBoton() {
+    if (!boton_silencio::pulsado()) {
+        return;
+    }
+    alerta_local::silenciar();
+    Serial.printf("# [%9lu ms] Alerta local silenciada (boton BOOT)\n", millis());
+}
+
+// ---------------------------------------------------------------------------
 // Comandos por serial
 // ---------------------------------------------------------------------------
 
@@ -233,6 +247,7 @@ void setup() {
 
     Serial.printf("# %s v%s (protocolo v%d)\n", FIRMWARE_NOMBRE, FIRMWARE_VERSION, PROTOCOLO_VERSION);
     alerta_local::iniciar();
+    boton_silencio::iniciar();
     // Primero la radio, después ESP-NOW (necesita la radio arrancada). La conexión al router
     // empieza en el primer red_wifi::actualizar() de loop().
     if (!red_wifi::iniciar() || !espnow_rx::iniciar()) {
@@ -254,6 +269,7 @@ void loop() {
     atenderColgante();
     atenderRadar();
     leerComandos();
+    atenderBoton();
     alerta_local::actualizar();
 }
 
