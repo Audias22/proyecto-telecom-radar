@@ -23,8 +23,8 @@ Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad
 | Componente | Estado | Notas |
 |---|---|---|
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
-| Colgante (botón + ESP32) | Firmware listo, sin probar en hardware | Firmware de Abraham revisado y fusionado el 12 oct (compila; 39 casos de prueba en PC); receptor de prueba y guía de protoboard listos para la primera prueba; nadie lo ha cargado todavía en un ESP32-C3. ESP32-C3 x2, cargador TP4056, buzzer activo y pulsador 12x12mm x2 comprados. Batería Li-ion 240 mAh y pasta flux pedidas a Tettsa, sin llegar. Pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
-| Base + notificación | Fase local lista, sin probar con el colgante | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados) y maneja el LED WS2812 y el buzzer en D10. Sin WiFi, Firebase ni Telegram todavía. CSV del radar opcional para captura de datos |
+| Colgante (botón + ESP32) | Pasó las pruebas en banco | Firmware de Abraham revisado y fusionado el 12 oct (39 casos de prueba en PC). Pruebas 1 a 9 en banco el 12 oct, por USB y con batería simulada: arranque, ALERTA con ACK, beeps, sin receptor, barrido de canales, ACK perdido y duplicados, heartbeat por timer, sin falsas alertas y potencia de transmisión (`pruebas/resultados/2026-10-12_colgante_banco.md`). Falta: despertar en distintos momentos del intervalo, RSSI bajo de la antena del ESP32-C3 (~-85 dBm a 3 m), alcance en la casa. Batería Li-ion 240 mAh recibida; pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ antes de conectarla (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
+| Base + notificación | Fase local probada con el colgante; fase WiFi lista, sin probar en hardware | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados), maneja el LED WS2812 y el buzzer en D10, y el botón BOOT silencia la alerta. Se conecta al router con reconexión propia (espera creciente) y registra el canal de la radio. Sin Firebase ni Telegram todavía. CSV del radar opcional para captura de datos |
 | Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
@@ -221,7 +221,7 @@ Instrucciones en `web/README.md`.
 |---|---|---|---|---|
 | MR60BHA2 (radar + ESP32-C6 integrado) | Guatemala Digital | Q322.40 (incluye envío) — Orden #1493658 | 21/09/2026 | Recibido y probado |
 | ESP32-C3 Super Mini (x2, para colgante y pruebas) | Electrónica DIY | Q75 c/u (Q150 total) | Por confirmar | Comprado |
-| Batería Li-ion 3.7V 240mAh (301645) | Tettsa | Q45 | Por confirmar | Pedido, sin llegar |
+| Batería Li-ion 3.7V 240mAh (301645) | Tettsa | Q45 | Recibida | Recibida |
 | Módulo de carga TP4056 (con protección, USB-C) | Electrónica DIY | Q12.50 | Por confirmar | Comprado |
 | Módulo de buzzer activo en bajo con PNP S8550 (azul), para el colgante | Electrónica DIY | Q12 | Por confirmar | Comprado |
 | Pulsador 12x12mm (tapa redonda, x2) | Electrónica DIY | Q2 c/u (Q4 total) | Por confirmar | Comprado |
