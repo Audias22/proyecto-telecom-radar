@@ -6,19 +6,23 @@ Firmware del XIAO ESP32-C6 que viene en el kit Seeed MR60BHA2.
 
 | Módulo | Responsabilidad |
 |---|---|
-| `radar` | Leer respiración, latido, presencia y distancia del radar por UART |
+| `radar` | Leer respiración, latido, presencia y distancia del radar por UART; ventana de actividad de 30 s |
+| `ventana_actividad` | Criterio "persona detectada": mediana de \|`fase_total`\| en 30 s, umbral 0.03 (lógica pura) |
 | `espnow_rx` | Recibir mensajes del colgante, filtrar duplicados, responder ACK |
 | `red_wifi` | Conexión WiFi STA y reconexión |
-| `firebase_cliente` | Login del dispositivo y escritura en Realtime Database por REST |
+| `firebase_cliente` | Tarea de red: sesión de Firebase Auth y escritura en Realtime Database por REST (HTTPS) |
+| `formato_nube` | JSON exacto que aceptan las reglas y lectura de las respuestas (lógica pura) |
+| `cola_peticiones` | Cola acotada de loop() a la tarea de red (lógica pura) |
 | `telegram` | Mensajes al cuidador por la API de bots |
 | `alerta_local` | Buzzer y LED; funciona sin red |
 | `boton_silencio` | Botón BOOT de la placa: silencia la alerta local |
 | `cola_offline` | Guardar lecturas cuando no hay red y reenviarlas al volver |
 
-Fase WiFi: están implementados `radar` (ver `docs/radar.md`), `espnow_rx`, `alerta_local`,
-`boton_silencio` y `red_wifi`. La fase local (sin WiFi) ya funcionó en hardware con el colgante;
-la conexión al router está lista pero sin probar en hardware. `firebase_cliente`, `telegram` y
-`cola_offline` siguen vacíos con `TODO`.
+Nube, parte 1: están implementados `radar` (ver `docs/radar.md`), `espnow_rx`, `alerta_local`,
+`boton_silencio`, `red_wifi` y `firebase_cliente`. WiFi, ESP-NOW con el colgante, ACK con canal,
+LED, buzzer, botón BOOT y radar ya funcionaron en hardware. Firebase está compilado y probado en
+PC (`pruebas_host/`), pero **por confirmar con el módulo** (guía de abajo). `telegram` y
+`cola_offline` (la cola sin red completa, parte 2) siguen vacíos con `TODO`.
 
 ## Qué hace hoy
 
@@ -42,6 +46,19 @@ la conexión al router está lista pero sin probar en hardware. `firebase_client
   una cola FreeRTOS. Es la
   misma lógica del receptor de prueba (`firmware/pruebas/receptor_espnow`), ya validada con el
   colgante.
+- **Radar: persona y objetivo** (`docs/modelo-datos.md`, 1.1; `docs/radar.md`, 13.6). Con cada
+  trama de fase, `radar` guarda |`fase_total`| (sin las tramas en 0) en una ventana deslizante de
+  30 s (`RADAR_VENTANA_ACTIVIDAD_MS`). `radar::estadoPersona()` devuelve:
+  - `actividad`: mediana de esa ventana (como `numpy.median`: con cantidad par, el promedio de
+    los dos del medio);
+  - `objetivo`: hubo al menos una trama de fase con dato en los últimos 30 s;
+  - `persona`: `actividad >= 0.03` (`RADAR_UMBRAL_PERSONA`).
+
+  Memoria fija: 640 muestras (`RADAR_CAPACIDAD_VENTANA`, ~490 a 16.2 tramas/s más ~30 % de
+  margen), 7.5 kB entre muestras y la copia para la mediana. La bandera `presencia` del módulo ya
+  no se usa para decir "persona": sigue en 1 con la cama vacía. Por serial sale cada cambio:
+  `radar: persona detectada (actividad 0.048)`, `sin persona detectada (actividad 0.012 < 0.03)` o
+  `sin persona detectada (radar sin objetivo)`. "Sin persona detectada" **no** es "cama vacía".
 - **Alerta local**: LED WS2812 de la placa y buzzer, sin `delay()`.
 
   | Situación | LED | Buzzer |
@@ -75,6 +92,71 @@ la conexión al router está lista pero sin probar en hardware. `firebase_client
   `BASE_SALIDA_CSV 1` en `config.h` se imprime además una línea CSV por lectura del radar, para
   `analisis/capturar_serial.py`, que ignora las líneas con `#`.
 
+### Firebase (`firebase_cliente`)
+
+Escribe como `web/simulador/simulador.py` (mismas rutas, campos y formatos, que pasaron la
+verificación contra las reglas publicadas):
+
+| Qué | Cuándo | Petición |
+|---|---|---|
+| Estado: `online`, `ultimo_contacto` (`{".sv":"timestamp"}`), `rssi_wifi`, `version_firmware` | al tener sesión y después cada `ESTADO_INTERVALO_MS` (60 s) | `PATCH /dispositivos/{BASE_ID}/estado` y `GET .../ultimo_contacto` |
+| Lectura: `persona`, `objetivo`, `actividad`, `distancia_cm`, `resp_rpm`, `latido_bpm` (los opcionales solo cuando corresponden, `docs/modelo-datos.md` 1.1) | cada `LECTURA_INTERVALO_MS` (5 s), si el radar tiene datos | `PUT /lecturas/{BASE_ID}/{ts}` |
+| Colgante: `bateria_mv`, `ultimo_heartbeat`, `rssi`, `base` | cada mensaje NUEVO del colgante (los duplicados no) | `PATCH /colgantes/{id}` |
+| Evento `BOTON` (`origen` = `colganteN`, `detalle` "boton del colgante") | cada ALERTA nueva | `POST /eventos` |
+
+Todas las escrituras van con `?print=silent` (respuesta vacía, no gasta descarga). Solo la
+lectura de `ultimo_contacto` trae datos (~13 bytes por minuto).
+
+- **Hora del servidor** (`docs/modelo-datos.md`, sección 2): tras cada estado se lee
+  `ultimo_contacto` y se guarda con el `millis()` de ese momento. La clave de una lectura es
+  `ts = hora_ref + (millis_lectura - millis_ref)`, con 13 dígitos. Hasta tener la primera
+  referencia, las lecturas esperan en la cola. Una lectura que sale más de 10 s
+  (`LECTURA_DIFERIDA_MS`) después de medirse lleva `diferida: true`.
+- **Sesión**: `signInWithPassword` con `DISPOSITIVO_EMAIL` / `DISPOSITIVO_CLAVE`. El `idToken`
+  (1 h) se renueva con el refresh token (`securetoken.googleapis.com`) 5 min antes de vencer
+  (`FIREBASE_MARGEN_RENOVACION_MS`); si la renovación falla, inicia sesión otra vez. Ante un 401
+  inicia sesión de nuevo y reintenta una vez.
+- **Errores**: sin red o con error del servidor (5xx, tiempo agotado) la petición queda en la
+  cola y se reintenta tras 5 s, 10 s, 20 s... hasta 60 s. Si después de iniciar sesión otra vez
+  sigue en 400/401/403 (las reglas la rechazan), reintentar no sirve: se descarta y se registra.
+  El estado nunca se descarta: rechazado, sigue reintentando con espera.
+- **HTTPS**: el certificado del servidor se verifica con el bundle de CA de ESP-IDF que trae
+  arduino-esp32 3.3.7 dentro de `libmbedtls.a` (`_binary_x509_crt_bundle_start`, lista completa
+  de Mozilla) mediante `NetworkClientSecure::setCACertBundle()`. Nunca `setInsecure()`. Se
+  verifican la cadena y el nombre del servidor; las fechas no, porque el framework se compila sin
+  `MBEDTLS_HAVE_TIME_DATE` (la base no tiene reloj al arrancar). La conexión con la base de datos
+  queda abierta (keep-alive): un handshake por conexión, no por petición.
+
+**Sin bloqueos.** Toda la red corre en la tarea FreeRTOS `red` (`TAREA_RED_*` en `config.h`).
+`loop()` solo llama a `firebase_cliente::encolar*()`, que copian la petición con un mutex que
+nunca se tiene tomado durante una petición. La alerta local y el ACK al colgante (que sale en el
+callback de ESP-NOW, en la tarea de WiFi) no pasan por la red.
+
+- La tarea tiene la misma prioridad que `loop()` (1). El ESP32-C6 tiene un solo núcleo; con la
+  misma prioridad FreeRTOS reparte la CPU por turnos de 1 ms, así que un handshake TLS (que hace
+  cálculos de ~1 s) no deja a `loop()` sin correr.
+- **Buffer de la UART del radar**: no hace falta agrandarlo. La librería Seeed lo fija en 32 kB
+  en `begin()`; con objetivo llegan ~74 tramas/s (~1.7 kB/s), o sea ~19 s de margen. El límite
+  real es la cola de tramas de la librería: guarda 120 tramas (~1.6 s, ~2.8 kB) y descarta las
+  más viejas si `loop()` tarda más que eso. El comando `e` muestra el pico de bytes en la UART:
+  si queda por debajo de 2800 B, no se perdió ninguna trama. Por confirmar con el módulo
+  durante un handshake TLS.
+
+**Cola acotada** (`cola_peticiones`, capacidades en `config.h`): eventos aparte (32), una
+entrada por colgante (8) y lecturas (24, 2 min). Llena, se descarta la lectura más antigua; una
+lectura nunca desplaza un evento. Sale primero lo más importante: eventos, colgantes, lecturas.
+La cola offline completa (horas sin red) es la parte 2.
+
+Registros:
+
+```
+# [     2510 ms] firebase: sesion iniciada: base01@... (uid AbC123...), token por 3600 s
+# [  3302511 ms] firebase: token renovado, vence en 3600 s
+# [    52400 ms] firebase: evento BOTON de colgante1 enviado
+# [   120330 ms] firebase: ERROR PUT lecturas/base01/1791234567890: HTTP -11 read Timeout (se reintenta)
+# [   130020 ms] firebase: 401 en dispositivos/base01/estado (Permission denied); se inicia sesion de nuevo
+```
+
 ### Comandos por el monitor serial
 
 Una letra y Enter (`pio device monitor -d firmware/base-radar --echo`):
@@ -83,8 +165,20 @@ Una letra y Enter (`pio device monitor -d firmware/base-radar --echo`):
 |---|---|
 | `b` | Buzzer fijo 10 s (`PRUEBA_BUZZER_MS`), para medir el voltaje en D10 |
 | `s` | Silencia la alerta local (igual que el botón BOOT) |
-| `e` | Estado: MAC, canal, antena, contadores de mensajes y del radar, y WiFi: estado, SSID, canal, RSSI, IP, intentos, fallidos seguidos y desconexiones |
+| `e` | Estado: MAC, canal, antena, contadores de mensajes y del radar, persona/objetivo/actividad y pico de la UART, WiFi (estado, SSID, canal, RSSI, IP, intentos, fallidos seguidos y desconexiones) y Firebase (abajo) |
 | `h` | Ayuda |
+
+Con `e`, Firebase se ve así:
+
+```
+# Firebase: sesion activa (uid AbC123...), inicios 1, renovaciones 0
+# Firebase: ultima escritura OK hace 3 s; OK 128, errores 1 (rechazadas 0), ultimo: HTTP -11 en lecturas/base01/1791234567890
+# Firebase: cola eventos 0/32, colgantes 0/8, lecturas 0/24 (lecturas descartadas 0, eventos sin lugar 0)
+# Firebase: hora del servidor sincronizada, ahora 1791234612345 ms (referencia de hace 21 s)
+# Memoria: heap libre 182340 B (minimo 140112 B), pila libre de la tarea de red 5120 B
+```
+
+(Números de ejemplo: los reales salen de la prueba.)
 
 ## Configuración
 
@@ -98,8 +192,48 @@ Una letra y Enter (`pio device monitor -d firmware/base-radar --echo`):
   copy firmware\base-radar\include\secrets.example.h firmware\base-radar\include\secrets.h
   ```
 
-  En esta fase solo hay que llenar `WIFI_SSID` y `WIFI_CLAVE` (red de 2.4 GHz). Los de Firebase,
-  `BASE_ID` y Telegram pueden quedar con los valores de ejemplo hasta la siguiente fase.
+  Campos que hay que llenar:
+
+  | Campo | De dónde sale |
+  |---|---|
+  | `WIFI_SSID`, `WIFI_CLAVE` | red de la casa, 2.4 GHz |
+  | `FIREBASE_URL` | consola de Firebase > Realtime Database: la URL de arriba de los datos, sin barra final (la misma que `database_url` del simulador) |
+  | `FIREBASE_API_KEY` | Configuración del proyecto > General > Clave de API web (la misma que `api_key` del simulador) |
+  | `DISPOSITIVO_EMAIL`, `DISPOSITIVO_CLAVE` | la cuenta de la base en Authentication > Usuarios (la misma que `base` del simulador) |
+  | `BASE_ID` | el valor del uid de esa cuenta en `/cuentas_dispositivo`, p. ej. `base01` |
+
+  Mientras `FIREBASE_URL`, `FIREBASE_API_KEY` o `DISPOSITIVO_CLAVE` tengan los valores de
+  ejemplo, la base funciona igual sin nube y lo avisa (`firebase: deshabilitado: ...`). Telegram
+  todavía no se usa.
+
+## Memoria
+
+`pio run` del entorno `base` con Firebase (arduino-esp32 3.3.7):
+
+| | Usado | Total | % |
+|---|---|---|---|
+| RAM estática | 60 832 B | 327 680 B | 18.6 % |
+| Flash (partición de la app) | 1 230 864 B | 1 310 720 B | **93.9 %** |
+
+El TLS, `HTTPClient` y el bundle de CA (~69 kB) suman ~230 kB de flash; quedan ~78 kB libres. La
+partición por defecto (`default.csv`) reparte los 4 MB en dos apps de 1.25 MB para OTA, que este
+proyecto no usa. Si Telegram (parte 2) no cabe, la salida es `board_build.partitions =
+no_ota.csv` en `platformio.ini` (una app de 2 MB). Cada conexión TLS usa además ~40-50 kB de
+heap mientras está abierta (dos a la vez durante un inicio de sesión); el comando `e` muestra el
+heap libre y el mínimo. Por confirmar con el módulo.
+
+## Pruebas host
+
+`pruebas_host/` compila en el PC la lógica pura de la base (ventana de actividad, JSON de
+Firebase, cola de peticiones) con los `.cpp` reales y la ejecuta, sin ESP32:
+
+```
+powershell -File firmware\base-radar\pruebas_host\ejecutar.ps1
+bash firmware/base-radar/pruebas_host/ejecutar.sh
+```
+
+Los JSON esperados son los mismos que escribe el simulador y que aceptan las reglas publicadas.
+
 
 ## Hardware del kit
 
@@ -212,6 +346,44 @@ de la base y acceso al router (para ver o cambiar su canal y apagarlo).
 
 Resultados: anotarlos en `pruebas/resultados/`. Por confirmar con el módulo.
 
+## Guía de prueba de Firebase
+
+Necesita `secrets.h` completo (tabla de arriba), las reglas publicadas, la cuenta de la base en
+`/cuentas_dispositivo` y el colgante cargado. En la consola de Firebase abrir Realtime Database >
+Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
+
+1. **Sesión**: cargar la base y abrir el monitor. Tras `wifi: conectado` debe salir
+   `firebase: sesion iniciada: ... (uid ...)`. Si sale `no se pudo iniciar sesion ... HTTP 400
+   INVALID_LOGIN_CREDENTIALS`, revisar correo y clave; con `API key not valid`, la API key.
+2. **Estado**: enseguida aparece `/dispositivos/{BASE_ID}/estado` con `online: true`,
+   `ultimo_contacto` (ms), `rssi_wifi` y `version_firmware: "0.5.0"`. `ultimo_contacto` cambia
+   cada minuto. Si sale `401 ... Permission denied` dos veces seguidas, el uid no está en
+   `/cuentas_dispositivo` o no vale `BASE_ID`. Con `e`: `hora del servidor sincronizada`.
+3. **Lecturas**: en `/lecturas/{BASE_ID}` aparece una clave de 13 dígitos cada 5 s. Sin nadie
+   frente al radar: `persona: false, objetivo: false` (o `objetivo: true` con `actividad` baja si
+   apunta a una pared). Sentarse o acostarse frente al radar: en menos de 30 s, `persona: true`,
+   `actividad` ≥ 0.03 y `distancia_cm`; `resp_rpm` y `latido_bpm` solo cuando el módulo da un
+   valor. La clave debe estar cerca de la hora real (convertir con cualquier conversor de epoch en
+   ms). Comparar con las líneas `radar: persona detectada` del monitor.
+4. **Colgante**: al encender el colgante (HEARTBEAT con `ARRANQUE_FRIO`) aparece `/colgantes/{id}`
+   con `bateria_mv`, `ultimo_heartbeat`, `rssi` y `base`. Un reintento `DUPLICADO` no lo
+   actualiza.
+5. **Evento BOTON**: presionar el botón del colgante. La alerta local suena enseguida (no espera a
+   la nube) y en `/eventos` aparece un nodo nuevo con `tipo: "BOTON"`, `origen: "colganteN"`,
+   `timestamp`, `atendido: false` y `detalle: "boton del colgante"`; por serial,
+   `firebase: evento BOTON de colganteN enviado`. Una pulsación = un evento.
+6. **Sin red**: apagar el router con la base funcionando y presionar el botón: la alerta local y
+   el ACK siguen igual. Al volver el router, el evento llega a `/eventos` con
+   `(enviado N s despues)` en `detalle`, y las lecturas que esperaban (hasta 2 min) llegan con
+   `diferida: true`. Con más de 2 min sin red se pierden las lecturas más viejas (`lecturas
+   descartadas` en `e`); la cola completa es la parte 2.
+7. **Token**: dejar la base más de 1 h: debe salir `firebase: token renovado` a los ~55 min sin
+   errores de escritura.
+8. **Sin bloqueos**: con `e`, `pico de la UART` debe quedar por debajo de 2800 B (no se perdieron
+   tramas del radar durante el TLS), y `pila libre de la tarea de red` por encima de ~1 kB.
+
+Resultados: anotarlos en `pruebas/resultados/`. Todo por confirmar con el módulo.
+
 ## Pendiente de confirmar con el módulo
 
 - Voltaje en D10 con el buzzer sonando (prueba de arriba).
@@ -220,3 +392,5 @@ Resultados: anotarlos en `pruebas/resultados/`. Por confirmar con el módulo.
 - Fase WiFi en hardware (guía de arriba): conexión, reconexión con espera creciente y en qué
   canal queda la radio entre intentos.
 - Que el botón BOOT sea accesible con la placa montada en el kit.
+- Firebase en hardware (guía de arriba): handshake TLS con el bundle de CA, keep-alive, heap
+  libre con dos conexiones TLS, pila de la tarea de red y pico de la UART durante el TLS.
