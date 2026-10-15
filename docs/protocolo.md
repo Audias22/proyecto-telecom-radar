@@ -24,7 +24,7 @@ coinciden, manda el header y hay que corregir este documento.
 | 2 | `id_dispositivo` | uint8 | Id del colgante. En un ACK, id del colgante al que se responde. |
 | 3 | `flags` | uint8 | Bits, ver tabla siguiente |
 | 4-5 | `secuencia` | uint16 LE | Contador del colgante. El ACK repite la secuencia que confirma. |
-| 6-7 | `bateria_mv` | uint16 LE | Batería del colgante en mV. `0` en un ACK. En un mensaje del colgante, `0` = sin dato (falló la lectura); el colgante marca además `FLAG_BATERIA_BAJA` por precaución, así que la base debe informar "batería sin dato" en vez de un voltaje. |
+| 6-7 | `bateria_mv` | uint16 LE | En ALERTA y HEARTBEAT: batería del colgante en mV; `0` = sin dato (falló la lectura), y el colgante marca además `FLAG_BATERIA_BAJA` por precaución, así que la base debe informar "batería sin dato" en vez de un voltaje. En un ACK: **canal de la base** (1-13), ver sección 6; `0` = sin dato. |
 
 Flags en mensajes del colgante:
 
@@ -49,11 +49,16 @@ Ejemplo: alerta del colgante 2, secuencia 300 (0x012C), 3950 mV (0x0F6E), sin fl
 01 01 02 00 2C 01 6E 0F
 ```
 
-ACK correspondiente:
+ACK correspondiente, con la base en el canal 7 (0x0007):
 
 ```
-01 03 02 00 2C 01 00 00
+01 03 02 00 2C 01 07 00
 ```
+
+Una base anterior al canal en el ACK responde `01 03 02 00 2C 01 00 00` (canal `0` = sin dato) y
+el colgante sigue funcionando como antes. El cambio no toca el tamaño ni el orden de los campos,
+por eso `PROTOCOLO_VERSION` sigue en `1`. En el código, el ACK se arma con `ackConCanal()` y el
+canal se lee con `canalDeAck()` (`protocolo.h`).
 
 ## 3. Constantes
 
@@ -83,7 +88,7 @@ flowchart TD
     B --> C[Leer batería, preparar paquete ALERTA<br/>secuencia = secuencia + 1]
     C --> D[Iniciar WiFi en modo STA sin conectar<br/>fijar canal guardado en RTC]
     D --> E[Enviar y esperar ACK hasta ACK_TIMEOUT_MS]
-    E -->|ACK con la misma secuencia| H[Guardar canal en RTC<br/>beep corto de confirmación]
+    E -->|ACK con la misma secuencia| H[Guardar en RTC el canal que anuncia el ACK<br/>beep corto de confirmación]
     E -->|sin ACK| F{¿Quedan reintentos<br/>en el canal guardado?}
     F -->|sí, marcar FLAG_REINTENTO| E
     F -->|no| G[Barrido: canales 1 a 13<br/>ACK_REINTENTOS_BARRIDO por canal]
@@ -101,7 +106,8 @@ Detalles:
 2. La secuencia se incrementa una vez por mensaje nuevo. Los reintentos usan la misma secuencia
    con `FLAG_REINTENTO`, así la base los reconoce como duplicados.
 3. Un ACK solo es válido si `tipo == MSG_ACK`, `id_dispositivo` es el del colgante y `secuencia`
-   coincide con la enviada. Cualquier otro paquete se ignora.
+   coincide con la enviada. Cualquier otro paquete se ignora. El canal que trae el ACK no forma
+   parte de la validación: solo decide qué canal se guarda (sección 6).
 4. Confirmación: un beep corto. Error: tres beeps largos, para que la persona sepa que debe
    volver a intentarlo o pedir ayuda de otra forma.
 5. Antes de dormir se configura el despertar por botón y por timer (`HEARTBEAT_INTERVALO_S`).
@@ -172,15 +178,42 @@ base cambia con él y el colgante deja de alcanzarla.
 
 ### Solución
 
-1. El colgante guarda el último canal en el que recibió un ACK en memoria RTC.
-2. Cada envío empieza en ese canal (o `CANAL_POR_DEFECTO` si no hay ninguno guardado).
-3. Si tras `ACK_REINTENTOS` no hay ACK, barre los canales `CANAL_MIN` a `CANAL_MAX`, enviando el
+1. El ACK de la base lleva el canal en el que está su radio (campo de bytes 6-7, sección 2).
+2. Al recibir un ACK válido, el colgante guarda en memoria RTC el canal que anuncia la base si
+   está entre `CANAL_MIN` y `CANAL_MAX`. Si trae `0` (sin dato) o un valor fuera de rango, guarda
+   el canal en el que recibió el ACK. Lo hace tanto en el canal guardado como en el barrido.
+3. Cada envío empieza en el canal guardado (o `CANAL_POR_DEFECTO` si no hay ninguno).
+4. Si tras `ACK_REINTENTOS` no hay ACK, barre los canales `CANAL_MIN` a `CANAL_MAX`, enviando el
    mismo mensaje (misma secuencia, con `FLAG_BARRIDO`) y esperando `ACK_TIMEOUT_BARRIDO_MS` en
-   cada uno.
-4. El primer canal que responde se guarda en RTC y se usa en adelante.
+   cada uno. El primer canal que responde termina el barrido y se aplica el punto 2.
 
 Como el barrido reenvía la misma secuencia, si la base recibió el mensaje en un intento anterior y
 solo se perdió el ACK, la base lo trata como duplicado y no repite la alerta.
+
+### Canal anunciado en el ACK (problema medido el 2026-10-14)
+
+Antes el colgante guardaba el canal en el que estaba al recibir el ACK. En la prueba con la base
+conectada al router en el canal 7 y el colgante a ~1 m, eso falló:
+
+1. En el barrido, el colgante oyó el ACK estando en el canal 6. Los canales de 2.4 GHz miden
+   ~20 MHz y están separados 5 MHz, así que a corta distancia las tramas del canal 7 se reciben
+   en el 6 (igual que las copias del barrido en el banco del 2026-10-12). Guardó el 6.
+2. El mensaje siguiente salió en el canal 6. La base lo oyó por el mismo solape (`ALERTA
+   seq=15658` llegó `NUEVO` con RSSI -46 dBm), pero el ACK no le llegó al colgante.
+3. El colgante agotó los reintentos en el 6 (dos líneas `REINTENTO` en la base, ya como
+   duplicados) y volvió a barrer desde el canal 1 (`REINTENTO|BARRIDO`) hasta que recibió el ACK
+   de nuevo con -46 dBm.
+
+La alerta llegó una sola vez (los reintentos se filtraron como duplicados), pero el colgante gastó
+radio y tiempo en reintentos y en un barrido completo, y el barrido podía volver a terminar en un
+canal vecino. La causa es que el canal en que se oye el ACK no es necesariamente el de la base.
+
+Corrección: la base pone su canal en el ACK (`ackConCanal()` con `espnow_rx::canalActual()`) y el
+colgante guarda ese canal (`espnow_tx::logica::canalAGuardar()`). Si el canal guardado difiere
+del canal en que se recibió el ACK, el colgante lo registra por serial
+(`espnow_tx: ACK recibido en el canal 6, se guarda el canal de la base: 7`). Con una base antigua
+(canal `0`) se mantiene el comportamiento anterior. Pruebas: `firmware/colgante/pruebas_host`
+(casos "ack canal"). Registro de la prueba: `pruebas/resultados/2026-10-14_wifi_base_router.md`.
 
 Optimización posible: en unicast, el callback de envío de ESP-NOW indica si la trama recibió el ACK
 de capa MAC. En un canal equivocado ese callback falla rápido, así que el barrido puede pasar al

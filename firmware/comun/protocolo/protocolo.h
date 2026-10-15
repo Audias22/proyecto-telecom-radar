@@ -49,7 +49,8 @@ struct __attribute__((packed)) PaqueteEspNow {
     uint8_t  id_dispositivo;  // id del colgante (en un ACK: id del colgante al que se responde)
     uint8_t  flags;           // combinación de FLAG_*
     uint16_t secuencia;       // contador del colgante; el ACK repite la secuencia que confirma
-    uint16_t bateria_mv;      // voltaje de batería del colgante en mV (0 en un ACK)
+    uint16_t bateria_mv;      // ALERTA/HEARTBEAT: batería del colgante en mV.
+                              // ACK: canal de la base (ver ackConCanal() y canalDeAck()).
 };
 
 static_assert(sizeof(PaqueteEspNow) == 8, "PaqueteEspNow debe medir 8 bytes");
@@ -62,6 +63,30 @@ static_assert(sizeof(PaqueteEspNow) == 8, "PaqueteEspNow debe medir 8 bytes");
 #define CANAL_POR_DEFECTO 1   // canal inicial si el colgante no tiene uno guardado
 #define CANAL_MIN         1
 #define CANAL_MAX         13  // último canal que barre el colgante (Por confirmar con el router de la casa)
+
+// En un MSG_ACK el campo bateria_mv lleva el canal en el que está la radio de la base (1-13).
+// El colgante guarda ese canal y no el canal en el que oyó el ACK: por el solape de los canales
+// de 2.4 GHz puede oírlo estando en un canal vecino (docs/protocolo.md, sección 6).
+// 0 = sin dato (base anterior a este cambio o canal desconocido); el colgante usa entonces el
+// canal en el que recibió el ACK. No cambia el formato, así que PROTOCOLO_VERSION sigue en 1.
+#define ACK_CANAL_SIN_DATO 0
+
+// ACK para el mensaje (id_dispositivo, secuencia), con el canal actual de la base.
+constexpr PaqueteEspNow ackConCanal(uint8_t id_dispositivo, uint16_t secuencia, bool duplicado,
+                                    uint8_t canal_base) {
+    return {PROTOCOLO_VERSION,
+            MSG_ACK,
+            id_dispositivo,
+            static_cast<uint8_t>(duplicado ? FLAG_ACK_DUPLICADO : 0),
+            secuencia,
+            canal_base};
+}
+
+// Canal que anuncia la base en un ACK. Se devuelve con 16 bits para que un valor fuera de rango
+// (por ejemplo 263) no se trunque a un canal válido; quien lo usa debe validarlo.
+constexpr uint16_t canalDeAck(const PaqueteEspNow& ack) {
+    return ack.bateria_mv;
+}
 
 // ---------------------------------------------------------------------------
 // Tiempos y reintentos (valores iniciales, se ajustan con mediciones)
