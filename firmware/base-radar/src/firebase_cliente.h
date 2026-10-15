@@ -15,6 +15,12 @@
 //   - HTTPS con verificación del certificado (bundle de CA de ESP-IDF), nunca sin verificar.
 // Solo trabaja con el WiFi conectado (red_wifi). Escribe con ?print=silent para no gastar
 // descarga, salvo la lectura de ultimo_contacto.
+//
+// Cada espera de la red tiene un límite corto (FIREBASE_TIMEOUT_* en config.h) y el cuerpo de
+// la respuesta se lee con cuerpo_http.h, nunca con HTTPClient::getString(). Además, un vigilante
+// (vigilante_red.h) que corre desde loop() corta una petición que pasa de
+// FIREBASE_PETICION_MAX_MS y, como último recurso, reinicia la base (docs/fallos.md, escenario 5).
+// Con FIREBASE_TRAZA cada petición deja una línea por serial: método, ruta, código y duración.
 
 #pragma once
 
@@ -38,7 +44,12 @@ void encolarColgante(uint8_t id, uint16_t bateria_mv, int8_t rssi);
 // Un evento para /eventos (POST). origen: BASE_ID o "colganteN". detalle puede ser vacío.
 void encolarEvento(TipoEvento tipo, const char *origen, const char *detalle);
 
-// Comando "e": sesión, última escritura correcta, errores, cola y hora del servidor.
+// Vigilante de la tarea de red. Llamar en cada vuelta de loop(); revisa una vez por segundo y
+// no bloquea. alerta_urgente: hay una alerta local urgente activa, que pospone el reinicio.
+void vigilar(bool alerta_urgente);
+
+// Comando "e": sesión, última escritura correcta, errores, petición en curso y cuánto lleva,
+// última petición, último error con su texto, vigilante, cola y hora del servidor.
 void imprimirEstado();
 
 }  // namespace firebase_cliente

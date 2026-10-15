@@ -4,16 +4,21 @@
 #include <HTTPClient.h>
 #include <NetworkClientSecure.h>
 #include <WiFi.h>
+#include <esp_attr.h>
+#include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
+#include <lwip/sockets.h>
 
 #include <cstdarg>
 #include <cstring>
 
 #include "cola_peticiones.h"
 #include "config.h"
+#include "cuerpo_http.h"
 #include "red_wifi.h"
+#include "vigilante_red.h"
 
 // Las credenciales solo hacen falta con Firebase habilitado (red_wifi.cpp ya da el #error si
 // falta secrets.h). En el firmware de diagnóstico o en la fase local no se compila la red.
@@ -49,6 +54,15 @@ const char *URL_RENOVAR_TOKEN = "https://securetoken.googleapis.com/v1/token";
 // Código propio: el 401 pidió iniciar sesión de nuevo y no se pudo (sin red, clave mala).
 constexpr int CODIGO_SIN_SESION = -100;
 
+// Cabeceras de la respuesta que se guardan: el lector del cuerpo necesita saber si es chunked.
+const char *CABECERAS[] = {"Transfer-Encoding"};
+
+// Motivo del último reinicio del vigilante. RTC_NOINIT sobrevive a esp_restart(), así el
+// arranque siguiente lo muestra por serial.
+constexpr uint32_t MARCA_REINICIO = 0x56524544;  // "VRED"
+RTC_NOINIT_ATTR uint32_t reinicio_marca;
+RTC_NOINIT_ATTR char reinicio_motivo[112];
+
 enum Resultado : uint8_t {
     RESULTADO_OK,
     RESULTADO_REINTENTAR,  // red o servidor: queda en la cola y se reintenta con espera
@@ -73,6 +87,16 @@ void registrar(const char *formato, ...) {
 // tomado durante una petición: solo para copiar datos.
 // ---------------------------------------------------------------------------
 
+// Una petición HTTPS terminada, para el comando "e".
+struct PeticionTerminada {
+    char     metodo[8];
+    char     ruta[64];
+    int      codigo;
+    char     texto[112];   // "HTTP 204", "error -11 read Timeout", ...
+    uint32_t duracion_ms;
+    uint32_t fin_ms;
+};
+
 struct Resumen {
     bool     sesion;
     char     uid[48];
@@ -83,8 +107,10 @@ struct Resumen {
     uint32_t rechazadas;
     bool     hubo_ok;
     uint32_t ultima_ok_ms;
-    int      ultimo_error_http;
-    char     ultimo_error_ruta[48];
+    bool     hubo_peticion;
+    PeticionTerminada ultima;
+    bool     hubo_error;
+    PeticionTerminada ultimo_error;  // la última que terminó en error de red o HTTP >= 400
     bool     hora_ok;
     uint64_t hora_ref_ms;   // ultimo_contacto leído de vuelta
     uint32_t millis_ref;    // millis() al leerlo
@@ -95,6 +121,8 @@ ColaPeticiones cola;
 Resumen resumen = {};
 TaskHandle_t tarea = nullptr;
 const char *motivo_inactiva = "FIREBASE_HABILITADO 0 en config.h";
+VigilanteRed vigilante;
+NetworkClientSecure *cliente_en_uso = nullptr;  // el de la petición en curso (para cortarla)
 
 class Bloqueo {
 public:
@@ -124,16 +152,25 @@ NetworkClientSecure *cliente_bd = nullptr;  // conexión a la base de datos, con
 HTTPClient *http_bd = nullptr;
 uint32_t ultimo_estado_ms = 0;
 bool estado_enviado = false;
+uint32_t ultimo_uso_bd_ms = 0;  // fin de la última petición por cliente_bd
 uint32_t espera_error_ms = 0;   // 0 = sin error pendiente
 uint32_t marca_error_ms = 0;
+char buffer_respuesta[FIREBASE_RESPUESTA_MAX];
 
-void usarBundleCa(NetworkClientSecure &cliente) {
+// Límites de config.h (FIREBASE_TIMEOUT_*); qué espera cubre cada uno en docs/fallos.md,
+// escenario 5.
+void configurarCliente(NetworkClientSecure &cliente) {
     cliente.setCACertBundle(bundle_ca_inicio, static_cast<size_t>(bundle_ca_fin - bundle_ca_inicio));
+    cliente.setHandshakeTimeout(FIREBASE_TIMEOUT_TLS_MS / 1000);  // recibe segundos
 }
 
 void configurarHttp(HTTPClient &http) {
+    // Va al connect() del cliente TLS: select del connect TCP y socket_timeout de ssl_client, que
+    // también corta una escritura TLS sin avance.
     http.setConnectTimeout(FIREBASE_TIMEOUT_CONEXION_MS);
+    // Tiempo sin recibir nada mientras llegan las cabeceras.
     http.setTimeout(FIREBASE_TIMEOUT_RESPUESTA_MS);
+    http.collectHeaders(CABECERAS, sizeof(CABECERAS) / sizeof(CABECERAS[0]));
 }
 
 // Texto del error que devuelve Firebase: {"error":"Permission denied"} en la base de datos o
@@ -151,23 +188,156 @@ String textoError(int codigo, const String &cuerpo) {
 }
 
 // ---------------------------------------------------------------------------
+// Cada petición HTTPS: vigilancia (vigilante_red.h), traza y último error
+// ---------------------------------------------------------------------------
+
+// Devuelve el último error TLS del cliente antes de la petición: describir() solo lo muestra si
+// cambió, porque ssl_client lo guarda entre conexiones.
+int empezarPeticion(const char *metodo, const char *ruta, NetworkClientSecure &cliente) {
+    char texto[8];
+    const int tls_antes = cliente.lastError(texto, sizeof(texto));
+    Bloqueo b;
+    vigilante.empezar(metodo, ruta, millis());
+    cliente_en_uso = &cliente;
+    return tls_antes;
+}
+
+// "HTTP 204", "HTTP 401 Permission denied" o "error -11 read Timeout"; si no se pudo conectar,
+// con el error TLS de esta conexión.
+void describir(int codigo, const String &cuerpo, NetworkClientSecure &cliente, int tls_antes,
+               char *texto, size_t tamano) {
+    if (codigo > 0) {
+        const String detalle = codigo >= 400 ? textoError(codigo, cuerpo) : String();
+        snprintf(texto, tamano, "HTTP %d%s%s", codigo, detalle.length() > 0 ? " " : "",
+                 detalle.c_str());
+        return;
+    }
+    const String error = textoError(codigo, cuerpo);
+    if (codigo != HTTPC_ERROR_CONNECTION_REFUSED) {
+        snprintf(texto, tamano, "error %d %s", codigo, error.c_str());
+        return;
+    }
+    char tls[64];
+    const int error_tls = cliente.lastError(tls, sizeof(tls));
+    if (error_tls == -1 && error_tls != tls_antes) {
+        // ssl_client devuelve -1 sin código de mbedTLS: connect TCP o handshake vencidos.
+        snprintf(texto, tamano, "error %d sin conexion; TCP o handshake TLS sin respuesta", codigo);
+    } else if (error_tls < 0 && error_tls != tls_antes) {
+        snprintf(texto, tamano, "error %d sin conexion; TLS -0x%04x %s", codigo, -error_tls, tls);
+    } else {
+        snprintf(texto, tamano, "error %d sin conexion (DNS, TCP o TLS)", codigo);
+    }
+}
+
+// Devuelve true si el vigilante la había cortado: el cliente se debe recrear.
+bool terminarPeticion(int codigo, const String &cuerpo, NetworkClientSecure &cliente,
+                      int tls_antes) {
+    PeticionTerminada t = {};
+    bool cortada;
+    {
+        Bloqueo b;
+        const PeticionEnCurso &p = vigilante.peticion();
+        strlcpy(t.metodo, p.metodo, sizeof(t.metodo));
+        strlcpy(t.ruta, p.ruta, sizeof(t.ruta));
+        t.fin_ms = millis();
+        t.duracion_ms = t.fin_ms - p.inicio_ms;
+        cortada = vigilante.terminar(t.fin_ms);
+        cliente_en_uso = nullptr;
+    }
+    t.codigo = codigo;
+    describir(codigo, cuerpo, cliente, tls_antes, t.texto, sizeof(t.texto));
+    if (cortada) {
+        strlcat(t.texto, " (cortada por el vigilante)", sizeof(t.texto));
+    }
+    const bool fallo = codigo <= 0 || codigo >= 400;
+    {
+        Bloqueo b;
+        resumen.hubo_peticion = true;
+        resumen.ultima = t;
+        if (fallo) {
+            resumen.hubo_error = true;
+            resumen.ultimo_error = t;
+        }
+    }
+    if (FIREBASE_TRAZA || cortada) {
+        registrar("%s %s -> %s (%lu ms)", t.metodo, t.ruta, t.texto,
+                  static_cast<unsigned long>(t.duracion_ms));
+    }
+    return cortada;
+}
+
+// Lee el cuerpo con un límite total de FIREBASE_TIMEOUT_CUERPO_MS, en lugar de
+// HTTPClient::getString() (sin límite: cuerpo_http.h). Devuelve codigo, o un error de HTTPClient
+// si el cuerpo no llegó completo; entonces cierra la conexión, que ya no se puede reusar.
+int leerCuerpo(HTTPClient &http, NetworkClientSecure &cliente, int codigo, String &respuesta) {
+    respuesta = String();
+    if (codigo <= 0) {
+        return codigo;
+    }
+    const int32_t largo = http.getSize();
+    const ModoCuerpo modo = cuerpo_http::modo(
+        codigo, largo, http.header("Transfer-Encoding").equalsIgnoreCase("chunked"));
+    CuerpoHttp cuerpo(buffer_respuesta, sizeof(buffer_respuesta));
+    cuerpo.iniciar(modo, largo);
+    uint8_t bloque[256];
+    const uint32_t inicio = millis();
+    while (!cuerpo.completo() && !cuerpo.invalido() &&
+           millis() - inicio < FIREBASE_TIMEOUT_CUERPO_MS) {
+        const int disponibles = cliente.available();
+        if (disponibles > 0) {
+            const size_t pedir = disponibles < static_cast<int>(sizeof(bloque))
+                                     ? static_cast<size_t>(disponibles)
+                                     : sizeof(bloque);
+            const int leidos = cliente.read(bloque, pedir);
+            if (leidos > 0) {
+                cuerpo.agregar(bloque, static_cast<size_t>(leidos));
+                continue;
+            }
+        }
+        if (!cliente.connected()) {
+            cuerpo.cerrada();
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    int resultado = codigo;
+    if (!cuerpo.completo()) {
+        resultado = cuerpo.invalido()      ? HTTPC_ERROR_ENCODING
+                    : cliente.connected() ? HTTPC_ERROR_READ_TIMEOUT
+                                          : HTTPC_ERROR_CONNECTION_LOST;
+    } else if (cuerpo.recortado()) {
+        resultado = HTTPC_ERROR_TOO_LESS_RAM;
+    } else {
+        respuesta = buffer_respuesta;
+    }
+    if (resultado != codigo || modo == CUERPO_HASTA_CIERRE) {
+        cliente.stop();
+    }
+    return resultado;
+}
+
+// ---------------------------------------------------------------------------
 // Firebase Auth
 // ---------------------------------------------------------------------------
 
 // POST a Firebase Auth con una conexión propia que se cierra al terminar (una vez por hora).
-int pedirAuth(const char *url, const char *tipo, const String &cuerpo, String &respuesta) {
+// etiqueta: nombre corto para la traza (la URL lleva la API key).
+int pedirAuth(const char *url, const char *etiqueta, const char *tipo, const String &cuerpo,
+              String &respuesta) {
     NetworkClientSecure cliente;
-    usarBundleCa(cliente);
+    configurarCliente(cliente);
     HTTPClient http;
     configurarHttp(http);
     http.setReuse(false);
-    if (!http.begin(cliente, url)) {
-        return HTTPC_ERROR_CONNECTION_REFUSED;
+    const int tls_antes = empezarPeticion("POST", etiqueta, cliente);
+    int codigo = HTTPC_ERROR_CONNECTION_REFUSED;
+    respuesta = String();
+    if (http.begin(cliente, url)) {
+        http.addHeader("Content-Type", tipo);
+        codigo = leerCuerpo(http, cliente, http.POST(cuerpo), respuesta);
+        http.end();
     }
-    http.addHeader("Content-Type", tipo);
-    const int codigo = http.POST(cuerpo);
-    respuesta = codigo > 0 ? http.getString() : String();
-    http.end();
+    terminarPeticion(codigo, respuesta, cliente, tls_antes);  // el cliente es nuevo en cada una
     return codigo;
 }
 
@@ -202,7 +372,8 @@ bool iniciarSesion() {
     formato_nube::jsonInicioSesion(DISPOSITIVO_EMAIL, DISPOSITIVO_CLAVE, cuerpo, sizeof(cuerpo));
     String url = String(URL_INICIO_SESION) + "?key=" + FIREBASE_API_KEY;
     String respuesta;
-    const int codigo = pedirAuth(url.c_str(), "application/json", String(cuerpo), respuesta);
+    const int codigo = pedirAuth(url.c_str(), "auth/signInWithPassword", "application/json",
+                                 String(cuerpo), respuesta);
     if (codigo != 200 || !guardarTokens(respuesta, "idToken", "refreshToken", "expiresIn")) {
         sesion.activa = false;
         publicarSesion(nullptr, false, false);
@@ -223,7 +394,7 @@ bool renovarToken() {
     String url = String(URL_RENOVAR_TOKEN) + "?key=" + FIREBASE_API_KEY;
     String respuesta;
     const int codigo =
-        pedirAuth(url.c_str(), "application/x-www-form-urlencoded", cuerpo, respuesta);
+        pedirAuth(url.c_str(), "auth/token", "application/x-www-form-urlencoded", cuerpo, respuesta);
     if (codigo != 200 || !guardarTokens(respuesta, "id_token", "refresh_token", "expires_in")) {
         registrar("no se pudo renovar el token (HTTP %d %s); se inicia sesion de nuevo", codigo,
                   textoError(codigo, respuesta).c_str());
@@ -252,42 +423,69 @@ bool asegurarSesion() {
 // Realtime Database
 // ---------------------------------------------------------------------------
 
+void crearClienteBd() {
+    cliente_bd = new NetworkClientSecure();
+    configurarCliente(*cliente_bd);
+    http_bd = new HTTPClient();
+    configurarHttp(*http_bd);
+    http_bd->setReuse(true);  // keep-alive: un handshake TLS por conexión, no por petición
+}
+
+// Tras un corte del vigilante el cliente pudo quedar a medias (cortado en medio del handshake o
+// de un registro TLS): se recrea entero en lugar de reusarlo.
+void recrearClienteBd() {
+    delete http_bd;  // primero: su destructor todavía usa el cliente
+    delete cliente_bd;
+    crearClienteBd();
+    registrar("cliente TLS de la base de datos recreado");
+}
+
 void cerrarConexion() {
     if (cliente_bd != nullptr && cliente_bd->connected()) {
         cliente_bd->stop();
     }
 }
 
-int pedirBdUnaVez(const String &url, const char *metodo, const char *cuerpo, String &respuesta) {
-    if (!http_bd->begin(*cliente_bd, url)) {
-        return HTTPC_ERROR_CONNECTION_REFUSED;
+int pedirBdUnaVez(const char *metodo, const char *ruta, const String &url, const char *cuerpo,
+                  String &respuesta) {
+    const int tls_antes = empezarPeticion(metodo, ruta, *cliente_bd);
+    int codigo = HTTPC_ERROR_CONNECTION_REFUSED;
+    respuesta = String();
+    if (http_bd->begin(*cliente_bd, url)) {
+        const size_t largo = cuerpo != nullptr ? strlen(cuerpo) : 0;
+        codigo = http_bd->sendRequest(
+            metodo, reinterpret_cast<uint8_t *>(const_cast<char *>(cuerpo)), largo);
+        codigo = leerCuerpo(*http_bd, *cliente_bd, codigo, respuesta);
+        http_bd->end();
     }
-    const size_t largo = cuerpo != nullptr ? strlen(cuerpo) : 0;
-    const int codigo = http_bd->sendRequest(
-        metodo, reinterpret_cast<uint8_t *>(const_cast<char *>(cuerpo)), largo);
-    respuesta = codigo > 0 ? http_bd->getString() : String();
-    http_bd->end();
     if (codigo <= 0) {
         cerrarConexion();  // la próxima petición abre una conexión nueva
+    }
+    ultimo_uso_bd_ms = millis();
+    if (terminarPeticion(codigo, respuesta, *cliente_bd, tls_antes)) {
+        recrearClienteBd();
     }
     return codigo;
 }
 
 // Una petición REST por la conexión con keep-alive. ruta sin barra inicial ni ".json".
-// Si falla sobre una conexión reutilizada (el servidor pudo cerrarla por inactividad), se
-// reintenta una vez con una conexión nueva.
+// Una conexión sin usar por FIREBASE_REUSO_MAX_MS se cierra antes. Si falla sobre una conexión
+// reutilizada (el servidor pudo cerrarla), se reintenta una vez con una conexión nueva.
 int pedirBd(const char *metodo, const char *ruta, const char *cuerpo, bool silencioso,
             String &respuesta) {
     String url = url_base + "/" + ruta + ".json?auth=" + sesion.id_token;
     if (silencioso) {
-        url += "&print=silent";  // respuesta vacía (204): no cuenta como descarga
+        url += "&print=silent";  // respuesta 204 sin cuerpo: no cuenta como descarga
+    }
+    if (millis() - ultimo_uso_bd_ms >= FIREBASE_REUSO_MAX_MS) {
+        cerrarConexion();
     }
     const bool reutilizada = cliente_bd->connected();
-    const int codigo = pedirBdUnaVez(url, metodo, cuerpo, respuesta);
+    const int codigo = pedirBdUnaVez(metodo, ruta, url, cuerpo, respuesta);
     if (codigo > 0 || !reutilizada) {
         return codigo;
     }
-    return pedirBdUnaVez(url, metodo, cuerpo, respuesta);
+    return pedirBdUnaVez(metodo, ruta, url, cuerpo, respuesta);
 }
 
 // Ante un 401 (token vencido o revocado; también es la respuesta de las reglas) inicia sesión de
@@ -332,8 +530,6 @@ void anotarResultado(const char *metodo, const char *ruta, int codigo, const Str
         }
         resumen.errores++;
         resumen.rechazadas += descartada ? 1 : 0;
-        resumen.ultimo_error_http = codigo;
-        strlcpy(resumen.ultimo_error_ruta, ruta, sizeof(resumen.ultimo_error_ruta));
     }
     registrar("ERROR %s %s: HTTP %d %s%s", metodo, ruta, codigo,
               textoError(codigo, respuesta).c_str(),
@@ -514,13 +710,12 @@ bool atenderSiguiente() {
 }
 
 void tareaRed(void *) {
-    cliente_bd = new NetworkClientSecure();
-    usarBundleCa(*cliente_bd);
-    http_bd = new HTTPClient();
-    configurarHttp(*http_bd);
-    http_bd->setReuse(true);  // keep-alive: un handshake TLS por conexión, no por petición
-
+    crearClienteBd();
     for (;;) {
+        {
+            Bloqueo b;
+            vigilante.latir(millis());
+        }
         if (!red_wifi::conectado()) {
             cerrarConexion();
             vTaskDelay(pdMS_TO_TICKS(500));
@@ -570,10 +765,36 @@ void imprimirEscrituras(const Resumen &r) {
     }
     Serial.printf("; OK %lu, errores %lu (rechazadas %lu)", static_cast<unsigned long>(r.escrituras_ok),
                   static_cast<unsigned long>(r.errores), static_cast<unsigned long>(r.rechazadas));
-    if (r.errores > 0) {
-        Serial.printf(", ultimo: HTTP %d en %s", r.ultimo_error_http, r.ultimo_error_ruta);
-    }
     Serial.println();
+}
+
+void imprimirTerminada(const char *titulo, const PeticionTerminada &t) {
+    Serial.printf("# Firebase: %s: %s %s -> %s (%lu ms), hace %lu s\n", titulo, t.metodo, t.ruta,
+                  t.texto, static_cast<unsigned long>(t.duracion_ms), segundosDesde(t.fin_ms));
+}
+
+// Petición en curso y desde cuándo, la última terminada, el último error y el vigilante.
+void imprimirPeticiones(const Resumen &r, const PeticionEnCurso &p, uint32_t cortes,
+                        bool pospuesto) {
+    if (p.activa) {
+        const uint32_t lleva_ms = millis() - p.inicio_ms;
+        Serial.printf("# Firebase: peticion en curso: %s %s, lleva %lu.%lu s (corte a los %lu s)\n",
+                      p.metodo, p.ruta, static_cast<unsigned long>(lleva_ms / 1000),
+                      static_cast<unsigned long>(lleva_ms % 1000 / 100),
+                      static_cast<unsigned long>(FIREBASE_PETICION_MAX_MS / 1000));
+    } else {
+        Serial.println("# Firebase: ninguna peticion en curso");
+    }
+    if (r.hubo_peticion) {
+        imprimirTerminada("ultima peticion", r.ultima);
+    }
+    if (r.hubo_error) {
+        imprimirTerminada("ultimo error", r.ultimo_error);
+    } else {
+        Serial.println("# Firebase: ninguna peticion con error");
+    }
+    Serial.printf("# Firebase: vigilante: %lu cortes%s\n", static_cast<unsigned long>(cortes),
+                  pospuesto ? ", reinicio pospuesto por la alerta local" : "");
 }
 
 void imprimirCola(const TamanosCola &t) {
@@ -604,12 +825,60 @@ void imprimirMemoria() {
                   static_cast<unsigned long>(uxTaskGetStackHighWaterMark(tarea)));
 }
 
+// Desde loop(): shutdown() del socket de la petición en curso. Es seguro desde otra tarea (lwIP
+// lo pasa por su hilo tcpip) y despierta a la tarea de red con un error en el select, el recv o
+// el send en que esté. El close() lo hace la tarea de red al recibir el error: si lo hiciera
+// loop(), el número de socket se podría reusar mientras la tarea de red todavía lo tiene.
+// Con el candado tomado: la tarea de red no puede destruir cliente_en_uso mientras tanto.
+void cortarPeticion() {
+    if (cliente_en_uso == nullptr) {
+        return;
+    }
+    const int fd = cliente_en_uso->fd();
+    if (fd >= 0) {
+        lwip_shutdown(fd, SHUT_RDWR);
+    }
+}
+
+void describirBloqueo(const PeticionEnCurso &p, char *texto, size_t tamano) {
+    if (p.activa) {
+        snprintf(texto, tamano, "%s %s lleva %lu s sin terminar", p.metodo, p.ruta,
+                 segundosDesde(p.inicio_ms));
+    } else {
+        snprintf(texto, tamano, "la tarea de red no avanza hace mas de %lu s",
+                 static_cast<unsigned long>(FIREBASE_PETICION_MAX_MS / 1000));
+    }
+}
+
+// Último recurso (vigilante_red.h). Se pierde la cola en RAM; el motivo queda en RTC para el
+// arranque siguiente. Con el candado tomado: la cola no cambia mientras se cuenta lo que se pierde.
+[[noreturn]] void reiniciar(const char *motivo) {
+    const TamanosCola t = cola.tamanos();
+    registrar("VIGILANTE: %s; se reinicia la base (se pierden %u eventos, %u colgantes y %u "
+              "lecturas pendientes)",
+              motivo, static_cast<unsigned>(t.eventos), static_cast<unsigned>(t.colgantes),
+              static_cast<unsigned>(t.lecturas));
+    strlcpy(reinicio_motivo, motivo, sizeof(reinicio_motivo));
+    reinicio_marca = MARCA_REINICIO;
+    Serial.flush();
+    esp_restart();
+}
+
+void informarReinicioAnterior() {
+    if (reinicio_marca == MARCA_REINICIO && esp_reset_reason() == ESP_RST_SW) {
+        reinicio_motivo[sizeof(reinicio_motivo) - 1] = '\0';
+        registrar("el arranque anterior termino en un reinicio del vigilante: %s", reinicio_motivo);
+    }
+    reinicio_marca = 0;
+}
+
 }  // namespace
 
 void iniciar() {
     if (!NUBE_COMPILADA) {
         return;
     }
+    informarReinicioAnterior();
     if (valoresDeEjemplo()) {
         motivo_inactiva = "secrets.h tiene los valores de ejemplo de Firebase";
         registrar("deshabilitado: %s", motivo_inactiva);
@@ -617,6 +886,7 @@ void iniciar() {
     }
     url_base = quitarBarraFinal(FIREBASE_URL);
     candado = xSemaphoreCreateMutex();
+    vigilante.latir(millis());
     if (candado == nullptr ||
         xTaskCreate(tareaRed, "red", TAREA_RED_PILA, nullptr, TAREA_RED_PRIORIDAD, &tarea) != pdPASS) {
         candado = nullptr;
@@ -661,6 +931,42 @@ void encolarEvento(TipoEvento tipo, const char *origen, const char *detalle) {
     }
 }
 
+void vigilar(bool alerta_urgente) {
+    static uint32_t ultima_ms = 0;
+    static bool pospuesto_antes = false;
+    if (!activa() || millis() - ultima_ms < FIREBASE_VIGILANTE_PERIODO_MS) {
+        return;
+    }
+    ultima_ms = millis();
+    AccionVigilante accion;
+    PeticionEnCurso p;
+    bool pospuesto;
+    {
+        Bloqueo b;
+        accion = vigilante.revisar(ultima_ms, alerta_urgente);
+        p = vigilante.peticion();
+        pospuesto = vigilante.reinicioPospuesto();
+        if (accion == VIGILANTE_CORTAR) {
+            cortarPeticion();
+        }
+    }
+    if (accion == VIGILANTE_NADA && pospuesto == pospuesto_antes) {
+        return;
+    }
+    char motivo[sizeof(reinicio_motivo)];
+    describirBloqueo(p, motivo, sizeof(motivo));
+    if (accion == VIGILANTE_CORTAR) {
+        registrar("VIGILANTE: %s; se cierra su socket", motivo);
+    } else if (pospuesto && !pospuesto_antes) {
+        registrar("VIGILANTE: %s; reinicio pospuesto hasta que termine la alerta local", motivo);
+    }
+    pospuesto_antes = pospuesto;
+    if (accion == VIGILANTE_REINICIAR) {
+        Bloqueo b;
+        reiniciar(motivo);
+    }
+}
+
 void imprimirEstado() {
     if (!activa()) {
         Serial.printf("# Firebase: deshabilitado (%s)\n", motivo_inactiva);
@@ -668,13 +974,20 @@ void imprimirEstado() {
     }
     Resumen r;
     TamanosCola t;
+    PeticionEnCurso p;
+    uint32_t cortes;
+    bool pospuesto;
     {
         Bloqueo b;
         r = resumen;
         t = cola.tamanos();
+        p = vigilante.peticion();
+        cortes = vigilante.cortes();
+        pospuesto = vigilante.reinicioPospuesto();
     }
     imprimirSesion(r);
     imprimirEscrituras(r);
+    imprimirPeticiones(r, p, cortes, pospuesto);
     imprimirCola(t);
     imprimirHora(r);
     imprimirMemoria();

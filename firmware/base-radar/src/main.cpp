@@ -70,7 +70,8 @@ static void ayuda() {
     Serial.println("# Comandos (letra y Enter):");
     Serial.println("#   b  buzzer fijo 10 s (medir el voltaje en D10)");
     Serial.println("#   s  silenciar la alerta local");
-    Serial.println("#   e  estado: MAC, canal, antena, radar, WiFi, Firebase y contadores");
+    Serial.println("#   e  estado: MAC, canal, antena, radar, WiFi, Firebase (peticion en curso,");
+    Serial.println("#      ultimo error) y contadores");
     Serial.println("#   h  esta ayuda");
     Serial.println("# Boton BOOT: silencia la alerta local (no presionarlo al reiniciar)");
 }
@@ -257,6 +258,17 @@ static void atenderBoton() {
 }
 
 // ---------------------------------------------------------------------------
+// Vigilante de la red
+// ---------------------------------------------------------------------------
+
+// Una alerta urgente (BOTON, APNEA) pospone el reinicio del vigilante de la red: la base nunca
+// se reinicia con el buzzer sonando. Un aviso (amarillo, sin buzzer) no lo pospone.
+static void vigilarRed() {
+    const PatronAlerta patron = alerta_local::patronActivo();
+    firebase_cliente::vigilar(patron == PATRON_BOTON || patron == PATRON_APNEA);
+}
+
+// ---------------------------------------------------------------------------
 // Comandos por serial
 // ---------------------------------------------------------------------------
 
@@ -354,6 +366,7 @@ void loop() {
     leerComandos();
     atenderBoton();
     alerta_local::actualizar();
+    vigilarRed();
 }
 
 #endif  // DIAGNOSTICO
