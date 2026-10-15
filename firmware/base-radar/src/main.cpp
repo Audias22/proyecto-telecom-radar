@@ -1,7 +1,8 @@
 // Firmware de la base (XIAO ESP32-C6 del kit MR60BHA2).
 //
-// Fase local, todavía sin WiFi, Firebase ni Telegram: lee el radar, recibe al colgante por
-// ESP-NOW (con ACK y filtro de duplicados) y maneja el LED y el buzzer de la base.
+// Lee el radar, recibe al colgante por ESP-NOW (con ACK y filtro de duplicados), maneja el LED y
+// el buzzer de la base y se conecta al router por WiFi (BASE_WIFI_HABILITADO). Todavía sin
+// Firebase ni Telegram.
 //
 // Salida por serial. Todos los registros empiezan con '#', que analisis/capturar_serial.py
 // trata como comentario:
@@ -23,6 +24,7 @@
 #include "config.h"
 #include "espnow_rx.h"
 #include "radar.h"
+#include "red_wifi.h"
 
 static const char *ENCABEZADO_CSV =
     "ms,valida,presencia,distancia_cm,resp_rpm,latido_bpm,fase_total,fase_resp,fase_latido";
@@ -62,7 +64,7 @@ static void ayuda() {
     Serial.println("# Comandos (letra y Enter):");
     Serial.println("#   b  buzzer fijo 10 s (medir el voltaje en D10)");
     Serial.println("#   s  silenciar la alerta local");
-    Serial.println("#   e  estado: MAC, canal, antena y contadores");
+    Serial.println("#   e  estado: MAC, canal, antena, WiFi y contadores");
     Serial.println("#   h  esta ayuda");
 }
 
@@ -179,6 +181,7 @@ static void imprimirEstado() {
     Serial.printf("# Radar: %s, reinicios de UART %lu, patron de alerta %d\n",
                   radar::sinDatos() ? "sin datos" : "con datos",
                   (unsigned long)radar::reiniciosUart(), (int)alerta_local::patronActivo());
+    red_wifi::imprimirEstado();
 }
 
 static void ejecutarComando(char comando) {
@@ -230,9 +233,11 @@ void setup() {
 
     Serial.printf("# %s v%s (protocolo v%d)\n", FIRMWARE_NOMBRE, FIRMWARE_VERSION, PROTOCOLO_VERSION);
     alerta_local::iniciar();
-    if (!espnow_rx::iniciar()) {
+    // Primero la radio, después ESP-NOW (necesita la radio arrancada). La conexión al router
+    // empieza en el primer red_wifi::actualizar() de loop().
+    if (!red_wifi::iniciar() || !espnow_rx::iniciar()) {
         // La base sigue con el radar y la alerta local; el error queda a la vista en el LED.
-        Serial.println("# ERROR: no se pudo iniciar ESP-NOW; el colgante no podra comunicarse");
+        Serial.println("# ERROR: no se pudo iniciar WiFi/ESP-NOW; el colgante no podra comunicarse");
         alerta_local::activar(PATRON_AVISO);
     }
     imprimirEstado();
@@ -245,6 +250,7 @@ void setup() {
 }
 
 void loop() {
+    red_wifi::actualizar();
     atenderColgante();
     atenderRadar();
     leerComandos();

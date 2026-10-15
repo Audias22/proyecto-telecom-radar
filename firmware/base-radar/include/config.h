@@ -4,7 +4,7 @@
 #pragma once
 
 #define FIRMWARE_NOMBRE  "base-radar"
-#define FIRMWARE_VERSION "0.3.0"
+#define FIRMWARE_VERSION "0.4.0"
 
 // ---------------------------------------------------------------------------
 // Salida por serial
@@ -79,13 +79,32 @@
 #define PRUEBA_BUZZER_MS  10000UL
 
 // ---------------------------------------------------------------------------
+// WiFi
+// ---------------------------------------------------------------------------
+
+// 1: la base se conecta al router (WIFI_SSID y WIFI_CLAVE de secrets.h). El canal de ESP-NOW es
+//    el del router; el colgante lo encuentra con su barrido (docs/protocolo.md, sección 6).
+// 0: fase local, sin WiFi: canal fijo BASE_CANAL_SIN_WIFI y no hace falta secrets.h.
+#define BASE_WIFI_HABILITADO  1
+
+// Reconexión propia con espera creciente (docs/fallos.md, "Reconexión WiFi y ESP-NOW"): tras
+// perder la conexión se espera WIFI_ESPERA_INICIAL_MS, y cada intento fallido duplica la espera
+// hasta WIFI_ESPERA_MAXIMA_MS (5 s, 10 s, 20 s, 40 s, 80 s, 120 s, 120 s...). Mientras busca el
+// router la radio cambia de canal; entre intentos queda quieta y el colgante la puede encontrar.
+#define WIFI_ESPERA_INICIAL_MS  5000UL
+#define WIFI_ESPERA_MAXIMA_MS   120000UL
+// Un intento que no termina (ni conecta ni falla) en este tiempo se corta y cuenta como fallido.
+#define WIFI_INTENTO_MAX_MS     20000UL
+// Cada cuánto se lee el canal de la radio para registrar sus cambios.
+#define WIFI_CANAL_MUESTREO_MS  100UL
+
+// ---------------------------------------------------------------------------
 // ESP-NOW
 // ---------------------------------------------------------------------------
 
-// Canal de radio mientras la base no se conecta a WiFi (fase local, sin red_wifi).
+// Canal de radio con BASE_WIFI_HABILITADO 0 (fase local).
 // Es CANAL_POR_DEFECTO del colgante, el primero que prueba tras encender.
-// Con WiFi conectado el canal lo fija el router y este valor deja de usarse (docs/protocolo.md,
-// sección 6): el colgante lo encuentra con el barrido.
+// Con WiFi el canal lo fija el router y este valor no se usa (docs/protocolo.md, sección 6).
 #define BASE_CANAL_SIN_WIFI  1
 
 // ---------------------------------------------------------------------------

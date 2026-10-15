@@ -20,10 +20,11 @@ struct MensajeColgante {
 
 namespace espnow_rx {
 
-// Inicia WiFi en modo STA sin conectarse (ahorro de energía desactivado), fija el canal
-// BASE_CANAL_SIN_WIFI, inicia ESP-NOW y registra el callback de recepción. El callback valida el
-// paquete, aplica la regla de duplicados, responde el ACK y copia el mensaje a una cola; el resto
-// del trabajo se hace en loop() con siguienteMensaje(). Devuelve false si algo falló.
+// Inicia ESP-NOW y registra el callback de recepción. La radio la arranca antes
+// red_wifi::iniciar() (esp_now_init() la necesita encendida); el canal es el que tenga la radio.
+// El callback valida el paquete, aplica la regla de duplicados, responde el ACK y copia el mensaje
+// a una cola; el resto del trabajo se hace en loop() con siguienteMensaje(). Devuelve false si
+// algo falló.
 bool iniciar();
 
 // Saca el siguiente mensaje de la cola. Ya respondió el ACK y marcó si es duplicado.

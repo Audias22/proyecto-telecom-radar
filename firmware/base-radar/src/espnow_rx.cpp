@@ -1,7 +1,6 @@
 #include "espnow_rx.h"
 
 #include <Arduino.h>
-#include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
@@ -10,8 +9,6 @@
 #include <cstring>
 
 #include <duplicados.h>
-
-#include "config.h"
 
 namespace espnow_rx {
 
@@ -32,7 +29,7 @@ bool asegurarPeer(const uint8_t *mac) {
     }
     esp_now_peer_info_t peer{};
     std::memcpy(peer.peer_addr, mac, ESP_NOW_ETH_ALEN);
-    peer.channel = 0;  // canal actual de la base: sigue al del router cuando haya WiFi
+    peer.channel = 0;  // canal actual de la radio: sigue al del router si cambia
     peer.ifidx = WIFI_IF_STA;
     peer.encrypt = false;
     return esp_now_add_peer(&peer) == ESP_OK;
@@ -86,24 +83,11 @@ void recibir(const esp_now_recv_info_t *info, const uint8_t *datos, int longitud
     }
 }
 
-bool iniciarWifiSinConexion() {
-    // Modo STA sin asociarse a ningún router: así el canal se puede fijar a mano.
-    WiFi.persistent(false);
-    if (!WiFi.mode(WIFI_STA)) {
-        return false;
-    }
-    WiFi.disconnect();
-    WiFi.setSleep(false);  // sin ahorro de energía: con el modem dormido se pierden tramas ESP-NOW
-    // Fase local: canal fijo. Cuando red_wifi conecte la base al router, el canal será el del
-    // router y no se podrá elegir; el colgante lo encuentra con su barrido.
-    return esp_wifi_set_channel(BASE_CANAL_SIN_WIFI, WIFI_SECOND_CHAN_NONE) == ESP_OK;
-}
-
 }  // namespace
 
 bool iniciar() {
     cola = xQueueCreate(CAPACIDAD_COLA, sizeof(MensajeColgante));
-    if (cola == nullptr || !iniciarWifiSinConexion()) {
+    if (cola == nullptr) {
         return false;
     }
     return esp_now_init() == ESP_OK && esp_now_register_recv_cb(recibir) == ESP_OK;
