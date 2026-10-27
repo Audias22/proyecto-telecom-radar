@@ -7,10 +7,12 @@
 //   2. REINICIAR: FIREBASE_REINICIO_TRAS_CORTE_MS después del corte la petición sigue sin
 //      terminar (bloqueada donde el socket no la despierta, p. ej. en el DNS de lwIP), o la tarea
 //      no da vueltas fuera de una petición por más de FIREBASE_PETICION_MAX_MS (no hay socket
-//      que cortar). Es el último recurso: se pierde la cola en RAM. Con una alerta local urgente
-//      activa no se reinicia: se pospone hasta que termine.
+//      que cortar). Es el último recurso: los eventos pendientes se guardan en NVS antes; se
+//      pierden las lecturas y los colgantes en RAM. Con una alerta local urgente activa no se
+//      reinicia: se pospone hasta que termine.
+// Vigila las peticiones de Firebase y de Telegram (peticion_https.h).
 //
-// Lógica pura, sin Arduino ni candados: firebase_cliente.cpp la protege con su mutex.
+// Lógica pura, sin Arduino ni candados: peticion_https.cpp la protege con su mutex.
 
 #pragma once
 
