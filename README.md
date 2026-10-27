@@ -24,8 +24,8 @@ Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad
 |---|---|---|
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
 | Colgante (botón + ESP32) | Pasó las pruebas en banco | Firmware de Abraham revisado y fusionado el 12 oct (39 casos de prueba en PC). Pruebas 1 a 9 en banco el 12 oct, por USB y con batería simulada: arranque, ALERTA con ACK, beeps, sin receptor, barrido de canales, ACK perdido y duplicados, heartbeat por timer, sin falsas alertas y potencia de transmisión (`pruebas/resultados/2026-10-12_colgante_banco.md`). Falta: despertar en distintos momentos del intervalo, RSSI bajo de la antena del ESP32-C3 (~-85 dBm a 3 m), alcance en la casa. Batería Li-ion 240 mAh recibida; pendiente quitar R3 del TP4056 y poner una THT de 4.7 kΩ antes de conectarla (ver nota técnica de la batería). Falta diseñar/imprimir carcasa y cordón |
-| Base + notificación | Fase local probada con el colgante; fase WiFi lista, sin probar en hardware | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados), maneja el LED WS2812 y el buzzer en D10, y el botón BOOT silencia la alerta. Se conecta al router con reconexión propia (espera creciente) y registra el canal de la radio. Sin Firebase ni Telegram todavía. CSV del radar opcional para captura de datos |
-| Firebase + panel web | Estructura y especificación definidas | Sin código funcional. Modelo de datos y reglas definidos |
+| Base + notificación | Firebase probado en hardware; Telegram, eventos y cola offline listos, por confirmar en hardware | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados), maneja el LED WS2812 y el buzzer en D10, y el botón BOOT silencia la alerta. Se conecta al router con reconexión propia. Probado el 15 oct (v0.5.1): escribe en Firebase estado, lecturas cada 5 s, colgante y evento BOTON (~270 ms del botón al evento), y sin internet reporta el error en 5 s y reintenta sin colgarse. v0.6.0 (27 oct, compilado y 63 casos de prueba en PC): avisos por Telegram, eventos BATERIA_BAJA, COLGANTE_AUSENTE, RADAR_SIN_DATOS y BASE_DESCONECTADA una vez por episodio, 1 h de lecturas sin red, eventos que sobreviven a un reinicio, watchdog de tareas y aviso de reinicio inesperado; tabla de particiones sin OTA (app de 3 MB, al 40 %). Guía de prueba en `firmware/base-radar/README.md` |
+| Firebase + panel web | Reglas publicadas y base escribiendo | Modelo de datos y reglas publicados; la base y el simulador (`web/simulador/`) escriben en el proyecto real. Panel web sin código funcional todavía |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
 
@@ -144,7 +144,7 @@ copy firmware\colgante\include\secrets.example.h  firmware\colgante\include\secr
 
 y llenando los valores:
 
-- Base: WiFi, URL y API key de Firebase, correo y clave de la cuenta del dispositivo, id de la base, token y chat_id del bot de Telegram.
+- Base: WiFi, URL y API key de Firebase, correo y clave de la cuenta del dispositivo, id de la base, token y chat_id del bot de Telegram (pasos para crear el bot con @BotFather en `firmware/base-radar/README.md`).
 - Colgante: MAC de la base e id del colgante. El colgante no lleva credenciales de WiFi ni de la nube.
 
 Nunca poner credenciales reales en `secrets.example.h`.
@@ -179,6 +179,9 @@ Instrucciones en `web/README.md`.
 - Revisión del firmware del colgante y fusión a `main`: espera al monitor USB solo en arranque en frío, regla de duplicados con `FLAG_ARRANQUE_FRIO` corregida en `docs/protocolo.md` y llevada a `firmware/comun/protocolo/duplicados.h`, con 2 casos de prueba nuevos
 - Desde esta fecha llevo solo el desarrollo y la integración
 - Preparación de la primera prueba del colgante en hardware: receptor ESP-NOW de prueba para un ESP32 clásico (`firmware/pruebas/receptor_espnow`), HEARTBEAT al encender, secuencia inicial aleatoria, intervalo de heartbeat corto para pruebas, y guía de conexión y lista de pruebas en `firmware/colgante/pruebas_fisicas.md`
+
+### 27 octubre 2026
+- Nube de la base, parte 2 (v0.6.0): cola offline de 1 h con eventos guardados en NVS, eventos BATERIA_BAJA (con histéresis), COLGANTE_AUSENTE, RADAR_SIN_DATOS y BASE_DESCONECTADA una vez por episodio, avisos por Telegram con el botón primero y límite de frecuencia, watchdog de tareas y aviso de reinicio inesperado, particiones sin OTA. 63 casos de prueba en PC. Falta probarlo en hardware (`docs/fallos.md`, "Qué está cubierto")
 
 ---
 

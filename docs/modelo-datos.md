@@ -110,7 +110,9 @@ servidor de Firebase:
   calcula `ts` con la misma fórmula al reenviarlas, aunque la referencia llegue después (la resta
   da negativo y funciona igual). Se marcan con `diferida: true`.
 - Si la base se reinicia, las lecturas en cola se pierden (la cola está en RAM). Así nunca se
-  mezcla un `millis()` de antes del reinicio con una referencia de después.
+  mezcla un `millis()` de antes del reinicio con una referencia de después. Los eventos pendientes
+  sí sobreviven (se guardan en NVS, `fallos.md`, "Cola offline"); su `timestamp` es la hora del
+  servidor al recibirlos y `detalle` dice si esperaron.
 
 `ts` se escribe con 13 dígitos (milisegundos desde 1970). Con longitud fija el orden alfabético de
 las claves coincide con el orden de tiempo, así que el panel puede usar `orderByKey()`.

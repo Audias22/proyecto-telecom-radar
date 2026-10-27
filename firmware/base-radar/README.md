@@ -10,19 +10,33 @@ Firmware del XIAO ESP32-C6 que viene en el kit Seeed MR60BHA2.
 | `ventana_actividad` | Criterio "persona detectada": mediana de \|`fase_total`\| en 30 s, umbral 0.03 (lógica pura) |
 | `espnow_rx` | Recibir mensajes del colgante, filtrar duplicados, responder ACK |
 | `red_wifi` | Conexión WiFi STA y reconexión |
-| `firebase_cliente` | Tarea de red: sesión de Firebase Auth y escritura en Realtime Database por REST (HTTPS) |
+| `firebase_cliente` | Tarea de red: sesión de Firebase Auth, escritura en Realtime Database por REST (HTTPS), eventos en NVS, `BASE_DESCONECTADA`; atiende también Telegram |
+| `peticion_https` | Lo común de cada petición HTTPS (Firebase y Telegram): certificado, límites de tiempo, cuerpo, vigilante y traza |
+| `vigilante_red` | Cuándo cortar una petición colgada y cuándo reiniciar (lógica pura) |
+| `cuerpo_http` | Cuerpo de las respuestas HTTP con memoria fija y sin esperas sin límite (lógica pura) |
 | `formato_nube` | JSON exacto que aceptan las reglas y lectura de las respuestas (lógica pura) |
 | `cola_peticiones` | Cola acotada de loop() a la tarea de red (lógica pura) |
-| `telegram` | Mensajes al cuidador por la API de bots |
+| `cola_offline` | Lecturas sin red (1 h en RAM) y eventos pendientes para Firebase y Telegram, guardables en NVS (lógica pura) |
+| `detectores` | Cuándo crear `BATERIA_BAJA`, `COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` (una vez por episodio) y la duración de `BASE_DESCONECTADA` (lógica pura) |
+| `telegram` | `sendMessage` al cuidador por la API de bots (HTTPS) |
+| `mensajes_telegram` | Texto de cada aviso y límite de frecuencia (lógica pura) |
+| `almacen` | NVS: eventos pendientes y estado de los detectores, que sobreviven a un reinicio |
+| `watchdog_tareas` | Watchdog de tareas de ESP-IDF sobre loop() y la tarea de red |
+| `motivo_reinicio` | Motivo del arranque (`esp_reset_reason()`) y si fue inesperado |
+| `registro` | Líneas de registro por serial con hora y módulo |
 | `alerta_local` | Buzzer y LED; funciona sin red |
 | `boton_silencio` | Botón BOOT de la placa: silencia la alerta local |
-| `cola_offline` | Guardar lecturas cuando no hay red y reenviarlas al volver |
 
-Nube, parte 1: están implementados `radar` (ver `docs/radar.md`), `espnow_rx`, `alerta_local`,
-`boton_silencio`, `red_wifi` y `firebase_cliente`. WiFi, ESP-NOW con el colgante, ACK con canal,
-LED, buzzer, botón BOOT y radar ya funcionaron en hardware. Firebase está compilado y probado en
-PC (`pruebas_host/`), pero **por confirmar con el módulo** (guía de abajo). `telegram` y
-`cola_offline` (la cola sin red completa, parte 2) siguen vacíos con `TODO`.
+Estado (v0.6.0, nube parte 2):
+
+- **Verificado en hardware** (hasta v0.5.1, 2026-10-15): WiFi, ESP-NOW con el colgante, ACK con
+  canal, LED, buzzer, botón BOOT, radar (~16 tramas de fase por segundo con persona) y Firebase:
+  estado, lecturas cada 5 s, colgante y evento `BOTON` (del botón al evento en Firebase en
+  ~270 ms), 0 errores. Sin internet el error sale en 5 s y la base reintenta sin colgarse.
+- **Nuevo en v0.6.0, compilado y probado en PC (`pruebas_host/`), por confirmar con el módulo**:
+  cola offline de 1 h con eventos en NVS, eventos `BATERIA_BAJA`, `COLGANTE_AUSENTE`,
+  `RADAR_SIN_DATOS` y `BASE_DESCONECTADA`, Telegram, watchdog de tareas y aviso de reinicio
+  inesperado. Guía de prueba de cada uno abajo.
 
 ## Qué hace hoy
 
@@ -103,6 +117,7 @@ verificación contra las reglas publicadas):
 | Lectura: `persona`, `objetivo`, `actividad`, `distancia_cm`, `resp_rpm`, `latido_bpm` (los opcionales solo cuando corresponden, `docs/modelo-datos.md` 1.1) | cada `LECTURA_INTERVALO_MS` (5 s), si el radar tiene datos | `PUT /lecturas/{BASE_ID}/{ts}` |
 | Colgante: `bateria_mv`, `ultimo_heartbeat`, `rssi`, `base` | cada mensaje NUEVO del colgante (los duplicados no) | `PATCH /colgantes/{id}` |
 | Evento `BOTON` (`origen` = `colganteN`, `detalle` "boton del colgante") | cada ALERTA nueva | `POST /eventos` |
+| Eventos `BATERIA_BAJA`, `COLGANTE_AUSENTE`, `RADAR_SIN_DATOS`, `BASE_DESCONECTADA` | una vez por episodio (abajo, "Eventos") | `POST /eventos` |
 
 Todas las escrituras van con `?print=silent` (respuesta vacía, no gasta descarga). Solo la
 lectura de `ultimo_contacto` trae datos (~13 bytes por minuto).
@@ -142,10 +157,10 @@ callback de ESP-NOW, en la tarea de WiFi) no pasan por la red.
   si queda por debajo de 2800 B, no se perdió ninguna trama. Por confirmar con el módulo
   durante un handshake TLS.
 
-**Cola acotada** (`cola_peticiones`, capacidades en `config.h`): eventos aparte (32), una
-entrada por colgante (8) y lecturas (24, 2 min). Llena, se descarta la lectura más antigua; una
-lectura nunca desplaza un evento. Sale primero lo más importante: eventos, colgantes, lecturas.
-La cola offline completa (horas sin red) es la parte 2.
+**Cola acotada** (`cola_peticiones` y `cola_offline`, capacidades en `config.h`): eventos aparte
+(32, guardados en NVS), una entrada por colgante (8) y lecturas (720, 1 h). Llena, se descarta la
+lectura más antigua; una lectura nunca desplaza un evento. Sale primero lo más importante:
+eventos, colgantes, lecturas. Detalle abajo, "Sin red".
 
 Registros:
 
@@ -157,6 +172,69 @@ Registros:
 # [   130020 ms] firebase: 401 en dispositivos/base01/estado (Permission denied); se inicia sesion de nuevo
 ```
 
+### Eventos
+
+Cada evento va a `/eventos` y a Telegram, y sale por serial. Ninguno se repite mientras dure la
+condición (`detectores`); el estado de cada episodio se guarda en NVS, así un reinicio no repite el
+aviso. Tiempos en `config.h` y su justificación en `docs/fallos.md`, "Tipos de evento".
+
+| Evento | Cuándo | Termina el episodio | Serial |
+|---|---|---|---|
+| `BOTON` | ALERTA nueva del colgante | (cada pulsación es uno) | `firebase: evento BOTON de colgante1 enviado` |
+| `BATERIA_BAJA` | primer mensaje con `FLAG_BATERIA_BAJA` (< 3500 mV en el colgante) | un mensaje sin la bandera y con ≥ 3700 mV | `colgante 1: bateria baja (3420 mV), evento BATERIA_BAJA` |
+| `COLGANTE_AUSENTE` | 45 min sin ningún mensaje del colgante (3 heartbeats) | el siguiente mensaje | `colgante 1: sin mensajes por 45 min, evento COLGANTE_AUSENTE` |
+| `RADAR_SIN_DATOS` | 30 s sin tramas del radar | 60 s seguidos con datos | `radar sin datos por 30 s, evento RADAR_SIN_DATOS` |
+| `BASE_DESCONECTADA` | al arrancar o reconectar, si pasaron ≥ 3 min desde el último `ultimo_contacto` | (uno por corte) | `firebase: la base estuvo 12 min sin actualizar su estado: evento BASE_DESCONECTADA` |
+
+Un colgante es "conocido" desde su primer mensaje; tras un reinicio de la base, los conocidos
+(de NVS) cuentan su ausencia desde el arranque. Hasta 8 colgantes.
+
+### Telegram (`telegram`)
+
+`POST https://api.telegram.org/bot<TOKEN>/sendMessage` con `{"chat_id":..., "text":...}` desde la
+tarea de red, con el certificado verificado con el bundle de CA (como Firebase). Mensajes:
+
+| Aviso | Texto |
+|---|---|
+| `BOTON` | ALERTA: botón de auxilio del colgante 1. Atender de inmediato. |
+| `BATERIA_BAJA` | Batería baja en el colgante 1 (3420 mV). Hay que cargarlo. |
+| `COLGANTE_AUSENTE` | El colgante 1 no se comunica (sin mensajes por 45 min). Revisar la batería y el alcance. |
+| `RADAR_SIN_DATOS` | El radar de la base base01 no envía datos (sin datos por 30 s). Revisar el cable y la alimentación. |
+| `BASE_DESCONECTADA` | La base base01 volvió a estar en línea (sin conexión por 12 min). |
+| Reinicio inesperado | La base base01 se reinició de forma inesperada: watchdog de tareas. |
+
+Un aviso que salió con más de 1 min de atraso agrega "(ocurrió hace 5 min)", y uno de antes de un
+reinicio, "(aviso de antes de un reinicio de la base)".
+
+- **No depende de Firebase**: conexión, espera tras error y límite propios; en cada vuelta la
+  tarea de red atiende Telegram antes que Firebase. Funciona también con Firebase desactivado.
+- **El botón primero**: el `BOTON` sale antes que cualquier otro aviso, espera solo 1 s desde el
+  mensaje anterior y no cuenta para el tope. Los demás: uno cada 3 s y 12 por hora como mucho; lo
+  que pasa del tope espera en la cola.
+- **Reintentos sin bloquear**: con error de red o 5xx, 2 s y el doble hasta 30 s; con 429 lo que
+  pide Telegram (`retry_after`). Con 400/401/403/404 (token o chat mal, bot fuera del grupo) el
+  aviso se descarta con `telegram: ERROR: HTTP 401 Unauthorized; el aviso se descarta ...`.
+- Con `TELEGRAM_TOKEN` o `TELEGRAM_CHAT_ID` de ejemplo: `telegram: deshabilitado: secrets.h tiene
+  los valores de ejemplo ...` y la base sigue sin Telegram.
+
+### Sin red (`cola_offline`, `almacen`)
+
+- **Lecturas**: hasta 720 en RAM (1 h). Llena, se descartan las más viejas. Al volver salen en
+  orden con `diferida: true`. Se pierden con un reinicio.
+- **Eventos**: hasta 32, no se descartan (con la cola llena un `BOTON` reemplaza al evento más
+  antiguo que no sea `BOTON`). Se guardan en NVS mientras estén pendientes y sobreviven a un
+  reinicio; salen con "(de antes de un reinicio de la base)" en `detalle`.
+- **Al volver**: primero Telegram (`BOTON` primero) y los eventos, después el colgante y las
+  lecturas en orden.
+
+### Watchdog y reinicios (`watchdog_tareas`, `motivo_reinicio`)
+
+- Watchdog de tareas de ESP-IDF de 10 s sobre `loop()` y sobre la tarea de red fuera de sus
+  peticiones HTTPS (dentro, el vigilante de la red). Si vence, la base se reinicia.
+- Al arrancar: `# Arranque: encendido`, `# Arranque: watchdog de tareas (reinicio inesperado)`,
+  `# Arranque: vigilante de la red: ... (reinicio inesperado)`. Los inesperados (watchdog, panic,
+  brownout, vigilante...) se avisan por Telegram; encendido, botón RST y USB no.
+
 ### Comandos por el monitor serial
 
 Una letra y Enter (`pio device monitor -d firmware/base-radar --echo`):
@@ -165,22 +243,32 @@ Una letra y Enter (`pio device monitor -d firmware/base-radar --echo`):
 |---|---|
 | `b` | Buzzer fijo 10 s (`PRUEBA_BUZZER_MS`), para medir el voltaje en D10 |
 | `s` | Silencia la alerta local (igual que el botón BOOT) |
-| `e` | Estado: MAC, canal, antena, contadores de mensajes y del radar, persona/objetivo/actividad y pico de la UART, WiFi (estado, SSID, canal, RSSI, IP, intentos, fallidos seguidos y desconexiones) y Firebase (abajo) |
+| `e` | Estado: MAC, canal, antena, contadores de mensajes y del radar, colgantes conocidos, persona/objetivo/actividad y pico de la UART, WiFi (estado, SSID, canal, RSSI, IP, intentos, fallidos seguidos y desconexiones), Firebase, Telegram, eventos pendientes y cola offline (abajo) |
+| `r` | PRUEBA: simula el radar sin datos (deja de leer tramas); otra vez `r` para volver |
+| `p` | PRUEBA: mensaje simulado del último colgante, sin radio: alterna 3400 mV con `BAT_BAJA` y 3900 mV (evento `BATERIA_BAJA` y su rearme) |
+| `w` | PRUEBA: cuelga `loop()` a propósito para que el watchdog reinicie la base (10 s) |
 | `h` | Ayuda |
 
-Con `e`, Firebase se ve así:
+Con `e`, la nube se ve así:
 
 ```
+# Detectores: 1 colgantes conocidos (ausente tras 45 min sin mensajes), radar normal
+...
 # Firebase: sesion activa (uid AbC123...), inicios 1, renovaciones 0
 # Firebase: ultima escritura OK hace 3 s; OK 128, errores 1 (rechazadas 0)
-# Firebase: peticion en curso: PUT lecturas/base01/1791234597890, lleva 0.3 s (corte a los 45 s)
 # Firebase: ultima peticion: PATCH colgantes/1 -> HTTP 204 (231 ms), hace 2 s
 # Firebase: ultimo error: PUT lecturas/base01/1791234567890 -> error -11 read Timeout (6004 ms), hace 40 s
-# Firebase: vigilante: 0 cortes
-# Firebase: cola eventos 0/32, colgantes 0/8, lecturas 0/24 (lecturas descartadas 0, eventos sin lugar 0)
 # Firebase: hora del servidor sincronizada, ahora 1791234612345 ms (referencia de hace 21 s)
+# Telegram: activo; enviados 3, errores 0, rechazados 0; ultimo OK hace 120 s; proximo aviso no urgente en 0 s
+# Red: peticion en curso: PUT lecturas/base01/1791234597890, lleva 0.3 s (corte a los 45 s)
+# Red: vigilante: 0 cortes
+# Cola: eventos pendientes 0/32 (Firebase 0, Telegram 0), guardados en NVS; rechazados 0, reemplazados por un BOTON 0
+# Cola offline: lecturas 0/720 (0 s de lecturas), descartadas 0; colgantes 0/8
 # Memoria: heap libre 182340 B (minimo 140112 B), pila libre de la tarea de red 5120 B
 ```
+
+`errores` cuenta toda petición fallida, también los inicios de sesión y las renovaciones del
+token que fallan (hasta la v0.5.1 esos no se sumaban).
 
 (Números de ejemplo: los reales salen de la prueba.)
 
@@ -210,32 +298,71 @@ pasa de 45 s; detalle en `docs/fallos.md`, "Bloqueo de la tarea de red".
   | `FIREBASE_API_KEY` | Configuración del proyecto > General > Clave de API web (la misma que `api_key` del simulador) |
   | `DISPOSITIVO_EMAIL`, `DISPOSITIVO_CLAVE` | la cuenta de la base en Authentication > Usuarios (la misma que `base` del simulador) |
   | `BASE_ID` | el valor del uid de esa cuenta en `/cuentas_dispositivo`, p. ej. `base01` |
+  | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | el bot de @BotFather y el chat del cuidador (abajo, "Crear el bot de Telegram") |
 
   Mientras `FIREBASE_URL`, `FIREBASE_API_KEY` o `DISPOSITIVO_CLAVE` tengan los valores de
-  ejemplo, la base funciona igual sin nube y lo avisa (`firebase: deshabilitado: ...`). Telegram
-  todavía no se usa.
+  ejemplo, la base funciona igual sin Firebase y lo avisa (`firebase: deshabilitado: ...`). Lo
+  mismo con `TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID` (`telegram: deshabilitado: ...`). Cada uno
+  funciona sin el otro.
 
 ## Memoria
 
-`pio run` del entorno `base` con Firebase (arduino-esp32 3.3.7):
+`pio run` del entorno `base` con Firebase y Telegram (v0.6.0, arduino-esp32 3.3.7, 2026-10-27):
 
 | | Usado | Total | % |
 |---|---|---|---|
-| RAM estática | 65 416 B | 327 680 B | 20.0 % |
-| Flash (partición de la app) | 1 235 438 B | 1 310 720 B | **94.3 %** |
+| RAM estática | 88 424 B | 327 680 B | 27.0 % |
+| Flash (partición de la app) | 1 250 898 B | 3 145 728 B | 39.8 % |
 
-El TLS, `HTTPClient` y el bundle de CA (~69 kB) suman ~230 kB de flash; quedan ~75 kB libres. La
-partición por defecto (`default.csv`) reparte los 4 MB en dos apps de 1.25 MB para OTA, que este
-proyecto no usa. Si Telegram (parte 2) no cabe, la salida es `board_build.partitions =
-no_ota.csv` en `platformio.ini` (una app de 2 MB). Cada conexión TLS usa además ~40-50 kB de
-heap mientras está abierta (dos a la vez durante un inicio de sesión); el comando `e` muestra el
-heap libre y el mínimo. Por confirmar con el módulo.
+Antes (v0.5.1, `default.csv`): 65 416 B de RAM (20.0 %) y 1 235 430 B de 1 310 720 B de flash
+(94.3 %). Los 23 kB de RAM nuevos son casi todos la cola offline (720 lecturas, ~20 kB) y los
+eventos (~3 kB). Telegram sumó ~15 kB de flash: reusa el TLS, `HTTPClient` y el bundle de CA.
+
+Cada conexión TLS usa además ~40-50 kB de heap mientras está abierta: la de la base de datos
+siempre, la de Telegram hasta 30 s después de un aviso y la de Auth durante un inicio de sesión
+(hasta tres a la vez). El comando `e` muestra el heap libre y el mínimo. Por confirmar con el
+módulo.
+
+### Particiones (sin OTA)
+
+El proyecto no usa OTA, así que la base usa `board_build.partitions = huge_app.csv` en
+`platformio.ini`. Tablas de 4 MB que trae arduino-esp32 3.3.7 (`tools/partitions/` del paquete
+`framework-arduinoespressif32`):
+
+| Tabla | App | Otros | Notas |
+|---|---|---|---|
+| `default.csv` (antes) | 2 × 1.25 MB (OTA) | SPIFFS 1.4 MB | la app estaba al 94.3 % |
+| `no_ota.csv` | 2 MB | SPIFFS 1.9 MB | |
+| **`huge_app.csv`** (elegida) | **3 MB** | SPIFFS 896 kB (sin uso) | "Huge APP (3MB No OTA/1MB SPIFFS)" del IDE de Arduino |
+| `max_app_4MB.csv` | 3.9 MB | ninguno | la app como `factory` |
+
+Se eligió `huge_app.csv`: da 2.4 veces el espacio de antes (la app queda al 40 %, con margen para
+años de cambios), es la tabla sin OTA más usada con estas placas y no cambia nada más: la app
+sigue en 0x10000 como `ota_0` (el `boot_app0.bin` que carga PlatformIO la elige igual que antes) y
+`nvs` (0x9000, 20 kB), `otadata` (0xE000) y `coredump` (0x3F0000) quedan en las mismas
+direcciones. `max_app_4MB.csv` da más, pero no hace falta y cambia el tipo de la app a `factory`.
+
+**No hace falta borrar la flash al cambiarla.** En cada carga PlatformIO escribe el bootloader, la
+tabla de particiones (0x8000), `otadata` y la app. NVS está en el mismo lugar, así que se
+conservan los eventos pendientes y el estado de los detectores; lo que quede de la vieja `app1` o
+de SPIFFS son bytes sin uso que nadie lee. Solo hay que borrarla si se quiere empezar limpio
+(olvidar eventos pendientes, colgantes conocidos y calibración del WiFi) o si alguna vez se mueve
+NVS:
+
+```
+pio run -d firmware/base-radar -t erase
+pio run -d firmware/base-radar -t upload
+```
+
+`erase` borra los 4 MB, NVS incluida. Si el puerto no responde, mantener presionado BOOT mientras
+se conecta el USB para entrar al modo de carga, y soltarlo antes de reiniciar.
 
 ## Pruebas host
 
 `pruebas_host/` compila en el PC la lógica pura de la base (ventana de actividad, JSON de
-Firebase, cola de peticiones, lector del cuerpo HTTP y vigilante de la tarea de red) con los
-`.cpp` reales y la ejecuta, sin ESP32:
+Firebase y Telegram, cola de peticiones y cola offline, lector del cuerpo HTTP, vigilante de la
+tarea de red, detectores de eventos y límite de Telegram) con los `.cpp` reales y la ejecuta, sin
+ESP32 (63 casos, 1674 verificaciones):
 
 ```
 powershell -File firmware\base-radar\pruebas_host\ejecutar.ps1
@@ -366,7 +493,7 @@ Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
    `firebase: sesion iniciada: ... (uid ...)`. Si sale `no se pudo iniciar sesion ... HTTP 400
    INVALID_LOGIN_CREDENTIALS`, revisar correo y clave; con `API key not valid`, la API key.
 2. **Estado**: enseguida aparece `/dispositivos/{BASE_ID}/estado` con `online: true`,
-   `ultimo_contacto` (ms), `rssi_wifi` y `version_firmware: "0.5.1"`. `ultimo_contacto` cambia
+   `ultimo_contacto` (ms), `rssi_wifi` y `version_firmware: "0.6.0"`. `ultimo_contacto` cambia
    cada minuto. Si sale `401 ... Permission denied` dos veces seguidas, el uid no está en
    `/cuentas_dispositivo` o no vale `BASE_ID`. Con `e`: `hora del servidor sincronizada`.
 3. **Lecturas**: en `/lecturas/{BASE_ID}` aparece una clave de 13 dígitos cada 5 s. Sin nadie
@@ -384,9 +511,9 @@ Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
    `firebase: evento BOTON de colganteN enviado`. Una pulsación = un evento.
 6. **Sin red**: apagar el router con la base funcionando y presionar el botón: la alerta local y
    el ACK siguen igual. Al volver el router, el evento llega a `/eventos` con
-   `(enviado N s despues)` en `detalle`, y las lecturas que esperaban (hasta 2 min) llegan con
-   `diferida: true`. Con más de 2 min sin red se pierden las lecturas más viejas (`lecturas
-   descartadas` en `e`); la cola completa es la parte 2.
+   `(enviado N s despues)` en `detalle`, y las lecturas que esperaban (hasta 1 h) llegan en orden
+   con `diferida: true`. Con más de 1 h sin red se pierden las lecturas más viejas (`descartadas`
+   en `e`). Más detalle en la guía de los eventos, paso 7.
 7. **Token**: dejar la base más de 1 h: debe salir `firebase: token renovado` a los ~55 min sin
    errores de escritura.
 8. **Sin bloqueos**: con `e`, `pico de la UART` debe quedar por debajo de 2800 B (no se perdieron
@@ -402,6 +529,98 @@ Datos: los cambios se ven en vivo (se resaltan en amarillo un momento).
 
 Resultados: anotarlos en `pruebas/resultados/`. Todo por confirmar con el módulo.
 
+## Crear el bot de Telegram
+
+Todo desde la app de Telegram y la API oficial de bots (`api.telegram.org`), sin servicios de
+terceros.
+
+1. **Crear el bot.** En Telegram buscar **@BotFather** (cuenta verificada, con la marca azul) y
+   abrir el chat. Enviar `/newbot`. Pide un nombre (p. ej. `Monitor Abuela`) y un usuario que
+   termine en `bot` (p. ej. `monitor_abuela_bot`). Responde con el **token**, de la forma
+   `123456789:AAH...`. Ese es `TELEGRAM_TOKEN`. Quien tenga el token controla el bot: no subirlo
+   al repo ni mandarlo por chat; si se filtra, `/revoke` en @BotFather da uno nuevo.
+2. **Elegir el chat.**
+   - Un solo cuidador: abrir el chat con el bot (`t.me/<usuario_del_bot>`), tocar **Iniciar** (o
+     enviar `/start`). Un bot no puede escribirle a alguien que nunca le escribió.
+   - Varios cuidadores: crear un grupo, agregar al bot como miembro y enviar en el grupo
+     `/start@<usuario_del_bot>` (con el modo privado por defecto el bot solo ve los comandos que lo
+     nombran).
+3. **Obtener el `chat_id`.** En el navegador abrir
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` (con el token del paso 1, sin `<>`). En la
+   respuesta buscar `"chat":{"id":...`. Ese número es `TELEGRAM_CHAT_ID`: positivo para un chat
+   privado, negativo para un grupo (los supergrupos empiezan con `-100`). Si sale `"result":[]`,
+   enviar otro mensaje al bot (o al grupo, paso 2) y recargar.
+4. **Probar el bot sin la base.** Abrir
+   `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>&text=prueba`. Debe llegar
+   "prueba" al chat y la página debe decir `"ok":true`. Con `"error_code":403` el bot no está en el
+   grupo o el cuidador no le escribió; con 400 `chat not found`, el chat_id está mal.
+5. **Configurar la base.** En `include/secrets.h`:
+
+   ```
+   #define TELEGRAM_TOKEN    "123456789:AAH..."
+   #define TELEGRAM_CHAT_ID  "987654321"
+   ```
+
+   (Con comillas: el chat_id va como texto.) Cargar la base: debe salir `telegram: activo`.
+6. Borrar del historial del navegador las direcciones con el token.
+
+## Guía de prueba de los eventos
+
+Necesita la base con `secrets.h` completo (Firebase y Telegram), el colgante cargado con la MAC de
+la base, la consola de Firebase en Realtime Database > Datos y el chat de Telegram abierto. Cada
+paso dice qué ver por serial, en `/eventos` y en Telegram. Con `e` se ven los contadores. Todo por
+confirmar con el módulo; anotar los resultados en `pruebas/resultados/`.
+
+1. **Arranque.** Cargar la base y abrir el monitor. Debe salir `# Arranque: USB (carga del
+   firmware o monitor serial)` (o `encendido`), `watchdog: watchdog de tareas activo sobre loop(),
+   10 s`, `telegram: activo` y, tras `firebase: sesion iniciada`, el estado. Sin aviso de
+   reinicio en Telegram: no fue inesperado.
+2. **BOTON.** Presionar el botón del colgante. La alerta local suena enseguida; en Telegram debe
+   llegar "ALERTA: botón de auxilio del colgante 1..." en pocos segundos y en `/eventos` un
+   `BOTON`. Por serial: `telegram: POST telegram/sendMessage -> HTTP 200 (... ms)` y `telegram:
+   aviso BOTON de colgante1 enviado`. Anotar el tiempo del botón al mensaje en el teléfono.
+   Presionar 3 veces seguidas: llegan los 3 mensajes, con ~1 s entre ellos como mínimo.
+3. **Telegram con Firebase caído.** Poner un `FIREBASE_URL` inválido (p. ej. otro nombre de
+   proyecto) en `secrets.h`, cargar y presionar el botón: el mensaje de Telegram debe llegar igual
+   aunque Firebase dé errores. Volver a la URL buena.
+4. **BATERIA_BAJA.** El colgante no se puede compilar con batería simulada baja (un
+   `static_assert` de `firmware/colgante/src/bateria.cpp` lo impide), así que se prueba con el
+   comando `p` de la base, que simula un mensaje del último colgante que habló. Primer `p`:
+   `PRUEBA: mensaje simulado del colgante 1 con 3400 mV y BAT_BAJA`, `colgante 1: bateria baja
+   (3400 mV), evento BATERIA_BAJA`, el evento en `/eventos` y "Batería baja en el colgante 1 (3400
+   mV)..." en Telegram. Reiniciar la base (RST) y escribir `p` (de nuevo 3400 mV): no debe haber
+   un evento nuevo (misma descarga, estado en NVS). Un `p` con 3900 mV rearma; el siguiente con
+   3400 mV da un evento nuevo. Con la batería real del colgante, por confirmar con el módulo que
+   la bandera llegue sola al bajar de 3500 mV.
+5. **COLGANTE_AUSENTE.** Para no esperar 45 min, poner en `include/config.h` de la base
+   `#define COLGANTE_AUSENTE_MS 120000UL` (2 min) y cargarla. Con el colgante encendido, mandar un
+   mensaje (botón) y después desconectarlo de la alimentación. A los 2 min: `colgante 1: sin
+   mensajes por 2 min, evento COLGANTE_AUSENTE`, el evento y "El colgante 1 no se comunica...". No
+   debe repetirse en los minutos siguientes. Reconectar el colgante: `colgante 1: volvio a
+   comunicarse`. Volver a `(COLGANTE_AUSENTE_S * 1000UL)`.
+6. **RADAR_SIN_DATOS.** Escribir `r` en el monitor (simula el radar sin datos). A los 5 s: `radar
+   sin datos` y aviso amarillo; a los 30 s: `radar sin datos por 30 s, evento RADAR_SIN_DATOS`, el
+   evento y el mensaje en Telegram. Nada más mientras siga así. `r` otra vez: a los 60 s con datos,
+   `termina el episodio sin datos`. Repetir `r` antes de esos 60 s: no debe haber un evento nuevo.
+7. **Sin red y reinicio con eventos pendientes.** Apagar el router. Presionar el botón: alerta
+   local, sin Telegram. Con `e`: `Cola: eventos pendientes 1/32 (Firebase 1, Telegram 1), guardados
+   en NVS`. Presionar el botón RST de la base (o desconectarla y conectarla): al arrancar,
+   `firebase: 1 eventos pendientes de antes del reinicio, restaurados de NVS`. Encender el router:
+   llegan el `BOTON` con "(aviso de antes de un reinicio de la base)" en Telegram y "(de antes de
+   un reinicio de la base)" en `detalle`, y las lecturas con `diferida: true` (las de antes del
+   reinicio no: se perdieron).
+8. **BASE_DESCONECTADA.** Desconectar la base de la alimentación 4 min y volver a conectarla. Tras
+   la sesión: `firebase: la base estuvo 4 min sin actualizar su estado: evento
+   BASE_DESCONECTADA`, el evento con "sin conexión por 4 min" y "La base base01 volvió a estar en
+   línea (sin conexión por 4 min)". Lo mismo apagando el router 4 min con la base encendida. Con
+   1 min no debe haber evento.
+9. **Reinicio inesperado.** Escribir `w` en el monitor: `loop()` se cuelga y a los 10 s la base se
+   reinicia. Al arrancar: `# Arranque: watchdog de tareas (reinicio inesperado)` (o `fallo del
+   programa (panic)`, según cómo lo informe ESP-IDF: anotarlo) y en Telegram "La base base01 se
+   reinició de forma inesperada: ...".
+10. **Límite de frecuencia.** Con `COLGANTE_AUSENTE_MS` corto y varios avisos seguidos, con `e`
+    se ve `proximo aviso no urgente en N s`; ningún mensaje se pierde, llegan espaciados.
+
 ## Pendiente de confirmar con el módulo
 
 - Voltaje en D10 con el buzzer sonando (prueba de arriba).
@@ -415,3 +634,10 @@ Resultados: anotarlos en `pruebas/resultados/`. Todo por confirmar con el módul
 - Que el handshake TLS con el bundle de CA quepa holgado en `FIREBASE_TIMEOUT_TLS_MS` (10 s) y
   que el corte del vigilante (`shutdown()` del socket desde `loop()`) despierte a la tarea de red
   en hardware (paso 9 de la guía de Firebase).
+- Todo lo nuevo de la v0.6.0 (guía de los eventos): Telegram con el certificado de
+  `api.telegram.org`, tiempo del botón al mensaje, cola offline de 1 h y su vaciado, eventos en
+  NVS tras un reinicio, cada evento una sola vez por episodio, watchdog de tareas y el motivo que
+  informa ESP-IDF tras el comando `w`.
+- Heap libre con tres conexiones TLS a la vez (Auth, base de datos y Telegram) y pila de la tarea
+  de red con Telegram.
+- Cuándo cierra Telegram una conexión inactiva (`TELEGRAM_REUSO_MAX_MS`, 30 s).

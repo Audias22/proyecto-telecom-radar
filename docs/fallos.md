@@ -13,13 +13,32 @@ de sueño real). La alarma confiable es el botón del colgante; el radar informa
 | 1 | Paquete perdido (alerta o ACK) | El colgante no recibe ACK en `ACK_TIMEOUT_MS` | Reenvía la misma secuencia con `FLAG_REINTENTO` hasta `ACK_REINTENTOS` veces; luego barre canales. Si nada responde, tres beeps largos para que la persona sepa que no llegó. | colgante: `espnow_tx`, `energia` |
 | 2 | Paquete duplicado | La base ve una secuencia igual o anterior a la última de ese colgante | No repite la alerta ni el aviso a la nube, pero responde ACK con `FLAG_ACK_DUPLICADO` para que el colgante deje de reintentar. | base: `espnow_rx` |
 | 3 | El router cambia de canal | El colgante no recibe ACK en el canal guardado | Barre los canales 1-13 con la misma secuencia; guarda en RTC el canal que responde. Ver `docs/protocolo.md`. | colgante: `espnow_tx` |
-| 4 | Caída de WiFi | `WiFi.status()` distinto de conectado | Alerta local normal. Lecturas a `cola_offline`; eventos y avisos de Telegram pendientes en una cola aparte que no descarta. Reconexión con espera creciente. Al volver, primero eventos y Telegram, después lecturas en orden. Una petición HTTPS en curso cuando se cae la red termina por sus límites de tiempo (escenario 5). | base: `red_wifi`, `cola_offline`, `alerta_local` |
-| 5 | Caída de Firebase (o token vencido), o internet que falla con el WiFi conectado | Error HTTP o tiempo agotado (cada espera HTTPS tiene un límite corto); 401 si el token venció; el vigilante de la tarea de red si una petición pasa de 45 s | Con 401, vuelve a iniciar sesión. Otros errores: igual que caída de WiFi, a la cola. Una petición colgada se corta cerrando su socket; como último recurso, la base se reinicia (nunca con una alerta local urgente activa). Telegram no depende de Firebase, así que el aviso al cuidador sale aunque Firebase falle. Ver "Bloqueo de la tarea de red" abajo. | base: `firebase_cliente`, `cuerpo_http`, `vigilante_red`, `cola_offline` |
-| 6 | Base apagada (corte de luz, cable suelto) | La base no puede avisar. El panel ve `ultimo_contacto` con más de 3 min. El colgante no recibe ACK. | Panel muestra "base desconectada". El colgante da el patrón de error, así la persona sabe que el botón no funcionó. Al volver, la base compara la hora con su último `ultimo_contacto`, crea un evento `BASE_DESCONECTADA` con la duración y avisa por Telegram. | base, panel |
-| 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga (no en cada heartbeat). Sin mensajes: evento `COLGANTE_AUSENTE` y Telegram; el panel lo marca ausente por `ultimo_heartbeat`. | base: `espnow_rx`, `telegram`; colgante: `bateria` |
+| 4 | Caída de WiFi | `WiFi.status()` distinto de conectado | Alerta local normal. Lecturas a `cola_offline` (RAM, 720 = 1 h; llena, se descartan las más viejas; al salir llevan `diferida: true`). Eventos y avisos de Telegram en una cola aparte que no descarta y se guarda en NVS mientras haya pendientes. Reconexión con espera creciente. Al volver, primero Telegram y los eventos, después el colgante y las lecturas en orden. Una petición HTTPS en curso cuando se cae la red termina por sus límites de tiempo (escenario 5). Ver "Cola offline" abajo. | base: `red_wifi`, `cola_offline`, `almacen`, `alerta_local` |
+| 5 | Caída de Firebase (o token vencido), o internet que falla con el WiFi conectado | Error HTTP o tiempo agotado (cada espera HTTPS tiene un límite corto); 401 si el token venció; el vigilante de la tarea de red si una petición pasa de 45 s | Con 401, vuelve a iniciar sesión. Otros errores: igual que caída de WiFi, a la cola. Una petición colgada se corta cerrando su socket; como último recurso, la base se reinicia (nunca con una alerta local urgente activa). Telegram no depende de Firebase (conexión, espera tras error y límite propios), así que el aviso al cuidador sale aunque Firebase falle. Ver "Bloqueo de la tarea de red" y "Telegram" abajo. | base: `firebase_cliente`, `peticion_https`, `cuerpo_http`, `vigilante_red`, `cola_offline`, `telegram` |
+| 6 | Base apagada (corte de luz, cable suelto) | La base no puede avisar. El panel ve `ultimo_contacto` con más de 3 min. El colgante no recibe ACK. | Panel muestra "base desconectada". El colgante da el patrón de error, así la persona sabe que el botón no funcionó. Al volver, la base lee el `ultimo_contacto` que dejó antes de escribir el nuevo; si pasaron 3 min o más (`BASE_DESCONECTADA_MIN_MS`) crea un evento `BASE_DESCONECTADA` con la duración en `detalle` y avisa por Telegram. Lo mismo al reconectar sin reiniciar (caída del router o de internet). | base: `firebase_cliente`, `detectores`; panel |
+| 7 | Colgante sin batería | Heartbeat o alerta con `FLAG_BATERIA_BAJA`; o ningún mensaje en `COLGANTE_AUSENTE_S` (45 min, 3 heartbeats) | Con batería baja: evento `BATERIA_BAJA` y Telegram, una vez por descarga: no se repite hasta que llegue un mensaje sin la bandera y con 3700 mV o más (histéresis de 200 mV). Sin mensajes: evento `COLGANTE_AUSENTE` y Telegram, una vez por episodio (termina con el siguiente mensaje); el panel lo marca ausente por `ultimo_heartbeat`. El estado se guarda en NVS: un reinicio de la base no repite el aviso. | base: `detectores`, `espnow_rx`, `telegram`; colgante: `bateria` |
 | 8 | Persona no detectada en la cama | Actividad (mediana de \|`fase_total`\| en 30 s) por debajo de 0.03, o radar sin objetivo. **No** con la bandera `presencia` del radar, que sigue en 1 con la cama vacía (`radar.md`, sección 11) | Estado "sin persona detectada" en el panel, **no** "cama vacía": en una noche real el radar no vio a la persona dormida ~55 % del tiempo (`radar.md`, sección 13.3). No es una alarma. | base: `radar` |
-| 9 | Radar sin datos o con datos inválidos | No llegan tramas en N segundos, o valores fuera de rango (p. ej. `resp_rpm` > 60) | La lectura se marca `valida = false` y no se envía. Si dura más de N segundos, se reinicia la UART del radar, aviso local suave, evento `RADAR_SIN_DATOS` y Telegram. El panel también lo nota porque dejan de llegar lecturas. | base: `radar` |
-| 10 | Reinicio inesperado (watchdog, brownout, fallo) | Al arrancar, `esp_reset_reason()` distinto de encendido normal | Watchdog activo sobre `loop()` para que un bloqueo termine en reinicio y no en una base colgada. Al arrancar se reporta el motivo por Telegram. Se pierden las secuencias en RAM (el siguiente mensaje de cada colgante se acepta como nuevo, a lo sumo una alerta repetida) y la cola offline. | base: `main` |
+| 9 | Radar sin datos o con datos inválidos | No llegan tramas en 5 s (`RADAR_SIN_DATOS_MS`), o valores fuera de rango (p. ej. `resp_rpm` > 60) | Valores fuera de rango no se envían (`formato_nube` los omite). Sin tramas 5 s: se reinicia la UART cada 5 s, aviso local suave y no se escriben lecturas. Sin tramas 30 s: evento `RADAR_SIN_DATOS` y Telegram, una vez por episodio; el episodio termina tras 60 s seguidos con datos (`RADAR_RECUPERADO_MS`). El panel también lo nota porque dejan de llegar lecturas. | base: `radar`, `detectores` |
+| 10 | Reinicio inesperado (watchdog, brownout, fallo) | Al arrancar, `esp_reset_reason()` distinto de encendido normal, botón RST o USB | Watchdog de tareas de ESP-IDF (10 s) sobre `loop()` y sobre la tarea de red fuera de sus peticiones, para que un bloqueo termine en reinicio y no en una base colgada. Al arrancar se registra el motivo por serial y, si fue inesperado, se avisa por Telegram. Los eventos pendientes y el estado de los detectores sobreviven (NVS). Se pierden las secuencias en RAM (el siguiente mensaje de cada colgante se acepta como nuevo, a lo sumo una alerta repetida) y las lecturas de la cola offline. | base: `main`, `watchdog_tareas`, `motivo_reinicio`, `almacen` |
+
+### Qué está cubierto (base v0.6.0, 2026-10-27)
+
+"Hardware" es lo que ya se vio funcionar con el módulo; "código y PC" es lo implementado, compilado
+y probado en `pruebas_host/`, pero todavía **por confirmar con el módulo**.
+
+| # | Escenario | Estado |
+|---|---|---|
+| 1, 2, 3 | Paquete perdido, duplicado, cambio de canal | Hardware (colgante en banco y base con el router, 2026-10-12 y 2026-10-14) |
+| 4 | Caída de WiFi | Hardware: alerta local sin red y reconexión. Código y PC: cola offline de 1 h, eventos en NVS, orden al volver. Por confirmar con el módulo: 1 h sin router y el vaciado de la cola al volver |
+| 5 | Caída de Firebase o de internet | Hardware (v0.5.1, 2026-10-15): sin internet el error sale en 5 s y la base reintenta sin colgarse. Por confirmar con el módulo: que Telegram salga con Firebase caído |
+| 6 | Base apagada | Código y PC: `BASE_DESCONECTADA` con la duración. Por confirmar con el módulo |
+| 7 | Colgante sin batería o ausente | Código y PC: `BATERIA_BAJA` con histéresis y `COLGANTE_AUSENTE`. Por confirmar con el módulo (batería simulada del colgante) |
+| 8 | Persona no detectada | Hardware (`radar.md`, 13) |
+| 9 | Radar sin datos | Hardware: reinicio de la UART y aviso local. Código y PC: `RADAR_SIN_DATOS` por episodio. Por confirmar con el módulo (comando `r`) |
+| 10 | Reinicio inesperado | Código: watchdog de tareas y aviso por Telegram. Por confirmar con el módulo (comando `w`) |
+
+Telegram completo (envío, certificado de `api.telegram.org` con el bundle, límite de frecuencia,
+reintentos) está por confirmar con el módulo. Guía de prueba de cada evento en el README de la base.
 
 ## Detalles y decisiones
 
@@ -149,19 +168,23 @@ mucho fuera de ellas.
    con la espera creciente de siempre.
 2. Si `FIREBASE_REINICIO_TRAS_CORTE_MS` (30 s) después del corte la petición sigue sin terminar
    (bloqueada donde el socket no la despierta, como el DNS de lwIP), o si la tarea deja de dar
-   vueltas fuera de una petición por más de 45 s, **se reinicia la base**. Es el último recurso:
-   se pierde la cola en RAM (eventos, colgantes y lecturas pendientes; se cuentan por serial antes
-   de reiniciar), pero una tarea de red colgada no la iba a enviar nunca, y reiniciar es lo único
-   que devuelve la nube sin intervención. El motivo queda en memoria RTC y el arranque siguiente
-   lo muestra (`el arranque anterior termino en un reinicio del vigilante: ...`).
+   vueltas fuera de una petición por más de 45 s, **se reinicia la base**. Es el último recurso.
+   Antes se guardan en NVS los eventos pendientes (desde la v0.6.0); se pierden las lecturas y
+   los colgantes en RAM (se cuentan por serial), pero una tarea de red colgada no los iba a enviar
+   nunca, y reiniciar es lo único que devuelve la nube sin intervención. El motivo queda en
+   memoria RTC; el arranque siguiente lo muestra (`Arranque: vigilante de la red: ...`) y lo
+   avisa por Telegram como reinicio inesperado.
 3. **Nunca se reinicia con una alerta local urgente activa** (`PATRON_BOTON` o `PATRON_APNEA`): el
    reinicio se pospone (`reinicio pospuesto hasta que termine la alerta local`) y ocurre al
    terminar o al silenciarla. Un aviso amarillo no lo pospone. El corte del socket no se pospone:
    no toca la alerta.
 
 Se eligió cortar el socket antes que reiniciar porque recupera sin perder la cola y sin cortar la
-radio (un reinicio también reinicia WiFi y ESP-NOW, unos segundos sin ACK al colgante). No se usa
-el watchdog de tareas de ESP-IDF sobre la tarea de red: reiniciaría sin mirar la alerta local.
+radio (un reinicio también reinicia WiFi y ESP-NOW, unos segundos sin ACK al colgante). El
+vigilante cubre las peticiones de Firebase y de Telegram (`peticion_https`). Durante una petición
+la tarea de red sale del watchdog de tareas de ESP-IDF: con 10 s reiniciaría en medio de un
+handshake TLS o de una espera de DNS válidos, y sin mirar la alerta local. Fuera de las peticiones
+sí está en el watchdog (ver "Watchdog de tareas" abajo).
 
 **Traza** (`FIREBASE_TRAZA 1` en `config.h`; con 0 solo salen los errores y los cortes). Una
 línea por petición, sin token ni API key (tiempos de ejemplo):
@@ -183,8 +206,25 @@ su texto y, al volver internet, escrituras OK en menos de un minuto.
 
 ### Base apagada (escenario 6)
 
+Al volver, la base avisa cuánto estuvo sin contacto (`firebase_cliente`, `detectores`):
+
+1. Al arrancar, antes del primer `PATCH` del estado (que lo pisaría), lee
+   `/dispositivos/{BASE_ID}/estado/ultimo_contacto`: es la hora del servidor del último estado que
+   escribió antes de apagarse. `null` (base nueva) no es un evento.
+2. Escribe el estado y lee el `ultimo_contacto` nuevo, como siempre (referencia de hora).
+3. Si entre los dos pasaron `BASE_DESCONECTADA_MIN_MS` (3 min, el mismo umbral del panel) o más,
+   crea `BASE_DESCONECTADA` con `detalle` "sin conexión por 12 min" y lo avisa por Telegram ("La
+   base base01 volvió a estar en línea (sin conexión por 12 min)").
+4. Sin reiniciar pasa lo mismo: cada estado enviado se compara con el anterior. Una caída del
+   router o de internet de 3 min o más también da el evento, una vez, al volver.
+
+Las dos horas son del servidor, así que la duración no depende del reloj de la base. Un reinicio
+rápido (watchdog, vigilante) da menos de 3 min y no crea el evento; lo cubre el aviso de reinicio
+inesperado. Sin Firebase configurado (solo Telegram) no hay hora del servidor y no se crea.
+
 Sin Cloud Functions no hay un servidor que note que la base dejó de reportar y avise por Telegram
-en el momento. Es un límite aceptado del diseño con plan Spark:
+en el momento: el aviso sale recién cuando la base vuelve. Es un límite aceptado del diseño con
+plan Spark:
 
 - El panel sí lo muestra en cuanto alguien lo abre.
 - El colgante avisa a la persona con el patrón de error.
@@ -194,17 +234,93 @@ en el momento. Es un límite aceptado del diseño con plan Spark:
 
 ### Tipos de evento
 
-| Tipo | Escenario | Lo crea |
-|---|---|---|
-| `BOTON` | 1, 2 | base, al recibir una alerta nueva del colgante |
-| `BATERIA_BAJA` | 7 | base, al recibir `FLAG_BATERIA_BAJA` (una vez por descarga) |
-| `BASE_DESCONECTADA` | 6 | base, al volver, con la duración en `detalle` |
-| `COLGANTE_AUSENTE` | 7 | base, si pasa `COLGANTE_AUSENTE_S` sin mensajes del colgante |
-| `RADAR_SIN_DATOS` | 9 | base, si pasan N segundos sin lecturas válidas del radar |
+| Tipo | Escenario | Lo crea | `origen` / `detalle` | Se repite |
+|---|---|---|---|---|
+| `BOTON` | 1, 2 | base, al recibir una alerta nueva del colgante | `colganteN` / "boton del colgante" | cada pulsación (un duplicado no) |
+| `BATERIA_BAJA` | 7 | base, al recibir `FLAG_BATERIA_BAJA` | `colganteN` / "3420 mV" | una vez por descarga: hasta un mensaje sin la bandera y con ≥ 3700 mV (`BATERIA_RECUPERADA_MV`) |
+| `BASE_DESCONECTADA` | 6 | base, al arrancar o reconectar, si pasaron ≥ 3 min desde su último `ultimo_contacto` | `base01` / "sin conexión por 12 min" | una vez por corte |
+| `COLGANTE_AUSENTE` | 7 | base, si pasa `COLGANTE_AUSENTE_S` (45 min) sin ningún mensaje del colgante | `colganteN` / "sin mensajes por 45 min" | una vez por episodio: termina con el siguiente mensaje |
+| `RADAR_SIN_DATOS` | 9 | base, tras 30 s sin tramas del radar | `base01` / "sin datos por 30 s" | una vez por episodio: termina tras 60 s seguidos con datos |
 
 `APNEA` no aparece en la tabla: el radar no crea eventos de apnea (ver "Apnea" arriba).
 
-Todos los eventos se guardan en `/eventos` (ver `modelo-datos.md`) y se avisan por Telegram.
-`COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` se crean una sola vez por episodio: no se repiten mientras
-la condición siga, y se pueden volver a crear cuando el colgante o el radar se recuperen y fallen
-de nuevo.
+Todos los eventos se guardan en `/eventos` (ver `modelo-datos.md`) y se avisan por Telegram. El
+reinicio inesperado (escenario 10) se avisa solo por Telegram: las reglas publicadas no tienen ese
+tipo. Ninguno se repite mientras dure la condición; se vuelven a crear cuando la condición termina
+y empieza de nuevo. El estado de cada episodio (colgantes conocidos, batería avisada, ausencias,
+radar sin datos) se guarda en NVS, así un reinicio de la base en medio de un episodio no lo avisa
+otra vez. `timestamp` es la hora del servidor al recibir el evento (las reglas exigen `now`): un
+evento que esperó en la cola lo dice en `detalle` ("enviado N s despues" o "de antes de un reinicio
+de la base").
+
+Por qué estos tiempos (`config.h`):
+
+- **Batería, 200 mV de histéresis.** Cerca de 3.5 V el voltaje de una Li-ion sube y baja con la
+  carga, la temperatura y el ruido del ADC; sin margen cada vaivén sobre el umbral sería un evento
+  nuevo. 3.7 V sin la bandera solo se ve después de cargar.
+- **Colgante ausente, 45 min (3 heartbeats).** Un heartbeat perdido es normal: la base buscando el
+  router cambia de canal y el colgante no reintenta un heartbeat hasta el siguiente. Dos seguidos
+  pasan en una caída larga del router. Con tres la ausencia es real (batería agotada, fuera de
+  alcance) y se avisa en menos de una hora. Es `COLGANTE_AUSENTE_S` de `protocolo.h`.
+- **Radar, 30 s y 60 s.** A los 5 s sin tramas la UART se reinicia; un corte que se arregla con
+  ese reinicio no es un evento. A los 30 s ya hubo 5 reinicios sin respuesta. Un radar que va y
+  viene no repite el aviso: el episodio termina recién con 60 s seguidos de datos.
+
+### Cola offline (escenario 4)
+
+`src/cola_offline.h`, dentro de la cola de la tarea de red (`cola_peticiones`):
+
+- **Lecturas**: en RAM, en orden de medición, hasta `COLA_OFFLINE_LECTURAS` (720, 1 h a una cada
+  5 s, ~20 kB). Llena, se descarta la más antigua (`descartadas` en el comando `e`). Al enviarse,
+  la que salió más de 10 s después de medirse lleva `diferida: true`. Se pierden con un reinicio:
+  su `millis()` no sirve con la referencia de hora de después (`modelo-datos.md`, sección 2).
+- **Eventos**: hasta 32, para Firebase y Telegram por separado (cada uno sale de la cola cuando
+  llegó a los dos). Nunca los desplaza una lectura y no se descartan; con la cola llena, un `BOTON`
+  reemplaza al evento más antiguo que no sea `BOTON` (un aviso de botón no se pierde nunca por
+  falta de lugar) y otro tipo se rechaza y se cuenta. Mientras haya pendientes se guardan en NVS
+  (`almacen`, clave `eventos`, hasta ~2.8 kB; se borra la clave con la cola vacía). La tarea de red
+  los escribe cada vez que cambian, también sin red; el vigilante los escribe antes de reiniciar.
+  Al arrancar se restauran, en el mismo orden, y salen con "de antes de un reinicio de la base".
+- **Orden al volver la red**: en cada vuelta de la tarea de red, primero un aviso de Telegram
+  (`BOTON` primero), después Firebase: eventos en orden, el estado si toca, colgantes y lecturas
+  en orden de medición. Probado en `pruebas_host/`.
+
+Límite conocido: un evento creado durante los ~0.5 s que tarda la tarea de red en guardarlo se
+pierde si la base se apaga justo en ese momento (la alerta local ya sonó).
+
+### Telegram
+
+`src/telegram.cpp` y `src/mensajes_telegram.cpp`. `sendMessage` por HTTPS desde la tarea de red,
+con el certificado verificado con el bundle de CA de ESP-IDF (`peticion_https`, igual que
+Firebase; nunca `setInsecure()`).
+
+- **Independiente de Firebase**: conexión, espera tras error y límite de frecuencia propios. En
+  cada vuelta la tarea de red atiende Telegram antes que Firebase, así que un Firebase caído o en
+  su espera de 60 s no retrasa el aviso. Si una petición de Firebase está en curso al llegar un
+  `BOTON`, el aviso espera a que termine (normalmente menos de 1 s; como mucho los 45 s del
+  vigilante).
+- **Prioridad**: el `BOTON` sale primero, espera solo 1 s desde el mensaje anterior y no cuenta
+  para el tope por hora. Los demás: uno cada 3 s como mucho y 12 por hora. Lo que excede el tope
+  espera en la cola, no se pierde.
+- **Reintentos** sin bloquear `loop()`: con error de red o 5xx, 2 s y el doble en cada fallo
+  hasta 30 s; un 429 trae `retry_after` y se respeta. Con 400/401/403/404 (token o chat inválidos,
+  bot fuera del grupo) reintentar no sirve: el aviso se descarta con un error por serial y en `e`,
+  para no trabar la cola; el evento en Firebase no se afecta.
+- Con `TELEGRAM_TOKEN` o `TELEGRAM_CHAT_ID` de ejemplo, Telegram queda desactivado y se avisa por
+  serial (`telegram: deshabilitado: ...`). Pasos para crear el bot en el README de la base.
+
+### Watchdog de tareas y motivo del reinicio (escenario 10)
+
+- **Watchdog de tareas de ESP-IDF** (`watchdog_tareas`), 10 s (`WDT_TAREAS_TIMEOUT_MS`), con
+  panic y reinicio. Vigila `loop()` (lo alimenta el núcleo de Arduino en cada vuelta) y la tarea de
+  red (se alimenta en cada vuelta). `loop()` nunca bloquea: vence solo si algo lo cuelga. La tarea
+  de red sale del watchdog durante cada petición HTTPS y vuelve al terminarla; ese tramo lo cubre
+  el vigilante (arriba). ESP-IDF lo arranca con 5 s; la base lo pasa a 10 s para cubrir de sobra
+  una escritura en NVS o un Serial lleno sin monitor.
+- **Motivo del reinicio** (`motivo_reinicio`): al arrancar se lee `esp_reset_reason()` y se
+  imprime (`# Arranque: watchdog de tareas (reinicio inesperado)`). Inesperados, avisados por
+  Telegram: watchdog de tareas o de interrupciones, panic, brownout, falla de alimentación, CPU
+  bloqueada y el reinicio del vigilante de la red (con su motivo, guardado en RTC). Normales, solo
+  por serial: encendido, botón RST, USB (carga o monitor) y JTAG. Un corte de luz es un encendido
+  normal: si duró 3 min o más lo cubre `BASE_DESCONECTADA`.
+
