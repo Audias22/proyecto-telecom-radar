@@ -87,6 +87,7 @@ static uint32_t tramas_fase = 0;
 static uint32_t reinicios = 0;
 static uint32_t ultimo_intento_ms = 0;
 static bool sin_datos = false;
+static bool simulando_sin_datos = false;
 
 static bool enRango(float valor, float minimo, float maximo) {
     return !isnan(valor) && valor >= minimo && valor <= maximo;
@@ -188,7 +189,7 @@ static void medirBufferUart() {
 
 void actualizar() {
     medirBufferUart();
-    for (int i = 0; i < TRAMAS_POR_LLAMADA; i++) {
+    for (int i = 0; i < TRAMAS_POR_LLAMADA && !simulando_sin_datos; i++) {
         uint32_t antes = mmwave.tramas_totales;
         // update(0) lee lo que haya en el buffer de la UART sin esperar y procesa una sola trama
         // de la cola de la librería. Con un timeout mayor, la librería hace espera activa.
@@ -221,6 +222,14 @@ EstadoPersona estadoPersona() {
 
 bool sinDatos() {
     return sin_datos;
+}
+
+void simularSinDatos(bool activo) {
+    simulando_sin_datos = activo;
+}
+
+bool simulandoSinDatos() {
+    return simulando_sin_datos;
 }
 
 uint32_t reiniciosUart() {

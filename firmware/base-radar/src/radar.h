@@ -51,6 +51,11 @@ EstadoPersona estadoPersona();
 // true si no llega ninguna trama del radar desde hace RADAR_SIN_DATOS_MS.
 bool sinDatos();
 
+// Prueba del evento RADAR_SIN_DATOS (comando "r"): con true se dejan de leer tramas, como si el
+// radar no mandara nada (la UART se sigue reiniciando cada RADAR_SIN_DATOS_MS).
+void simularSinDatos(bool activo);
+bool simulandoSinDatos();
+
 // Veces que se reinició la UART por falta de datos desde el arranque.
 uint32_t reiniciosUart();
 
