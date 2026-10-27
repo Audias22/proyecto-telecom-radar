@@ -17,6 +17,7 @@ enum TipoEvento : uint8_t {
     EVENTO_BASE_DESCONECTADA,
     EVENTO_COLGANTE_AUSENTE,
     EVENTO_RADAR_SIN_DATOS,
+    EVENTO_REINICIO,  // solo Telegram: las reglas no lo aceptan en /eventos (docs/fallos.md, 10)
 };
 
 // Una lectura de /lecturas/{baseId}/{ts} (docs/modelo-datos.md, 1.1). NAN = sin dato.
@@ -58,15 +59,24 @@ size_t jsonColgante(uint16_t bateria_mv, int rssi, const char *base, char *json,
 size_t jsonEvento(TipoEvento tipo, const char *origen, const char *detalle, char *json,
                   size_t tamano);
 
-// "BOTON", "BATERIA_BAJA", ... ("APNEA" para el tipo reservado).
+// "BOTON", "BATERIA_BAJA", ... ("APNEA" para el tipo reservado, "REINICIO" para el aviso que
+// solo va a Telegram).
 const char *nombreEvento(TipoEvento tipo);
 
 // Cuerpo de signInWithPassword: {"email":...,"password":...,"returnSecureToken":true}.
 size_t jsonInicioSesion(const char *correo, const char *clave, char *json, size_t tamano);
 
+// Cuerpo de sendMessage de Telegram: {"chat_id":"...","text":"..."}. chat_id va como texto, que
+// la API acepta igual que un número.
+size_t jsonTelegram(const char *chat_id, const char *texto, char *json, size_t tamano);
+
 // Copia el valor de texto de "clave" en un JSON plano (respuestas de Firebase Auth). false si no
 // está, no es texto, trae escapes o no cabe en destino.
 bool extraerTexto(const char *json, const char *clave, char *destino, size_t tamano);
+
+// Valor entero sin signo de "clave" en un JSON plano, p. ej. retry_after en la respuesta 429 de
+// Telegram ({"ok":false,"parameters":{"retry_after":5}}). false si no está o no es un entero.
+bool extraerEntero(const char *json, const char *clave, uint64_t &valor);
 
 // Lee un entero sin signo (con espacios o comillas alrededor), p. ej. la respuesta de
 // GET .../ultimo_contacto.json o el "3600" de expiresIn. false si no hay dígitos.

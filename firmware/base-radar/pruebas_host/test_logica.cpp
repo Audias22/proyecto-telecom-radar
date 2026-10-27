@@ -1,7 +1,8 @@
 // test_logica.cpp
 // Pruebas unitarias en host (PC) de la lógica pura de la base: ventana de actividad del radar
 // (persona / objetivo), JSON que se escribe en Firebase, cola de peticiones a la tarea de red,
-// lector del cuerpo de las respuestas HTTP y vigilante de la tarea de red.
+// lector del cuerpo de las respuestas HTTP, vigilante de la tarea de red, cola offline, detectores
+// de eventos y avisos de Telegram.
 //
 // Incluye los headers y .cpp reales (sin Arduino); no duplica su lógica. Los JSON esperados son
 // los mismos que escribe web/simulador/simulador.py, que pasó la verificación contra las reglas
@@ -14,7 +15,9 @@
 
 #include "cola_peticiones.h"
 #include "cuerpo_http.h"
+#include "detectores.h"
 #include "formato_nube.h"
+#include "mensajes_telegram.h"
 #include "ventana_actividad.h"
 #include "vigilante_red.h"
 
@@ -584,6 +587,7 @@ void vigilanteRutaLarga() {
 PeticionEvento eventoBoton(int n) {
     PeticionEvento e{};
     e.tipo = EVENTO_BOTON;
+    e.destinos = DESTINO_FIREBASE | DESTINO_TELEGRAM;
     std::snprintf(e.origen, sizeof(e.origen), "colgante%d", n);
     return e;
 }
@@ -624,11 +628,11 @@ void colaReintentoNoSaca() {
 
 void colaLecturasLlena() {
     ColaPeticiones cola;
-    for (uint32_t i = 0; i <= COLA_LECTURAS_CAPACIDAD; i++) {
+    for (uint32_t i = 0; i <= COLA_OFFLINE_LECTURAS; i++) {
         cola.agregarLectura(lecturaEn(i));
     }
     const TamanosCola t = cola.tamanos();
-    VERIFICAR(t.lecturas == COLA_LECTURAS_CAPACIDAD);
+    VERIFICAR(t.lecturas == COLA_OFFLINE_LECTURAS);
     VERIFICAR(t.lecturas_descartadas == 1);
     Peticion p;
     VERIFICAR(cola.siguiente(true, p) && p.lectura.millis_medicion == 1);  // la 0 se descartó
@@ -637,13 +641,14 @@ void colaLecturasLlena() {
 void colaEventosNuncaDesplazados() {
     ColaPeticiones cola;
     for (int i = 0; i < COLA_EVENTOS_CAPACIDAD; i++) {
-        VERIFICAR(cola.agregarEvento(eventoBoton(i)));
+        VERIFICAR(cola.agregarEvento(eventoBoton(i)) == EVENTO_AGREGADO);
     }
-    for (uint32_t i = 0; i < 3 * COLA_LECTURAS_CAPACIDAD; i++) {
+    for (uint32_t i = 0; i < 3 * COLA_OFFLINE_LECTURAS; i++) {
         cola.agregarLectura(lecturaEn(i));
     }
     VERIFICAR(cola.tamanos().eventos == COLA_EVENTOS_CAPACIDAD);  // las lecturas no los tocan
-    VERIFICAR(!cola.agregarEvento(eventoBoton(99)));  // sin lugar: se rechaza el nuevo
+    // Llena de BOTON: no hay a quién reemplazar y se rechaza el nuevo.
+    VERIFICAR(cola.agregarEvento(eventoBoton(99)) == EVENTO_RECHAZADO);
     VERIFICAR(cola.tamanos().eventos_rechazados == 1);
     Peticion p;
     VERIFICAR(cola.siguiente(true, p) && std::strcmp(p.evento.origen, "colgante0") == 0);
@@ -653,14 +658,14 @@ void colaConfirmarTrasPisada() {
     // La tarea de red toma la lectura más antigua; mientras la envía, loop() agrega otra con la
     // cola llena y la pisa. Confirmar la vieja no debe sacar la nueva primera.
     ColaPeticiones cola;
-    for (uint32_t i = 0; i < COLA_LECTURAS_CAPACIDAD; i++) {
+    for (uint32_t i = 0; i < COLA_OFFLINE_LECTURAS; i++) {
         cola.agregarLectura(lecturaEn(i));
     }
     Peticion enviada;
     cola.siguiente(true, enviada);
     cola.agregarLectura(lecturaEn(100));
     cola.confirmar(enviada);
-    VERIFICAR(cola.tamanos().lecturas == COLA_LECTURAS_CAPACIDAD);
+    VERIFICAR(cola.tamanos().lecturas == COLA_OFFLINE_LECTURAS);
     Peticion p;
     VERIFICAR(cola.siguiente(true, p) && p.lectura.millis_medicion == 1);
 }
@@ -688,6 +693,418 @@ void colaColgantesLlena() {
     VERIFICAR(cola.tamanos().colgantes == COLA_COLGANTES_CAPACIDAD);
     Peticion p;
     VERIFICAR(cola.siguiente(true, p) && p.colgante.id == 2);  // el 1 era el más antiguo
+}
+
+// ---------------------------------------------------------------------------
+// Cola offline: eventos y lecturas sin red
+// ---------------------------------------------------------------------------
+
+PeticionEvento eventoDe(TipoEvento tipo, const char *origen, uint8_t destinos) {
+    PeticionEvento e{};
+    e.tipo = tipo;
+    e.destinos = destinos;
+    std::snprintf(e.origen, sizeof(e.origen), "%s", origen);
+    std::snprintf(e.detalle, sizeof(e.detalle), "detalle de %s", origen);
+    return e;
+}
+
+constexpr uint8_t AMBOS = DESTINO_FIREBASE | DESTINO_TELEGRAM;
+
+// Una hora sin red: llegan lecturas, eventos y colgantes. Al volver, Firebase recibe primero los
+// eventos en orden, después el colgante y después las lecturas en orden de medición.
+void offlineOrdenAlReconectar() {
+    ColaPeticiones cola;
+    cola.agregarLectura(lecturaEn(1000));
+    cola.agregarEvento(eventoDe(EVENTO_RADAR_SIN_DATOS, "base01", AMBOS));
+    cola.agregarLectura(lecturaEn(2000));
+    cola.agregarColgante({1, 3900, -60});
+    cola.agregarEvento(eventoDe(EVENTO_BOTON, "colgante1", AMBOS));
+    cola.agregarLectura(lecturaEn(3000));
+    Peticion p;
+    VERIFICAR(cola.siguiente(true, p) && p.tipo == PETICION_EVENTO &&
+              p.evento.tipo == EVENTO_RADAR_SIN_DATOS);
+    cola.confirmar(p);
+    VERIFICAR(cola.siguiente(true, p) && p.tipo == PETICION_EVENTO && p.evento.tipo == EVENTO_BOTON);
+    cola.confirmar(p);
+    VERIFICAR(cola.siguiente(true, p) && p.tipo == PETICION_COLGANTE);
+    cola.confirmar(p);
+    for (uint32_t ms = 1000; ms <= 3000; ms += 1000) {
+        VERIFICAR(cola.siguiente(true, p) && p.tipo == PETICION_LECTURA &&
+                  p.lectura.millis_medicion == ms);
+        cola.confirmar(p);
+    }
+    VERIFICAR(!cola.siguiente(true, p));
+    // Telegram va por su cuenta: los dos eventos siguen pendientes para él, BOTON primero.
+    PeticionEvento e;
+    uint32_t numero;
+    VERIFICAR(cola.tamanos().eventos == 2 && cola.tamanos().eventos_firebase == 0);
+    VERIFICAR(cola.siguienteTelegram(e, numero) && e.tipo == EVENTO_BOTON);
+    cola.confirmarTelegram(numero);
+    VERIFICAR(cola.siguienteTelegram(e, numero) && e.tipo == EVENTO_RADAR_SIN_DATOS);
+    cola.confirmarTelegram(numero);
+    VERIFICAR(cola.tamanos().eventos == 0);
+}
+
+void offlineLecturasLimite() {
+    static ColaLecturas lecturas;
+    const uint32_t total = COLA_OFFLINE_LECTURAS + 50;  // más de 1 h sin red
+    for (uint32_t i = 0; i < total; i++) {
+        lecturas.agregar(lecturaEn(i * 5000), i + 1);
+    }
+    VERIFICAR(lecturas.cantidad() == COLA_OFFLINE_LECTURAS);
+    VERIFICAR(lecturas.descartadas() == 50);
+    LecturaNube l;
+    uint32_t numero;
+    VERIFICAR(lecturas.primera(l, numero) && l.millis_medicion == 50 * 5000);  // las 50 más viejas
+    lecturas.confirmar(numero + 1);  // número equivocado: no saca nada
+    VERIFICAR(lecturas.cantidad() == COLA_OFFLINE_LECTURAS);
+    lecturas.confirmar(numero);
+    VERIFICAR(lecturas.primera(l, numero) && l.millis_medicion == 51 * 5000);
+}
+
+void offlineEventosDestinos() {
+    ColaEventos eventos;
+    VERIFICAR(eventos.agregar(eventoDe(EVENTO_BOTON, "colgante1", 0), 1) == EVENTO_RECHAZADO);
+    VERIFICAR(eventos.agregar(eventoDe(EVENTO_REINICIO, "base01", DESTINO_TELEGRAM), 2) ==
+              EVENTO_AGREGADO);
+    PeticionEvento e;
+    uint32_t numero;
+    VERIFICAR(!eventos.siguiente(DESTINO_FIREBASE, e, numero));  // REINICIO no va a Firebase
+    VERIFICAR(eventos.siguiente(DESTINO_TELEGRAM, e, numero) && numero == 2);
+    VERIFICAR(eventos.cambio());
+    eventos.limpiarCambio();
+    eventos.confirmar(DESTINO_FIREBASE, 2);  // no tenía ese destino: nada cambia
+    VERIFICAR(!eventos.cambio() && eventos.cantidad() == 1);
+    eventos.confirmar(DESTINO_TELEGRAM, 2);
+    VERIFICAR(eventos.cambio() && eventos.cantidad() == 0);
+}
+
+// Con la cola llena un BOTON reemplaza al evento más antiguo que no es BOTON; otro tipo se
+// rechaza.
+void offlineBotonNuncaSePierde() {
+    ColaEventos eventos;
+    uint32_t n = 0;
+    eventos.agregar(eventoDe(EVENTO_BOTON, "colgante1", AMBOS), ++n);
+    for (int i = 1; i < COLA_EVENTOS_CAPACIDAD; i++) {
+        eventos.agregar(eventoDe(EVENTO_COLGANTE_AUSENTE, "colgante2", AMBOS), ++n);
+    }
+    VERIFICAR(eventos.agregar(eventoDe(EVENTO_RADAR_SIN_DATOS, "base01", AMBOS), ++n) ==
+              EVENTO_RECHAZADO);
+    VERIFICAR(eventos.agregar(eventoDe(EVENTO_BOTON, "colgante3", AMBOS), ++n) ==
+              EVENTO_AGREGADO_REEMPLAZANDO);
+    VERIFICAR(eventos.rechazados() == 1 && eventos.reemplazados() == 1);
+    VERIFICAR(eventos.cantidad() == COLA_EVENTOS_CAPACIDAD);
+    // El reemplazado fue el número 2 (el primer COLGANTE_AUSENTE); el 1 (BOTON) sigue.
+    PeticionEvento e;
+    uint32_t numero;
+    VERIFICAR(eventos.siguiente(DESTINO_FIREBASE, e, numero) && numero == 1);
+    eventos.confirmar(DESTINO_FIREBASE, 1);
+    VERIFICAR(eventos.siguiente(DESTINO_FIREBASE, e, numero) && numero == 3);
+    VERIFICAR(eventos.siguiente(DESTINO_TELEGRAM, e, numero) && numero == 1);
+    eventos.confirmar(DESTINO_TELEGRAM, 1);
+    VERIFICAR(eventos.siguiente(DESTINO_TELEGRAM, e, numero) &&
+              std::strcmp(e.origen, "colgante3") == 0);
+}
+
+// Guardar en NVS y restaurar tras un reinicio: mismo orden, marcados previo_reinicio, solo los
+// destinos activos ahora.
+void offlineEventosSobrevivenReinicio() {
+    static ColaPeticiones antes;
+    antes.agregarEvento(eventoDe(EVENTO_BATERIA_BAJA, "colgante1", AMBOS));
+    antes.agregarEvento(eventoDe(EVENTO_BOTON, "colgante1", AMBOS));
+    antes.agregarEvento(eventoDe(EVENTO_REINICIO, "base01", DESTINO_TELEGRAM));
+    Peticion p;
+    antes.siguiente(true, p);
+    antes.confirmar(p);  // BATERIA_BAJA ya llegó a Firebase; le falta Telegram
+    VERIFICAR(antes.eventosCambiaron());
+    uint8_t datos[ColaEventos::TAMANO_SERIALIZADO];
+    const size_t largo = antes.serializarEventos(datos, sizeof(datos));
+    VERIFICAR(largo == 4 + 3 * sizeof(PeticionEvento) && !antes.eventosCambiaron());
+
+    static ColaPeticiones despues;
+    VERIFICAR(despues.restaurarEventos(datos, largo, AMBOS) == 3);
+    const TamanosCola t = despues.tamanos();
+    VERIFICAR(t.eventos == 3 && t.eventos_firebase == 1 && t.eventos_telegram == 3);
+    VERIFICAR(despues.siguiente(true, p) && p.evento.tipo == EVENTO_BOTON &&
+              p.evento.previo_reinicio);
+    PeticionEvento e;
+    uint32_t numero;
+    VERIFICAR(despues.siguienteTelegram(e, numero) && e.tipo == EVENTO_BOTON);
+    despues.confirmarTelegram(numero);
+    VERIFICAR(despues.siguienteTelegram(e, numero) && e.tipo == EVENTO_BATERIA_BAJA);
+
+    // Ahora Telegram está desactivado: lo que solo iba a Telegram no se restaura.
+    static ColaPeticiones sin_telegram;
+    VERIFICAR(sin_telegram.restaurarEventos(datos, largo, DESTINO_FIREBASE) == 1);
+    // Datos de otro formato o cortados: se ignoran.
+    VERIFICAR(sin_telegram.restaurarEventos(datos, largo - 1, AMBOS) == -1);
+    datos[2] ^= 0x01;
+    VERIFICAR(sin_telegram.restaurarEventos(datos, largo, AMBOS) == -1);
+    VERIFICAR(antes.serializarEventos(datos, 10) == 0);  // no cabe
+}
+
+void offlineSerializaVacia() {
+    ColaEventos eventos;
+    uint8_t datos[8];
+    VERIFICAR(eventos.serializar(datos, sizeof(datos)) == 4 && datos[1] == 0);
+    uint32_t numero = 0;
+    VERIFICAR(eventos.restaurar(datos, 4, AMBOS, numero) == 0);
+}
+
+// ---------------------------------------------------------------------------
+// Detectores de eventos
+// ---------------------------------------------------------------------------
+
+void bateriaHisteresis() {
+    DetectorBateria d;
+    VERIFICAR(!d.revisar(false, 3600));
+    VERIFICAR(d.revisar(true, 3490));        // primera vez con la bandera: evento
+    VERIFICAR(!d.revisar(true, 3480));       // sigue baja: nada
+    VERIFICAR(!d.revisar(false, 3510));      // vaivén sobre el umbral: no rearma
+    VERIFICAR(!d.revisar(true, 3495));       // vuelve a bajar: misma descarga, nada
+    VERIFICAR(!d.revisar(false, 0));         // sin dato: no rearma
+    VERIFICAR(!d.revisar(false, BATERIA_RECUPERADA_MV - 1));
+    VERIFICAR(d.avisada());
+    VERIFICAR(!d.revisar(false, BATERIA_RECUPERADA_MV));  // cargada: rearma
+    VERIFICAR(!d.avisada());
+    VERIFICAR(d.revisar(true, 3450));        // descarga nueva: evento nuevo
+}
+
+void episodioEsperas() {
+    Episodio e(25000, 60000);
+    VERIFICAR(e.actualizar(true, 0) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(true, 24999) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(false, 25000) == EPISODIO_SIN_CAMBIO);  // se cortó: cuenta de cero
+    VERIFICAR(e.actualizar(true, 30000) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(true, 55000) == EPISODIO_EMPIEZA);
+    for (uint32_t t = 56000; t < 200000; t += 1000) {
+        VERIFICAR(e.actualizar(true, t) == EPISODIO_SIN_CAMBIO);  // una sola vez por episodio
+    }
+    VERIFICAR(e.actualizar(false, 200000) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(true, 230000) == EPISODIO_SIN_CAMBIO);   // el radar va y viene
+    VERIFICAR(e.actualizar(false, 231000) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(false, 290999) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(false, 291000) == EPISODIO_TERMINA);
+    VERIFICAR(!e.activo());
+    VERIFICAR(e.actualizar(true, 300000) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(true, 325000) == EPISODIO_EMPIEZA);      // episodio nuevo
+}
+
+void episodioVueltaMillis() {
+    Episodio e(25000, 60000);
+    const uint32_t casi = 0xFFFFFFFFu - 10000;
+    VERIFICAR(e.actualizar(true, casi) == EPISODIO_SIN_CAMBIO);
+    VERIFICAR(e.actualizar(true, casi + 25000) == EPISODIO_EMPIEZA);  // pasó por 0
+}
+
+void colganteAusenteUnaVez() {
+    RegistroColgantes r;
+    uint8_t ids[RegistroColgantes::MAXIMO];
+    r.mensaje(1, false, 3900, 0);
+    r.mensaje(2, false, 3900, 600000);
+    VERIFICAR(r.revisarAusentes(COLGANTE_AUSENTE_MS - 1, ids, 8) == 0);
+    VERIFICAR(r.revisarAusentes(COLGANTE_AUSENTE_MS, ids, 8) == 1 && ids[0] == 1);
+    VERIFICAR(r.ausente(1) && !r.ausente(2));
+    for (uint32_t t = COLGANTE_AUSENTE_MS; t < 3 * COLGANTE_AUSENTE_MS; t += 60000) {
+        const size_t n = r.revisarAusentes(t, ids, 8);
+        VERIFICAR(n == 0 || (n == 1 && ids[0] == 2));  // el 1 no se repite
+    }
+    VERIFICAR(r.ausente(2));
+    const ResultadoMensaje m = r.mensaje(1, false, 3900, 3 * COLGANTE_AUSENTE_MS);
+    VERIFICAR(m.volvio && !m.bateria_baja && !r.ausente(1));
+    VERIFICAR(r.revisarAusentes(4 * COLGANTE_AUSENTE_MS, ids, 8) == 1 && ids[0] == 1);  // nuevo
+}
+
+void colganteBateriaPorId() {
+    RegistroColgantes r;
+    VERIFICAR(r.mensaje(1, true, 3400, 0).bateria_baja);
+    VERIFICAR(!r.mensaje(1, true, 3400, 1000).bateria_baja);
+    VERIFICAR(r.mensaje(2, true, 3400, 2000).bateria_baja);  // otro colgante, otra descarga
+    VERIFICAR(!r.mensaje(1, false, 3900, 3000).bateria_baja);
+    VERIFICAR(r.mensaje(1, true, 3400, 4000).bateria_baja);
+}
+
+void colgantesLlenos() {
+    RegistroColgantes r;
+    for (uint8_t id = 1; id <= RegistroColgantes::MAXIMO; id++) {
+        r.mensaje(id, false, 3900, id * 1000u);
+    }
+    r.mensaje(1, false, 3900, 20000);  // el 2 queda como el más antiguo
+    r.mensaje(50, false, 3900, 21000);
+    VERIFICAR(r.cantidad() == RegistroColgantes::MAXIMO);
+    uint8_t ids[RegistroColgantes::MAXIMO];
+    const size_t n = r.revisarAusentes(21000 + COLGANTE_AUSENTE_MS, ids, RegistroColgantes::MAXIMO);
+    bool esta_el_2 = false;
+    for (size_t k = 0; k < n; k++) {
+        esta_el_2 = esta_el_2 || ids[k] == 2;
+    }
+    VERIFICAR(n == RegistroColgantes::MAXIMO && !esta_el_2);
+}
+
+// Un reinicio en medio de una descarga o de una ausencia no repite el aviso.
+void detectoresSobrevivenReinicio() {
+    RegistroColgantes antes;
+    uint8_t ids[RegistroColgantes::MAXIMO];
+    antes.mensaje(1, true, 3400, 0);
+    antes.mensaje(2, false, 3900, 0);
+    antes.revisarAusentes(COLGANTE_AUSENTE_MS, ids, 8);  // los dos ausentes
+    antes.mensaje(1, true, 3400, COLGANTE_AUSENTE_MS + 1);  // el 1 vuelve, con batería baja
+    VERIFICAR(antes.cambio());
+    uint8_t datos[2 + RegistroColgantes::TAMANO_SERIALIZADO];
+    const size_t largo = serializarEstado(antes, true, datos, sizeof(datos));
+    VERIFICAR(largo == 2 + 2 + 2 * 2);
+
+    RegistroColgantes despues;
+    bool radar = false;
+    const uint32_t arranque = 5000;
+    VERIFICAR(restaurarEstado(datos, largo, arranque, despues, radar) && radar);
+    VERIFICAR(despues.cantidad() == 2 && !despues.cambio());
+    VERIFICAR(!despues.mensaje(1, true, 3400, arranque).bateria_baja);  // misma descarga
+    VERIFICAR(despues.ausente(2));
+    // Solo el 1 (sin mensajes desde el arranque) pasa a ausente; el 2 ya lo estaba y no se repite.
+    VERIFICAR(despues.revisarAusentes(arranque + 2 * COLGANTE_AUSENTE_MS, ids, 8) == 1 &&
+              ids[0] == 1);
+    VERIFICAR(despues.mensaje(2, false, 3900, arranque + 1).volvio);
+    // El 1 se conoce desde el arranque: sin mensajes, ausente a COLGANTE_AUSENTE_MS de ahí.
+    RegistroColgantes otro;
+    restaurarEstado(datos, largo, arranque, otro, radar);
+    VERIFICAR(otro.revisarAusentes(arranque + COLGANTE_AUSENTE_MS - 1, ids, 8) == 0);
+    VERIFICAR(otro.revisarAusentes(arranque + COLGANTE_AUSENTE_MS, ids, 8) == 1 && ids[0] == 1);
+    datos[0] = 9;
+    VERIFICAR(!restaurarEstado(datos, largo, arranque, otro, radar));
+}
+
+void baseDesconectada() {
+    const uint64_t t = 1791234567890ULL;
+    VERIFICAR(duracionDesconexion(false, 0, t) == 0);                 // primera vez: sin anterior
+    VERIFICAR(duracionDesconexion(true, t, t + 60000) == 0);          // estado normal cada 60 s
+    VERIFICAR(duracionDesconexion(true, t, t + BASE_DESCONECTADA_MIN_MS - 1) == 0);
+    VERIFICAR(duracionDesconexion(true, t, t + BASE_DESCONECTADA_MIN_MS) == BASE_DESCONECTADA_MIN_MS);
+    VERIFICAR(duracionDesconexion(true, t, t + 720000) == 720000);
+    VERIFICAR(duracionDesconexion(true, t, t - 1000) == 0);           // hora hacia atrás
+    char texto[24];
+    textoDuracion(45000, texto, sizeof(texto));
+    VERIFICAR_TEXTO(texto, "45 s");
+    textoDuracion(720000, texto, sizeof(texto));
+    VERIFICAR_TEXTO(texto, "12 min");
+    textoDuracion((3 * 3600 + 5 * 60 + 59) * 1000ULL, texto, sizeof(texto));
+    VERIFICAR_TEXTO(texto, "3 h 5 min");
+    textoDuracion((2 * 86400 + 4 * 3600) * 1000ULL, texto, sizeof(texto));
+    VERIFICAR_TEXTO(texto, "2 d 4 h");
+}
+
+// ---------------------------------------------------------------------------
+// Telegram
+// ---------------------------------------------------------------------------
+
+PeticionEvento avisoDe(TipoEvento tipo, const char *origen, const char *detalle) {
+    PeticionEvento e = eventoDe(tipo, origen, AMBOS);
+    std::snprintf(e.detalle, sizeof(e.detalle), "%s", detalle);
+    e.millis_creado = 1000;
+    return e;
+}
+
+void telegramTextos() {
+    char t[200];
+    mensajes_telegram::texto(avisoDe(EVENTO_BOTON, "colgante1", "boton del colgante"), 2000, t,
+                             sizeof(t));
+    VERIFICAR_TEXTO(t, "ALERTA: botón de auxilio del colgante 1. Atender de inmediato.");
+    mensajes_telegram::texto(avisoDe(EVENTO_BATERIA_BAJA, "colgante2", "3420 mV"), 2000, t,
+                             sizeof(t));
+    VERIFICAR_TEXTO(t, "Batería baja en el colgante 2 (3420 mV). Hay que cargarlo.");
+    mensajes_telegram::texto(
+        avisoDe(EVENTO_COLGANTE_AUSENTE, "colgante1", "sin mensajes por 45 min"), 2000, t,
+        sizeof(t));
+    VERIFICAR_TEXTO(t, "El colgante 1 no se comunica (sin mensajes por 45 min). Revisar la "
+                       "batería y el alcance.");
+    mensajes_telegram::texto(avisoDe(EVENTO_BASE_DESCONECTADA, "base01", "sin conexión por 12 min"),
+                             2000, t, sizeof(t));
+    VERIFICAR_TEXTO(t, "La base base01 volvió a estar en línea (sin conexión por 12 min).");
+    mensajes_telegram::texto(avisoDe(EVENTO_REINICIO, "base01", "watchdog de tareas"), 2000, t,
+                             sizeof(t));
+    VERIFICAR_TEXTO(t, "La base base01 se reinició de forma inesperada: watchdog de tareas.");
+    mensajes_telegram::texto(avisoDe(EVENTO_RADAR_SIN_DATOS, "base01", "sin datos por 30 s"), 2000,
+                             t, sizeof(t));
+    VERIFICAR(std::strstr(t, "El radar de la base base01 no envía datos (sin datos por 30 s)") == t);
+    // Atrasado y de antes de un reinicio.
+    mensajes_telegram::texto(avisoDe(EVENTO_BATERIA_BAJA, "colgante2", "3420 mV"), 1000 + 720000,
+                             t, sizeof(t));
+    VERIFICAR(std::strstr(t, "Hay que cargarlo. (ocurrió hace 12 min)") != nullptr);
+    PeticionEvento previo = avisoDe(EVENTO_BOTON, "colgante1", "");
+    previo.previo_reinicio = true;
+    mensajes_telegram::texto(previo, 5, t, sizeof(t));
+    VERIFICAR(std::strstr(t, "(aviso de antes de un reinicio de la base)") != nullptr);
+    char chico[16];
+    mensajes_telegram::texto(avisoDe(EVENTO_BOTON, "colgante1", ""), 2000, chico, sizeof(chico));
+    VERIFICAR(std::strlen(chico) == sizeof(chico) - 1);  // recortado, terminado en '\0'
+    VERIFICAR(mensajes_telegram::esUrgente(EVENTO_BOTON));
+    VERIFICAR(!mensajes_telegram::esUrgente(EVENTO_BATERIA_BAJA));
+}
+
+void telegramJson() {
+    char json[160];
+    formato_nube::jsonTelegram("-1001234567890", "Batería \"baja\"", json, sizeof(json));
+    VERIFICAR_TEXTO(json, "{\"chat_id\":\"-1001234567890\",\"text\":\"Batería \\\"baja\\\"\"}");
+    uint64_t v = 0;
+    VERIFICAR(formato_nube::extraerEntero(
+                  "{\"ok\":false,\"error_code\":429,\"parameters\":{\"retry_after\": 17}}",
+                  "retry_after", v) && v == 17);
+    VERIFICAR(!formato_nube::extraerEntero("{\"retry_after\":\"x\"}", "retry_after", v));
+    VERIFICAR(!formato_nube::extraerEntero("{\"ok\":true}", "retry_after", v));
+    char texto[40];
+    VERIFICAR(formato_nube::extraerTexto("{\"ok\":false,\"description\":\"Unauthorized\"}",
+                                         "description", texto, sizeof(texto)));
+    VERIFICAR_TEXTO(texto, "Unauthorized");
+    VERIFICAR_TEXTO(formato_nube::nombreEvento(EVENTO_REINICIO), "REINICIO");
+}
+
+void telegramIntervalos() {
+    LimiteTelegram l;
+    VERIFICAR(l.puedeEnviar(0, false) && l.puedeEnviar(0, true));
+    l.enviado(10000, false);
+    VERIFICAR(!l.puedeEnviar(10000 + TELEGRAM_INTERVALO_MIN_MS - 1, false));
+    VERIFICAR(l.espera(10000 + 1000, false) == TELEGRAM_INTERVALO_MIN_MS - 1000);
+    VERIFICAR(l.puedeEnviar(10000 + TELEGRAM_INTERVALO_URGENTE_MS, true));  // un BOTON espera menos
+    VERIFICAR(l.puedeEnviar(10000 + TELEGRAM_INTERVALO_MIN_MS, false));
+}
+
+void telegramTopePorHora() {
+    LimiteTelegram l;
+    uint32_t t = 0;
+    for (int i = 0; i < TELEGRAM_MAX_POR_HORA; i++) {
+        VERIFICAR(l.puedeEnviar(t, false));
+        l.enviado(t, false);
+        t += 60000;
+    }
+    VERIFICAR(!l.puedeEnviar(t, false));               // tope de la hora
+    VERIFICAR(l.puedeEnviar(t, true));                 // el BOTON no cuenta ni espera el tope
+    l.enviado(t, true);
+    VERIFICAR(!l.puedeEnviar(3600000 - 1, false));
+    VERIFICAR(l.puedeEnviar(3600000, false));          // el primero salió hace 1 h
+    l.enviado(3600000, false);
+    // El tope sigue lleno: el siguiente más antiguo salió en 60000 y se libera a la hora.
+    VERIFICAR(!l.puedeEnviar(3600000 + 59999, false));
+    VERIFICAR(l.puedeEnviar(3600000 + 60000, false));
+}
+
+void telegramEsperaTrasError() {
+    LimiteTelegram l;
+    l.fallo(0, 0);
+    VERIFICAR(l.esperaError() == TELEGRAM_ESPERA_ERROR_MS);
+    VERIFICAR(!l.puedeEnviar(TELEGRAM_ESPERA_ERROR_MS - 1, true));  // también el BOTON: no hay red
+    VERIFICAR(l.puedeEnviar(TELEGRAM_ESPERA_ERROR_MS, true));
+    for (int i = 0; i < 10; i++) {
+        l.fallo(0, 0);
+    }
+    VERIFICAR(l.esperaError() == TELEGRAM_ESPERA_ERROR_MAXIMA_MS);
+    l.fallo(0, 45000);  // 429 con retry_after 45 s: manda el servidor
+    VERIFICAR(l.esperaError() == 45000 && !l.puedeEnviar(44999, true));
+    l.enviado(50000, true);
+    VERIFICAR(l.esperaError() == 0);
+    l.fallo(60000, 0);
+    VERIFICAR(l.esperaError() == TELEGRAM_ESPERA_ERROR_MS);  // empieza de nuevo
+    l.sinError();
+    VERIFICAR(l.puedeEnviar(60000 + TELEGRAM_INTERVALO_MIN_MS, false));
 }
 
 }  // namespace
@@ -738,6 +1155,25 @@ int main() {
     ejecutar("vigilante: vuelta de millis()", vigilanteVueltaMillis);
     ejecutar("vigilante: metodo y ruta largos se recortan", vigilanteRutaLarga);
 
+    ejecutar("offline: al reconectar, eventos y despues lecturas en orden", offlineOrdenAlReconectar);
+    ejecutar("offline: lecturas con limite, se descartan las mas viejas", offlineLecturasLimite);
+    ejecutar("offline: destinos Firebase y Telegram por separado", offlineEventosDestinos);
+    ejecutar("offline: un BOTON nunca se pierde con la cola llena", offlineBotonNuncaSePierde);
+    ejecutar("offline: eventos sobreviven a un reinicio (NVS)", offlineEventosSobrevivenReinicio);
+    ejecutar("offline: cola de eventos vacia", offlineSerializaVacia);
+    ejecutar("eventos: bateria baja con histeresis", bateriaHisteresis);
+    ejecutar("eventos: episodio con esperas de inicio y fin", episodioEsperas);
+    ejecutar("eventos: episodio con vuelta de millis()", episodioVueltaMillis);
+    ejecutar("eventos: colgante ausente una vez por episodio", colganteAusenteUnaVez);
+    ejecutar("eventos: bateria baja por colgante", colganteBateriaPorId);
+    ejecutar("eventos: mas colgantes que lugares", colgantesLlenos);
+    ejecutar("eventos: estado de los detectores tras un reinicio", detectoresSobrevivenReinicio);
+    ejecutar("eventos: base desconectada y duraciones", baseDesconectada);
+    ejecutar("telegram: textos de los avisos", telegramTextos);
+    ejecutar("telegram: cuerpo de sendMessage y respuestas", telegramJson);
+    ejecutar("telegram: intervalo minimo entre mensajes", telegramIntervalos);
+    ejecutar("telegram: tope por hora, el BOTON no espera", telegramTopePorHora);
+    ejecutar("telegram: espera tras error y retry_after", telegramEsperaTrasError);
     std::printf("\n%d casos, %d verificaciones, %d casos fallidos\n", casos, verificaciones,
                 casos_fallidos);
     return casos_fallidos == 0 ? 0 : 1;

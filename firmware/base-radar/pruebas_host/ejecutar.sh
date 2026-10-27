@@ -9,8 +9,9 @@ if [ -z "$CXX" ]; then
 fi
 mkdir -p build
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
-  -I../include -I../src \
+  -I../include -I../src -I../../comun/protocolo \
   test_logica.cpp ../src/ventana_actividad.cpp ../src/formato_nube.cpp ../src/cola_peticiones.cpp \
-  ../src/cuerpo_http.cpp ../src/vigilante_red.cpp \
+  ../src/cuerpo_http.cpp ../src/vigilante_red.cpp ../src/cola_offline.cpp ../src/detectores.cpp \
+  ../src/mensajes_telegram.cpp \
   -o build/test_logica
 ./build/test_logica

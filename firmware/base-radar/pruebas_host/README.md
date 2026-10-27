@@ -10,17 +10,23 @@ sin radar, sin Arduino y sin red.
 - `src/formato_nube.cpp`: JSON de lecturas, estado, colgante, evento e inicio de sesión; clave
   `ts` de 13 dígitos; hora del servidor desde `millis()`; lectura de las respuestas de Firebase.
 - `src/cola_peticiones.cpp`: cola acotada de `loop()` a la tarea de red.
+- `src/cola_offline.cpp`: lecturas sin red (1 h, se descartan las más viejas) y eventos para
+  Firebase y Telegram que no se descartan y se guardan en NVS.
+- `src/detectores.cpp`: `BATERIA_BAJA` con histéresis, `COLGANTE_AUSENTE` y `RADAR_SIN_DATOS` una
+  vez por episodio, estado guardado tras un reinicio y duración de `BASE_DESCONECTADA`.
+- `src/mensajes_telegram.cpp`: texto de cada aviso y límite de frecuencia de Telegram.
 - `src/cuerpo_http.cpp`: cuerpo de las respuestas HTTP con memoria fija (en lugar de
   `HTTPClient::getString()`, que no tiene límite de tiempo).
 - `src/vigilante_red.cpp`: cuándo cortar una petición colgada y cuándo reiniciar la base.
-- `include/config.h`: capacidades, ventana, umbral y tiempos del vigilante.
+- `include/config.h`: capacidades, ventana, umbral, tiempos del vigilante, de los eventos y de
+  Telegram. `firmware/comun/protocolo/protocolo.h`: `BATERIA_BAJA_MV` y `COLGANTE_AUSENTE_S`.
 
 Los JSON esperados son los mismos que escribe `web/simulador/simulador.py`, que pasó la
 verificación contra las reglas publicadas. No usa `secrets.h`. Cada caso imprime `[ OK  ]` o
 `[FALLO]`, y el programa termina con código `0` solo si todos pasan.
 
-Estado actual: **44 casos y 1287 verificaciones** (la mayoría, del caso "tarea sana" del
-vigilante, que revisa cada 500 ms durante 7.5 min simulados).
+Estado actual (2026-10-27): **63 casos y 1674 verificaciones** (la mayoría, del caso "tarea
+sana" del vigilante, que revisa cada 500 ms durante 7.5 min simulados).
 
 | Área | Qué se verifica |
 |---|---|
@@ -32,6 +38,9 @@ vigilante, que revisa cada 500 ms durante 7.5 min simulados).
 | Cuerpo HTTP | 204, 304 y 1xx sin cuerpo aunque falte `Content-Length` (el 204 de `?print=silent` llega así); `Content-Length` sin consumir de más; chunked entero, de a un byte, con extensión, con trailer y con solo LF; chunked mal formado (no hexadecimal, falta el CRLF, tamaño absurdo, línea vacía); cuerpo que no cabe se consume y se marca; hasta el cierre del servidor |
 | Vigilante | Tarea sana con peticiones cortas: nunca actúa; corta a los 45 s, una sola vez, y reinicia 30 s después; el corte recupera la tarea y una petición nueva se vigila desde cero; una alerta local urgente pospone el reinicio pero no el corte; tarea sin vueltas fuera de una petición: reinicio sin corte; vuelta de `millis()`; método y ruta largos se recortan |
 | Cola | Orden eventos, colgantes, lecturas; sin hora del servidor no salen lecturas; un envío fallido no saca la petición; lecturas llenas descartan la más antigua; las lecturas nunca desplazan eventos y un evento sin lugar se rechaza y se cuenta; confirmar tras una lectura pisada no saca la nueva; un colgante reemplaza al pendiente del mismo id; más colgantes que lugares |
+| Cola offline | Al reconectar, eventos en orden, colgante y lecturas en orden de medición, y Telegram por su cuenta con el BOTON primero; 1 h de lecturas y 50 más descartan las 50 más viejas; destinos Firebase y Telegram por separado (REINICIO solo a Telegram); con la cola llena un BOTON reemplaza al evento más antiguo que no es BOTON y otro tipo se rechaza; guardar y restaurar tras un reinicio (orden, `previo_reinicio`, solo destinos activos, datos cortados u otro formato se ignoran); cola vacía |
+| Eventos | Batería: evento con la primera bandera, vaivén sobre el umbral y "sin dato" no rearman, 3700 mV rearma; episodio con espera de inicio y de fin, una sola vez, el radar que va y viene no repite, vuelta de `millis()`; colgante ausente una vez, vuelve con el siguiente mensaje, episodio nuevo; batería por colgante; más colgantes que lugares; estado tras un reinicio (misma descarga y misma ausencia no se repiten, ausencia contada desde el arranque); `BASE_DESCONECTADA` desde 3 min, no con el estado normal de 60 s ni sin anterior; duraciones "45 s", "12 min", "3 h 5 min", "2 d 4 h" |
+| Telegram | Texto de cada aviso; atraso de más de 1 min y aviso de antes de un reinicio; texto recortado; cuerpo de `sendMessage` con escape; `retry_after` y `description`; 3 s entre mensajes y 1 s para el BOTON; tope de 12 por hora que el BOTON no espera; espera tras error creciente hasta 30 s, `retry_after` mayor manda, un envío correcto la termina |
 
 Ejecutar desde la raíz del repositorio:
 

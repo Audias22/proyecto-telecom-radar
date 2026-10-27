@@ -1,20 +1,11 @@
 #include "cola_peticiones.h"
 
 void ColaPeticiones::agregarLectura(const LecturaNube &lectura) {
-    if (lecturas_.lleno()) {
-        lecturas_.sacar();  // se descarta la más antigua
-        lecturas_descartadas_++;
-    }
-    lecturas_.meter(lectura, ++ultimo_numero_);
+    lecturas_.agregar(lectura, ++ultimo_numero_);
 }
 
-bool ColaPeticiones::agregarEvento(const PeticionEvento &evento) {
-    if (eventos_.lleno()) {
-        eventos_rechazados_++;
-        return false;
-    }
-    eventos_.meter(evento, ++ultimo_numero_);
-    return true;
+ResultadoAgregar ColaPeticiones::agregarEvento(const PeticionEvento &evento) {
+    return eventos_.agregar(evento, ++ultimo_numero_);
 }
 
 // Reemplaza el pendiente del mismo id con un número nuevo: si la tarea de red estaba enviando
@@ -32,10 +23,8 @@ void ColaPeticiones::agregarColgante(const PeticionColgante &colgante) {
 
 bool ColaPeticiones::siguiente(bool con_hora, Peticion &p) const {
     p = {};
-    if (eventos_.cantidad > 0) {
+    if (eventos_.siguiente(DESTINO_FIREBASE, p.evento, p.numero)) {
         p.tipo = PETICION_EVENTO;
-        p.numero = eventos_.numeros[eventos_.inicio];
-        p.evento = eventos_.datos[eventos_.inicio];
         return true;
     }
     const int c = colganteMasAntiguo();
@@ -45,26 +34,21 @@ bool ColaPeticiones::siguiente(bool con_hora, Peticion &p) const {
         p.colgante = colgantes_[c].colgante;
         return true;
     }
-    if (con_hora && lecturas_.cantidad > 0) {
+    if (con_hora && lecturas_.primera(p.lectura, p.numero)) {
         p.tipo = PETICION_LECTURA;
-        p.numero = lecturas_.numeros[lecturas_.inicio];
-        p.lectura = lecturas_.datos[lecturas_.inicio];
         return true;
     }
+    p = {};
     return false;
 }
 
 void ColaPeticiones::confirmar(const Peticion &p) {
     switch (p.tipo) {
         case PETICION_EVENTO:
-            if (eventos_.cantidad > 0 && eventos_.numeros[eventos_.inicio] == p.numero) {
-                eventos_.sacar();
-            }
+            eventos_.confirmar(DESTINO_FIREBASE, p.numero);
             break;
         case PETICION_LECTURA:
-            if (lecturas_.cantidad > 0 && lecturas_.numeros[lecturas_.inicio] == p.numero) {
-                lecturas_.sacar();
-            }
+            lecturas_.confirmar(p.numero);
             break;
         case PETICION_COLGANTE:
             for (auto &entrada : colgantes_) {
@@ -78,13 +62,40 @@ void ColaPeticiones::confirmar(const Peticion &p) {
     }
 }
 
+bool ColaPeticiones::siguienteTelegram(PeticionEvento &evento, uint32_t &numero) const {
+    return eventos_.siguiente(DESTINO_TELEGRAM, evento, numero);
+}
+
+void ColaPeticiones::confirmarTelegram(uint32_t numero) {
+    eventos_.confirmar(DESTINO_TELEGRAM, numero);
+}
+
+size_t ColaPeticiones::serializarEventos(uint8_t *buffer, size_t tamano) {
+    const size_t largo = eventos_.serializar(buffer, tamano);
+    if (largo > 0) {
+        eventos_.limpiarCambio();
+    }
+    return largo;
+}
+
+int ColaPeticiones::restaurarEventos(const uint8_t *datos, size_t largo,
+                                     uint8_t destinos_activos) {
+    return eventos_.restaurar(datos, largo, destinos_activos, ultimo_numero_);
+}
+
 TamanosCola ColaPeticiones::tamanos() const {
     size_t colgantes = 0;
     for (const auto &entrada : colgantes_) {
         colgantes += entrada.ocupada ? 1 : 0;
     }
-    return {eventos_.cantidad, colgantes, lecturas_.cantidad, lecturas_descartadas_,
-            eventos_rechazados_};
+    return {eventos_.cantidad(),
+            eventos_.pendientes(DESTINO_FIREBASE),
+            eventos_.pendientes(DESTINO_TELEGRAM),
+            colgantes,
+            lecturas_.cantidad(),
+            lecturas_.descartadas(),
+            eventos_.rechazados(),
+            eventos_.reemplazados()};
 }
 
 // Números crecientes: el menor es el más antiguo. La comparación por diferencia aguanta la vuelta

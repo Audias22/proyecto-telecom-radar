@@ -4,7 +4,7 @@
 #pragma once
 
 #define FIRMWARE_NOMBRE  "base-radar"
-#define FIRMWARE_VERSION "0.5.1"
+#define FIRMWARE_VERSION "0.6.0"
 
 // ---------------------------------------------------------------------------
 // Salida por serial
@@ -170,8 +170,9 @@
 #define FIREBASE_ESPERA_ERROR_MS         5000UL
 #define FIREBASE_ESPERA_ERROR_MAXIMA_MS  60000UL
 
-// Límites de cada petición HTTPS, en las dos conexiones (Auth y base de datos). La tarea de red
-// espera; loop() nunca. Cada espera de arduino-esp32 3.3.7 está en docs/fallos.md, escenario 5.
+// Límites de cada petición HTTPS, en todas las conexiones (Auth, base de datos y Telegram,
+// src/peticion_https.h). La tarea de red espera; loop() nunca. Cada espera de arduino-esp32
+// 3.3.7 está en docs/fallos.md, escenario 5.
 // - DNS: no se puede limitar desde aquí. lwIP lo corta solo (DNS_MAX_RETRIES 4, reintentos a
 //   1, 1, 2 y 3 s: ~7 s por servidor DNS).
 // - Conexión TCP (select del connect) y escritura TLS sin avance (socket_timeout de ssl_client):
@@ -210,13 +211,16 @@
 // Una lectura que sale más de este tiempo después de medirse se marca diferida: true.
 #define LECTURA_DIFERIDA_MS  (2 * LECTURA_INTERVALO_MS)
 
-// Cola de peticiones de loop() a la tarea de red (src/cola_peticiones.h). Acotada:
-// - lecturas: 24 (2 min a una cada 5 s). Llena, se descarta la lectura más antigua.
-// - eventos: 32, aparte. Una lectura nunca desplaza a un evento.
+// Cola de peticiones de loop() a la tarea de red (src/cola_peticiones.h y src/cola_offline.h,
+// docs/fallos.md escenario 4). Acotada:
+// - lecturas: 720 en RAM (1 h a una cada 5 s; 28 B cada una con su número, ~20 kB). Llena, se
+//   descarta la más antigua. Se pierden con un reinicio (docs/modelo-datos.md, 2).
+// - eventos: 32, aparte, para Firebase y Telegram. Una lectura nunca desplaza a un evento y no se
+//   descartan; se guardan en NVS mientras estén pendientes (~2.8 kB con la cola llena). Con la
+//   cola llena, solo un BOTON reemplaza al evento más antiguo que no sea BOTON.
 // - colgantes: una entrada por id (8 ids a la vez); un mensaje nuevo reemplaza al pendiente del
 //   mismo colgante, porque solo importa el último valor.
-// La cola offline completa (lecturas de horas sin red) es la parte 2 (src/cola_offline.h).
-#define COLA_LECTURAS_CAPACIDAD   24
+#define COLA_OFFLINE_LECTURAS     720
 #define COLA_EVENTOS_CAPACIDAD    32
 #define COLA_COLGANTES_CAPACIDAD  8
 
@@ -225,3 +229,65 @@
 // nunca deja a loop() sin correr. Pila: el handshake de mbedTLS usa unos 6-8 kB.
 #define TAREA_RED_PRIORIDAD  1
 #define TAREA_RED_PILA       12288
+
+// Watchdog de tareas de ESP-IDF (src/watchdog_tareas.h). Vigila loop() y la tarea de red fuera de
+// sus peticiones HTTPS (dentro de una petición la vigila vigilante_red, que mira la alerta local).
+// loop() nunca bloquea y da una vuelta en milisegundos; 10 s cubren de sobra la escritura más
+// lenta en NVS y un Serial lleno sin monitor. Al vencer: panic y reinicio (ESP_RST_TASK_WDT).
+#define WDT_TAREAS_TIMEOUT_MS  10000
+
+// ---------------------------------------------------------------------------
+// Eventos de la base (docs/fallos.md, "Tipos de evento"). Cada uno, una vez por episodio.
+// ---------------------------------------------------------------------------
+
+// Cada cuánto loop() revisa la ausencia de colgantes y el radar sin datos.
+#define DETECTORES_PERIODO_MS  1000UL
+
+// BATERIA_BAJA: el colgante pone FLAG_BATERIA_BAJA por debajo de BATERIA_BAJA_MV (3500 mV,
+// protocolo.h). El evento sale con el primer mensaje con la bandera y no se repite hasta que
+// llegue uno sin la bandera y con al menos BATERIA_RECUPERADA_MV: cerca del umbral el voltaje de
+// una Li-ion sube y baja con la carga, la temperatura y el ruido del ADC, y sin margen cada
+// vaivén sería un evento nuevo. 200 mV por encima solo se alcanzan cargando la batería.
+#define BATERIA_RECUPERADA_MV  (BATERIA_BAJA_MV + 200)
+
+// COLGANTE_AUSENTE: ningún mensaje del colgante en COLGANTE_AUSENTE_S (protocolo.h): 45 min, tres
+// heartbeats de 15 min. Un heartbeat perdido es normal (la base buscando el router cambia de canal
+// y el colgante no reintenta un heartbeat hasta el siguiente); dos seguidos pasan en una caída
+// larga del router. Con tres, la ausencia es real (batería agotada, fuera de alcance) y se avisa a
+// menos de una hora. Con HEARTBEAT_PRUEBA_S en el colgante, bajar este valor para probar.
+#define COLGANTE_AUSENTE_MS  (COLGANTE_AUSENTE_S * 1000UL)
+
+// RADAR_SIN_DATOS: radar::sinDatos() (RADAR_SIN_DATOS_MS sin tramas) durante
+// RADAR_EVENTO_ESPERA_MS más, o sea 30 s sin tramas: para entonces la UART se reinició 5 veces.
+// Un corte que se arregla con el primer reinicio de la UART no es un evento. El episodio termina
+// tras RADAR_RECUPERADO_MS seguidos con datos, para que un radar que va y viene no repita avisos.
+#define RADAR_EVENTO_ESPERA_MS  25000UL
+#define RADAR_RECUPERADO_MS     60000UL
+
+// BASE_DESCONECTADA: al arrancar o reconectar, si entre el último ultimo_contacto y el nuevo pasó
+// esto o más. Es el umbral del panel (3 periodos de estado, docs/modelo-datos.md, 3).
+#define BASE_DESCONECTADA_MIN_MS  180000ULL
+
+// ---------------------------------------------------------------------------
+// Telegram (src/telegram.h). TELEGRAM_TOKEN y TELEGRAM_CHAT_ID en secrets.h.
+// ---------------------------------------------------------------------------
+
+#define TELEGRAM_HABILITADO  BASE_WIFI_HABILITADO
+
+// Límite de frecuencia. Telegram pide no más de un mensaje por segundo en un chat y 20 por minuto
+// en un grupo. Aquí: un mensaje cada 3 s como mucho y 12 por hora sin contar los BOTON. Un BOTON
+// solo espera 1 s desde el anterior y no cuenta para el tope por hora. Lo que excede el tope no se
+// pierde: espera en la cola.
+#define TELEGRAM_INTERVALO_MIN_MS      3000UL
+#define TELEGRAM_INTERVALO_URGENTE_MS  1000UL
+#define TELEGRAM_MAX_POR_HORA          12
+
+// Tras un error de red o del servidor: 2 s y el doble en cada fallo seguido, hasta 30 s. Un 429
+// de Telegram trae retry_after y se respeta si es mayor.
+#define TELEGRAM_ESPERA_ERROR_MS         2000UL
+#define TELEGRAM_ESPERA_ERROR_MAXIMA_MS  30000UL
+
+// La conexión con api.telegram.org queda abierta para el mensaje siguiente; sin uso por más de
+// esto se cierra (libera ~40 kB de heap del TLS). Por confirmar con el módulo cuándo cierra el
+// servidor una conexión inactiva.
+#define TELEGRAM_REUSO_MAX_MS  30000UL

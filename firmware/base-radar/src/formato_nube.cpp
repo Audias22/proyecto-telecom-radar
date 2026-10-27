@@ -112,6 +112,21 @@ const char *saltarEspacios(const char *c) {
     return c;
 }
 
+// Inicio del valor de "clave" (después de los dos puntos y los espacios), o nullptr.
+const char *buscarValor(const char *json, const char *clave) {
+    char buscado[48];
+    const int n = snprintf(buscado, sizeof(buscado), "\"%s\"", clave);
+    if (n < 0 || static_cast<size_t>(n) >= sizeof(buscado)) {
+        return nullptr;
+    }
+    const char *c = std::strstr(json, buscado);
+    if (c == nullptr) {
+        return nullptr;
+    }
+    c = saltarEspacios(c + n);
+    return *c == ':' ? saltarEspacios(c + 1) : nullptr;
+}
+
 }  // namespace
 
 uint64_t millisAHoraServidor(uint64_t hora_ref_ms, uint32_t millis_ref, uint32_t millis_medicion) {
@@ -190,6 +205,8 @@ const char *nombreEvento(TipoEvento tipo) {
             return "COLGANTE_AUSENTE";
         case EVENTO_RADAR_SIN_DATOS:
             return "RADAR_SIN_DATOS";
+        case EVENTO_REINICIO:
+            return "REINICIO";
         default:
             return "APNEA";
     }
@@ -205,22 +222,19 @@ size_t jsonInicioSesion(const char *correo, const char *clave, char *json, size_
     return e.terminar();
 }
 
+size_t jsonTelegram(const char *chat_id, const char *texto, char *json, size_t tamano) {
+    Escritor e(json, tamano);
+    e.agregar("{\"chat_id\":");
+    e.agregarTexto(chat_id);
+    e.agregar(",\"text\":");
+    e.agregarTexto(texto);
+    e.agregar("}");
+    return e.terminar();
+}
+
 bool extraerTexto(const char *json, const char *clave, char *destino, size_t tamano) {
-    char buscado[48];
-    const int n = snprintf(buscado, sizeof(buscado), "\"%s\"", clave);
-    if (n < 0 || static_cast<size_t>(n) >= sizeof(buscado) || tamano == 0) {
-        return false;
-    }
-    const char *c = std::strstr(json, buscado);
-    if (c == nullptr) {
-        return false;
-    }
-    c = saltarEspacios(c + n);
-    if (*c != ':') {
-        return false;
-    }
-    c = saltarEspacios(c + 1);
-    if (*c != '"') {
+    const char *c = buscarValor(json, clave);
+    if (c == nullptr || tamano == 0 || *c != '"') {
         return false;
     }
     c++;
@@ -233,6 +247,11 @@ bool extraerTexto(const char *json, const char *clave, char *destino, size_t tam
     }
     destino[i] = '\0';
     return true;
+}
+
+bool extraerEntero(const char *json, const char *clave, uint64_t &valor) {
+    const char *c = buscarValor(json, clave);
+    return c != nullptr && *c != '"' && leerEntero(c, valor);
 }
 
 bool leerEntero(const char *texto, uint64_t &valor) {
