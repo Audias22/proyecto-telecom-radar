@@ -27,25 +27,41 @@
 // ganan ~6 dB. Aparte, la altura y la orientacion del receptor cambian mucho el RSSI.
 #define COLGANTE_TX_POTENCIA_QDBM 80
 
-// Medicion de bateria. El modo simulado queda habilitado mientras no exista hardware; su valor
-// sirve para desarrollar el flujo, no representa una medicion ni confirma que haya una bateria.
-#define BATERIA_MODO_SIMULADO          1
+// Medicion de bateria. Con 1 se envia BATERIA_SIMULADA_MV sin tocar el ADC; solo para desarrollar
+// sin bateria, no es una medicion. Con la bateria y el divisor armados (2026-10-27) se mide.
+#define BATERIA_MODO_SIMULADO          0
 #define BATERIA_SIMULADA_MV         3900U
 #define BATERIA_LECTURA_INVALIDA_MV     0U
 
-// Divisor propuesto: bateria protegida -- 1 Mohm -- GPIO1 -- 470 kohm -- GND.
-// Un capacitor de 10 nF entre GPIO1 y GND reduce ruido y ayuda al ADC con la alta impedancia.
-#define BATERIA_RESISTENCIA_SUPERIOR_OHM  1000000UL
-#define BATERIA_RESISTENCIA_INFERIOR_OHM   470000UL
-#define BATERIA_CAPACITOR_NF                    10U
+// Divisor armado: OUT+ del TP4056 -- 100 kohm -- GPIO1 -- 100 kohm -- GND, sin capacitor (no hay
+// 1 Mohm, 470 kohm ni 10 nF). Factor 2: con 4.2 V la bateria deja 2.1 V en GPIO1. Corriente
+// continua del divisor, tambien en deep sleep: 4.2 V / 200 kohm = 21 uA (~0.5 mAh por dia).
+#define BATERIA_RESISTENCIA_SUPERIOR_OHM   100000UL
+#define BATERIA_RESISTENCIA_INFERIOR_OHM   100000UL
 #define BATERIA_TENSION_MAXIMA_MV             4200U
 
-// ADC real: 12 bits, atenuacion de 11 dB y promedio de lecturas calibradas. En ESP32-C3 los
-// ~1343 mV esperados superan el rango documentado de 6 dB (~1300 mV), por eso se usan 11 dB.
+// ADC real: 12 bits, atenuacion ADC_11db y promedio de lecturas calibradas. En arduino-esp32 3.3.7
+// ADC_11db es la ADC_ATTEN_DB_12 de ESP-IDF (hal/adc_types.h: ADC_ATTEN_DB_11 = ADC_ATTEN_DB_12).
+// Hoja de datos ESP32-C3 v2.4, tabla 5-6: rango efectivo 0-750 mV (ATTEN0), 0-1050 (ATTEN1),
+// 0-1300 (ATTEN2) y 0-2500 mV (ATTEN3), con error total de +-35 mV en ATTEN3. Los 2.1 V solo
+// caben en ATTEN3.
+#define BATERIA_ADC_RANGO_ATTEN3_MV             2500U
 #define BATERIA_ADC_RESOLUCION_BITS              12U
 #define BATERIA_ADC_MUESTRAS                      16U
-#define BATERIA_ADC_ESTABILIZACION_MS           20UL
-#define BATERIA_ADC_LIMITE_MV                   1500U
+
+// Una lectura del pin por encima de este valor se descarta (centinela 0). Peor caso esperado:
+// 4.24 V (4.2 V +1 % del TP4056) con resistencias de 5 % da 2227 mV, mas 35 mV de error del ADC,
+// 2262 mV. 2400 queda arriba de eso y abajo del final del rango de ATTEN3 (2500 mV).
+#define BATERIA_ADC_LIMITE_MV                   2400U
+
+// Impedancia de la fuente vista por el ADC: 100 k || 100 k = 50 kohm, sin capacitor que entregue
+// la carga del muestreo. Espressif caracteriza el ADC con 100 nF externos (tabla 5-5), asi que este
+// caso no esta cubierto por la hoja de datos. Se acepta porque la tension de la bateria cambia
+// en horas: la primera conversion se descarta y se promedian BATERIA_ADC_MUESTRAS lecturas, lo que
+// reduce el ruido (la hoja recomienda promediar). Riesgo que queda: un error fijo por la carga del
+// capacitor de muestreo a traves de 50 kohm, que el promedio no corrige, y ruido del radio si se
+// mide cerca de una transmision. Por confirmar con el modulo: comparar con el multimetro
+// (pruebas_fisicas.md, seccion 4).
 
 // Tiempos del boton. La espera de liberacion siempre termina al alcanzar el limite,
 // aunque el boton permanezca presionado o el contacto siga rebotando.

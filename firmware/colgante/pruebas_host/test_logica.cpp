@@ -203,7 +203,11 @@ void bateriaConversionAdc() {
     VERIFICAR(bateria::logica::lecturaAdcValida(BATERIA_ADC_LIMITE_MV));
     VERIFICAR(!bateria::logica::lecturaAdcValida(BATERIA_ADC_LIMITE_MV + 1));
     VERIFICAR_IGUAL(bateria::logica::convertirAdcABateria(0), 0);
-    VERIFICAR_IGUAL(bateria::logica::convertirAdcABateria(1343), 4200);
+    VERIFICAR_IGUAL(bateria::logica::convertirAdcABateria(2100), 4200);
+    VERIFICAR_IGUAL(bateria::logica::convertirAdcABateria(1750), 3500);
+    VERIFICAR_IGUAL(bateria::logica::convertirAdcABateria(1931), 3862);
+    VERIFICAR(bateria::logica::lecturaAdcValida(2262));
+    VERIFICAR(BATERIA_ADC_LIMITE_MV <= BATERIA_ADC_RANGO_ATTEN3_MV);
     VERIFICAR(bateria::logica::convertirAdcABateria(BATERIA_ADC_LIMITE_MV) <= UINT16_MAX);
 }
 

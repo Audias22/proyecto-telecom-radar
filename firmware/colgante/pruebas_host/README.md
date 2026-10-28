@@ -18,7 +18,7 @@ No usa `secrets.h` ni ningún archivo `.cpp` del firmware. No necesita un framew
 cada caso imprime `[ OK  ]` o `[FALLO]`, y el programa termina con código `0` solo si todos los
 casos pasan.
 
-Estado actual: **43 casos y 649 verificaciones**. Además, dos `static_assert` comprueban en
+Estado actual: **43 casos y 653 verificaciones**. Además, dos `static_assert` comprueban en
 compilación que `decidir()` produce ALERTA y HEARTBEAT en sus casos principales.
 
 ## Casos
@@ -27,7 +27,7 @@ compilación que `decidir()` produce ALERTA y HEARTBEAT en sus casos principales
 |---|---|
 | Paquete | `sizeof == 8`, desplazamiento de cada campo, bytes exactos del ejemplo ALERTA y del ACK con canal 7 de `docs/protocolo.md` (también armado con `ackConCanal`), secuencia en little-endian |
 | Construcción | Versión `1`, tipo ALERTA `1` / HEARTBEAT `2`, id `7`/`255`, secuencias `0`, `1`, `0x7FFF`, `0x8000`, `0xFFFF`; sin `FLAG_REINTENTO`, `FLAG_BARRIDO` ni bits reservados |
-| Batería | `0`, `3499` → baja; `3500`, `3900` → no baja; el flag del paquete coincide con `esBaja`; `0 mV` es el centinela inválido; límite ADC `1500/1501 mV`; divisor `1343 → 4200 mV` |
+| Batería | `0`, `3499` → baja; `3500`, `3900` → no baja; el flag del paquete coincide con `esBaja`; `0 mV` es el centinela inválido; límite ADC `2400/2401 mV` (dentro de los 2500 mV de ATTEN3) y peor caso esperado `2262 mV` válido; divisor 100 k / 100 k: `2100 → 4200`, `1750 → 3500`, `1931 → 3862 mV` |
 | Flags | Valores de bits; `FLAG_ARRANQUE_FRIO` solo con `arranque_frio`; las cuatro combinaciones de `prepararFlags`; conserva flags previos; idempotencia |
 | Retransmisión | Los `ACK_REINTENTOS` intentos del canal guardado y los `13 × ACK_REINTENTOS_BARRIDO` del barrido conservan secuencia, versión, tipo, id y batería; `FLAG_REINTENTO` desde el segundo intento; barrido con `FLAG_REINTENTO | FLAG_BARRIDO`; el ACK de la secuencia original confirma cualquier retransmisión |
 | ACK | Aceptado con y sin `FLAG_ACK_DUPLICADO` y en secuencias límite; rechazado por versión, tipo (ALERTA, HEARTBEAT, 0, 4, eco del propio paquete), id y secuencia (incluido el byte-swap) |

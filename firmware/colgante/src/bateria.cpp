@@ -27,6 +27,8 @@ static_assert(BATERIA_SIMULADA_MV <= UINT16_MAX,
               "El voltaje simulado debe caber en el campo del protocolo");
 static_assert(ADC_MAXIMO_ESPERADO_MV < BATERIA_ADC_LIMITE_MV,
               "El limite ADC debe superar el maximo esperado del divisor");
+static_assert(BATERIA_ADC_LIMITE_MV <= BATERIA_ADC_RANGO_ATTEN3_MV,
+              "El limite ADC no debe pasar del rango efectivo de ATTEN3 (2500 mV)");
 static_assert(bateria::logica::convertirAdcABateria(BATERIA_ADC_LIMITE_MV) <= UINT16_MAX,
               "La conversion maxima debe caber en uint16_t");
 static_assert(!bateria::logica::esBaja(BATERIA_SIMULADA_MV),
@@ -39,17 +41,19 @@ static_assert(!bateria::logica::lecturaBateriaValida(BATERIA_LECTURA_INVALIDA_MV
               "El centinela no debe considerarse una medicion valida");
 static_assert(bateria::logica::lecturaBateriaValida(BATERIA_SIMULADA_MV),
               "El valor simulado debe pertenecer al dominio numerico valido");
-static_assert(bateria::logica::convertirAdcABateria(1343U) == 4200U,
-              "El factor del divisor debe reconstruir aproximadamente 4.2 V");
+static_assert(ADC_MAXIMO_ESPERADO_MV == 2100U,
+              "Con 100 k / 100 k la bateria llena deja 2.1 V en GPIO1");
+static_assert(bateria::logica::convertirAdcABateria(2100U) == 4200U,
+              "El factor del divisor debe reconstruir 4.2 V");
 
 uint16_t leerMilivoltiosReales() {
     // En Arduino ESP32 3.3.7 la calibracion de analogReadMilliVolts() usa la atenuacion global.
     // Se configura antes de inicializar el canal para que lectura y calibracion coincidan.
     analogReadResolution(BATERIA_ADC_RESOLUCION_BITS);
     analogSetAttenuation(ADC_11db);
-    delay(BATERIA_ADC_ESTABILIZACION_MS);
 
-    // La primera conversion carga el circuito de muestreo; no se incorpora al promedio.
+    // Sin capacitor no hay que esperar a que cargue: el divisor responde de inmediato. La primera
+    // conversion inicializa el canal y carga el circuito de muestreo; no entra en el promedio.
     (void)analogReadMilliVolts(PIN_BATERIA_ADC);
 
     uint64_t suma_adc_mv = 0;
