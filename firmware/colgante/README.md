@@ -13,7 +13,7 @@ Detalle en `docs/protocolo.md`.
 | `boton` | Botón de auxilio, antirrebote y causa del despertar (implementado) |
 | `espnow_tx` | Envío, espera de ACK, reintentos, barrido, canal y secuencia en RTC (implementado) |
 | `energia` | Deep sleep, fuentes de despertar, beeps de confirmación y error (implementado) |
-| `bateria` | Voltaje simulado o medido por ADC (implementado; simulación activa) |
+| `bateria` | Voltaje medido por ADC con el divisor de GPIO1, o simulado para desarrollo (implementado; medición real activa) |
 | `despertar` | Decisión pura ALERTA / HEARTBEAT / ninguna a partir de reset, causa de wake y recuperación (solo header) |
 
 `main.cpp` integra el ciclo completo de los cuatro módulos. Lee el motivo de reset, la causa del
@@ -39,8 +39,9 @@ despertar, el bit de GPIO3 y la recuperación del botón atascado, y delega la d
   ruido eléctrico. Las pruebas físicas deben confirmar que el pull-up y el cableado no causen wakes
   falsos; si los causan, se necesitará mejorar el circuito o añadir filtrado hardware. Antes de
   rearmar el wake, `energia::dormir()` exige una liberación estable con el antirrebote existente.
-- Antes de cada mensaje se obtiene el voltaje. Mientras `BATERIA_MODO_SIMULADO=1`, se transmiten
-  `3900 mV` solo para desarrollar el flujo y el registro advierte que no es una medición física.
+- Antes de cada mensaje se mide el voltaje de la batería (`BATERIA_MODO_SIMULADO=0`). Con `1` se
+  transmiten `3900 mV` solo para desarrollar el flujo y el registro advierte que no es una
+  medición física.
 - `espnow_tx::enviar()` determina la entrega exclusivamente por ACK de aplicación. En una alerta,
   `ENVIO_OK` o `ENVIO_OK_BARRIDO` produce un beep corto; `ENVIO_SIN_ACK`, incluida una MAC nula o
   una inicialización fallida, produce tres beeps de error. Un heartbeat nunca produce sonidos,
@@ -153,72 +154,84 @@ deep sleep, habrá que añadir una resistencia externa sin cambiar la lógica ac
 
 ### Modo simulado
 
-- `BATERIA_MODO_SIMULADO` está inicialmente en `1`. En este modo `leerMilivoltios()` devuelve
+- `BATERIA_MODO_SIMULADO` está en `0` desde el 2026-10-27 (batería y divisor armados). Con `1`,
+  `leerMilivoltios()` devuelve
   exactamente `3900 mV`, escribe por Serial que el dato es simulado y no configura ni consulta el
   ADC. `modoSimulado()` permite que `main.cpp` registre que ese valor no es una medición física.
   El paquete no tiene un campo que indique simulación: la base recibe `3900 mV` como cualquier
   otro valor.
 - Los `3900 mV` sirven únicamente para ejercitar el formato del paquete y la lógica. No demuestran
   que haya una batería conectada, no describen su carga y no deben almacenarse como telemetría
-  física. Antes de probar el dispositivo real se debe cambiar `BATERIA_MODO_SIMULADO` a `0`.
+  física.
 - El umbral compartido es estricto: `bateria_mv < BATERIA_BAJA_MV`. Por ello `3499 mV` se considera
   bajo, `3500 mV` no, y el valor simulado de `3900 mV` no activa `FLAG_BATERIA_BAJA`. Esto valida
   lógica de desarrollo, no el estado de una celda real.
 
-### Circuito propuesto
+### Divisor armado (2026-10-27)
 
-No conectar una Li-ion directamente a GPIO1. El pin admite la salida reducida de este divisor:
+No conectar la Li-ion directamente a GPIO1. Se armó con lo que había: dos resistencias de
+100 kΩ, sin capacitor (no había 1 MΩ, 470 kΩ ni 10 nF).
 
 ```text
-OUT+ protegido de la batería --- 1 MΩ ---+--- GPIO1 / ADC1_CH1
-                                         |
-                                         +--- 470 kΩ --- GND / OUT-
-                                         |
-                                         +--- 10 nF ---- GND / OUT-
+OUT+ del TP4056 --- 100 kΩ ---+--- GPIO1 / ADC1_CH1
+                              |
+                              +--- 100 kΩ --- G / OUT-
 ```
 
-El capacitor de `10 nF` se conecta del nodo GPIO1 a GND, en paralelo con la resistencia de
-`470 kΩ`. No se debe conectar el nodo a VBUS/USB de 5 V. Hay que confirmar en el módulo TP4056
-real cuáles terminales son la salida protegida `OUT+` y `OUT-`.
+- Factor de reconstrucción: `(100 k + 100 k) / 100 k = 2`. Con la batería llena (4.2 V), GPIO1
+  recibe 2.1 V; con 3.5 V (`BATERIA_BAJA_MV`), 1.75 V.
+- Corriente continua del divisor: `4.2 V / 200 kΩ = 21 µA`, también en deep sleep. Son unos
+  0.5 mAh por día, el 0.2 % de la celda de 240 mAh. Es bastante más que los ~2.9 µA del divisor
+  de 1 MΩ / 470 kΩ que se había propuesto, y puede pesar en la autonomía si el resto de la placa
+  consume poco en deep sleep. Por confirmar con el módulo cuando se pueda medir corriente.
+- Impedancia de la fuente vista por el ADC: `100 k || 100 k = 50 kΩ`, sin capacitor.
 
-- Resistencias propuestas: `R_superior = 1,000,000 Ω` y `R_inferior = 470,000 Ω`, idealmente de
-  1 %. Factor de reconstrucción: `(R_superior + R_inferior) / R_inferior = 1470 / 470 ≈ 3.12766`.
-- Con la Li-ion en su máximo esperado de `4.2 V`, GPIO1 recibe
-  `4.2 × 470 / 1470 ≈ 1.343 V`.
-- La corriente continua máxima del divisor es `4.2 V / 1.47 MΩ ≈ 2.86 µA`. Debe medirse junto
-  con el consumo de la placa; LED, regulador y fugas pueden dominar ampliamente ese valor.
-- La impedancia Thévenin es aproximadamente `320 kΩ`. Es alta para priorizar bajo consumo; el
-  capacitor de `10 nF` actúa como reserva local de carga para el muestreo del ADC y forma una
-  constante de tiempo de unos `3.2 ms`. La espera configurada de `20 ms` supera seis constantes
-  de tiempo antes de descartar la primera conversión. Esto reduce el error por la alta impedancia,
-  pero su efectividad todavía debe comprobarse con el circuito real.
+### Lectura real
 
-### Lectura real preparada
+`BATERIA_MODO_SIMULADO = 0`. El módulo configura 12 bits y la atenuación `ADC_11db`, descarta la
+primera conversión y promedia 16 resultados de `analogReadMilliVolts()`, que usa la calibración
+del ESP32-C3 para dar milivoltios del pin. Después multiplica por 2 con redondeo.
 
-Con la simulación desactivada, el módulo configura 12 bits y atenuación de 11 dB, descarta la
-primera conversión y promedia 16 resultados de `analogReadMilliVolts()`. Esta API utiliza el
-esquema de calibración disponible en el ESP32-C3 para convertir la lectura a milivoltios del pin;
-después se aplica el factor racional `1470/470` usando aritmética de 64 bits y redondeo.
+Rango del ADC, verificado y no supuesto:
 
-En el ESP32-C3, el rango documentado para 6 dB termina aproximadamente en `1300 mV`, de modo que
-no cubre los `1343 mV` del divisor a carga completa. La atenuación de 11 dB amplía el rango hasta
-aproximadamente `2500 mV`. El software adopta un límite más conservador de `1500 mV`, todavía por
-encima del máximo esperado.
+- En arduino-esp32 3.3.7, `ADC_11db` es la `ADC_ATTEN_DB_12` de ESP-IDF (`hal/adc_types.h` del
+  framework instalado: `ADC_ATTEN_DB_11` está marcada como obsoleta y vale lo mismo que
+  `ADC_ATTEN_DB_12`).
+- Hoja de datos del ESP32-C3 (v2.4, tabla 5-6), rango efectivo después de la calibración:
+  0-750 mV (ATTEN0), 0-1050 mV (ATTEN1), 0-1300 mV (ATTEN2) y 0-2500 mV (ATTEN3), con un error
+  total de ±10 mV en las tres primeras y de ±35 mV en ATTEN3. Los 2.1 V solo caben en ATTEN3.
+- `BATERIA_ADC_LIMITE_MV = 2400`. Peor caso esperado: 4.24 V (4.2 V +1 % de la regulación del
+  TP4056) con resistencias de 5 % da 2227 mV, más 35 mV de error del ADC, 2262 mV. 2400 queda
+  arriba de eso y abajo del final del rango (2500 mV); un `static_assert` lo comprueba.
 
-Una lectura del pin que supere ese límite o una conversión imposible devuelve el centinela
+Sin capacitor y con 50 kΩ: Espressif caracteriza el ADC con un capacitor externo de 100 nF
+(tabla 5-5), así que este montaje no está cubierto por la hoja de datos. Se considera aceptable
+porque el voltaje de la batería cambia en horas, no en milisegundos: descartar la primera
+conversión y promediar 16 reduce el ruido, como recomienda la propia hoja de datos. Riesgos que
+quedan, **por confirmar con el módulo**:
+
+- Un error fijo: el capacitor de muestreo del ADC se carga a través de 50 kΩ y puede no llegar al
+  voltaje del nodo en cada conversión. El promedio no corrige un error fijo; si aparece, se ve
+  como una diferencia constante contra el multímetro.
+- Ruido del radio: la lectura se hace antes de transmitir, pero conviene comparar lecturas con y
+  sin radio activo.
+- Si hace falta, un capacitor de 10-100 nF entre GPIO1 y GND resuelve los dos puntos; entonces
+  habría que volver a esperar a que cargue antes de medir (con 50 kΩ y 100 nF, τ = 5 ms).
+
+Al quitar el capacitor se eliminó también la espera de 20 ms antes de medir, que solo servía para
+cargarlo.
+
+Una lectura del pin que supere el límite o una conversión imposible devuelve el centinela
 `BATERIA_LECTURA_INVALIDA_MV = 0`. Debido a que `PaqueteEspNow.bateria_mv` no tiene un estado de
 validez separado, `main.cpp` lo transmite tal cual y lo registra por Serial; la base debe
 interpretarlo como lectura no disponible o fallo ADC, no como una medición física de `0 V`. El
-paquete lleva además `FLAG_BATERIA_BAJA` por seguridad. `lecturaValida()` permite distinguir el centinela antes de transmitir. Afirmar que
-un dato es físico requiere simultáneamente `!modoSimulado()` y `lecturaValida(valor)`.
+paquete lleva además `FLAG_BATERIA_BAJA` por seguridad. `lecturaValida()` permite distinguir el
+centinela antes de transmitir.
 
-La calibración interna no corrige tolerancias del divisor, ruido de la placa, fugas por la alta
-impedancia ni error residual del ADC.
-
-Cuando llegue el hardware se debe comparar GPIO1 y la batería con un multímetro en varios puntos
-entre carga completa y descarga, repetir lecturas con y sin radio activo, verificar el error de
-las resistencias reales y medir consumo en deep sleep. Solo esa curva permitirá confirmar o
-ajustar `BATERIA_BAJA_MV = 3500 mV`; hasta entonces el umbral sigue siendo una hipótesis de diseño.
+La calibración interna no corrige tolerancias del divisor ni el error por la impedancia. Hay que
+comparar GPIO1 y la batería con un multímetro en varios puntos entre carga completa y descarga
+(`pruebas_fisicas.md`, sección 4). Solo esa curva permitirá confirmar o ajustar
+`BATERIA_BAJA_MV = 3500 mV`; hasta entonces el umbral sigue siendo una hipótesis de diseño.
 
 ## Instalación y carga
 
@@ -231,6 +244,9 @@ pio run -d firmware/colgante
 pio run -d firmware/colgante -t upload
 pio device monitor -d firmware/colgante
 ```
+
+Antes de conectar el USB del C3, desconectar `OUT+` del pin `5V` (ver "Regla: nunca conectar el
+USB del C3 con la batería conectada").
 
 Mientras el colgante duerme, el puerto USB desaparece. Para cargar firmware, mantener BOOT
 presionado al conectar si el puerto no aparece.
@@ -252,37 +268,78 @@ primera ALERTA sale al presionar el botón con el equipo ya dormido, y el siguie
 
 | Valor | Actual | Para el dispositivo real |
 |---|---|---|
-| `BATERIA_MODO_SIMULADO` | `1` (envía 3900 mV fijos) | `0`, después de armar y medir el divisor |
+| `BATERIA_MODO_SIMULADO` | `0` (mide con el divisor de GPIO1) | `0`. `1` solo para desarrollar sin batería (envía 3900 mV fijos) |
 | `REGISTROS_SERIAL_HABILITADOS` | `1` (espera hasta 2 s el USB solo en el arranque en frío) | `0` en operación normal, para reducir tiempo despierto y consumo |
 | `COLGANTE_TX_POTENCIA_QDBM` | `80` (20 dBm; unidades de 0.25 dBm) | `80`. Elegido con la prueba 9 de `pruebas_fisicas.md`: a 3 m dio ~6 dB más de RSSI que con `34` (8.5 dBm) |
 | `HEARTBEAT_PRUEBA_S` | `0` (heartbeat cada 15 min, de `protocolo.h`) | `0`. Para pruebas en banco, un valor corto como `30` |
-| `PIN_BOTON`, `PIN_BATERIA_ADC`, `PIN_BUZZER` | GPIO3, GPIO1, GPIO10 | Confirmar con el circuito armado |
+| `PIN_BOTON`, `PIN_BATERIA_ADC`, `PIN_BUZZER` | GPIO3, GPIO1, GPIO10 | Los del circuito armado el 2026-10-27 |
 
 Las constantes del enlace (canal, tiempos, reintentos, heartbeat, umbral de batería) están en
 `firmware/comun/protocolo/protocolo.h` y se comparten con la base.
 
-## Conexiones propuestas
+## Conexiones del colgante (armado el 2026-10-27)
 
-Pendientes de confirmar con el circuito armado. Ningún cableado se ha probado todavía.
+```text
+                 TP4056 HW-373 V1.2.1 (con protección; su USB-C es para cargar)
+
+ Li-ion 240 mAh ── B+          OUT+ ──┬──────────────────── 5V    ESP32-C3 Super Mini
+ (soldada)      ── B-          OUT- ──│──────┬───────────── G
+                                      │      │
+                                   100 kΩ    │
+                                      ├──────│──────────── GPIO1 (ADC)
+                                   100 kΩ    │
+                                      └──────┘
+                 PROG (patita 2) ── 4.7 kΩ ── OUT-   (en lugar de R3)
+
+ Pulsador:              GPIO3 ── [ ] ── G
+ Buzzer azul (3 pines): VCC ── 3V3,  I/O ── GPIO10,  GND ── G
+```
 
 | Elemento | Conexión | Notas |
 |---|---|---|
-| Pulsador | GPIO3 ↔ GND | Activo en bajo con `INPUT_PULLUP`. GPIO0-GPIO5 son los únicos que despiertan de deep sleep; se evita GPIO2 (strapping). Puede necesitar pull-up externo. |
-| Módulo de buzzer activo (3 pines, PNP S8550 y 1 kΩ en la base) | `VCC` a 3V3, `GND` a GND, `I/O` a GPIO10 | Activo en bajo. `VCC` a 3V3 y no a 5 V: con 5 V el PNP no se apaga con 3.3 V en `I/O`. Sin resistencia de GPIO10 a GND (lo haría sonar siempre); el firmware retiene el pin en alto durante el deep sleep. Quitar la etiqueta "REMOVE SEAL AFTER WASHING", que baja mucho el volumen. Probado en banco. |
-| Divisor de batería | `OUT+` — 1 MΩ — GPIO1 — 470 kΩ — GND, con 10 nF de GPIO1 a GND | Ver "Circuito propuesto" arriba. Nunca la batería directa a GPIO1. |
-| Batería Li-ion 240 mAh | Soldada a los pads `BAT+` / `BAT-` del TP4056 | Respetar polaridad. Antes, cambiar R3 por 4.7 kΩ. |
-| Alimentación del ESP32-C3 | Desde `OUT+` / `OUT-` del TP4056 | Por definir a qué pin de la Super Mini (5V o 3V3) y con qué regulación. No está decidido en el repositorio. |
+| Batería Li-ion 240 mAh | Soldada a `B+` / `B-` del TP4056 | Medía 3.86 V antes de la primera carga |
+| TP4056 HW-373 V1.2.1 (con protección) | Carga por su USB-C. `OUT+` / `OUT-` son la salida protegida | R3 (1 A) reemplazada por 4.7 kΩ (abajo) |
+| Alimentación del ESP32-C3 | `OUT+` → pin `5V` del C3, `OUT-` → `G` | El regulador de la placa baja a 3.3 V. Ver la regla del USB abajo |
+| Divisor de batería | `OUT+` — 100 kΩ — GPIO1 — 100 kΩ — `G`, sin capacitor | Ver "Batería y ADC". Nunca la batería directa a GPIO1 |
+| Pulsador | GPIO3 ↔ GND | Activo en bajo con `INPUT_PULLUP`. GPIO0-GPIO5 son los únicos que despiertan de deep sleep; se evita GPIO2 (strapping). Puede necesitar pull-up externo |
+| Módulo de buzzer activo azul (3 pines, PNP S8550 y 1 kΩ en la base) | `VCC` a 3V3, `GND` a G, `I/O` a GPIO10 | Activo en bajo (`BUZZER_ACTIVO_EN_BAJO 1`). `VCC` a 3V3 y no a 5 V: con 5 V el PNP no se apaga con 3.3 V en `I/O`. Sin resistencia de GPIO10 a GND (lo haría sonar siempre); el firmware retiene el pin en alto durante el deep sleep. Quitar la etiqueta "REMOVE SEAL AFTER WASHING". Probado en banco |
+
+### Regla: nunca conectar el USB del C3 con la batería conectada
+
+En el ESP32-C3 Super Mini el pin `5V` y el VBUS del USB-C están unidos y no hay diodo ni
+selector de fuente. Con la batería conectada, el USB del C3 metería 5 V en `OUT+` del TP4056, es
+decir, en la batería y en el divisor. Por eso:
+
+- Con `OUT+` conectado al pin `5V`, el USB-C del C3 **no se conecta nunca**. La batería se carga
+  solo por el USB-C del TP4056.
+- Para programar o ver el monitor: desconectar primero `OUT+` del pin `5V` (irá con un conector
+  header/dupont) y después conectar el USB del C3. Al terminar, desconectar el USB y volver a
+  conectar `OUT+`.
+- Con `OUT+` desconectado, el divisor no recibe nada: por USB la lectura de batería da casi 0 V y
+  el paquete lleva `FLAG_BATERIA_BAJA`. Es lo esperado, no un fallo.
+
+### Corriente de carga: R3 por 4.7 kΩ
+
+El módulo venía programado a 1 A (R3 medía 1.202 kΩ; `I = 1200 / R_PROG`), demasiado para una
+celda de 240 mAh. Se quitó R3; uno de sus pads quedó dañado, así que la resistencia nueva de
+4.7 kΩ THT va soldada directo de la patita 2 (`PROG`) del TP4056 al pad `OUT-`.
+
+- Comprobado con el multímetro: 0.1 Ω entre la patita 2 y el pad de R3 del lado `PROG`, y
+  4.65 kΩ entre la patita 2 y `OUT-`.
+- Cargando, V(`PROG`) = 0.918 V. Con la fórmula de la hoja de datos del TP4056,
+  `I = V_PROG / R_PROG × 1200 = 0.918 / 4650 × 1200 ≈ 237 mA`, cerca de 1C para la celda. No se
+  midió con el multímetro en serie (fusible de mA quemado).
 
 ## Hardware
 
 - Botón en GPIO0-GPIO5 (únicos pines que despiertan al ESP32-C3 de deep sleep).
-- Batería Li-ion 240 mAh con cargador TP4056.
-- El módulo TP4056 comprado es la versión con protección (USB-C). Por confirmar con el módulo el
-  voltaje de corte por descarga, para fijar `BATERIA_BAJA_MV` con margen sobre ese corte.
-- La corriente de carga del módulo viene en 1 A; hay que cambiar R3 por 4.7 kΩ antes de conectar
-  la batería de 240 mAh (ver nota técnica en el README principal).
-- Por confirmar con el módulo: consumo real en deep sleep de la placa completa (LED de encendido,
-  regulador, divisor de batería). Define la duración de la batería.
+- Batería Li-ion 240 mAh con cargador TP4056 HW-373 V1.2.1 (con protección, USB-C), cargando a
+  ≈237 mA (R3 cambiada por 4.7 kΩ, ver "Conexiones del colgante").
+- Por confirmar con el módulo el voltaje de corte por descarga de la protección, para fijar
+  `BATERIA_BAJA_MV` con margen sobre ese corte.
+- Consumo en deep sleep de la placa completa (LED de encendido, regulador, divisor de 21 µA,
+  pull-up): no se pudo medir, el fusible de la escala de mA del multímetro está quemado. Define la
+  duración de la batería; por confirmar con el módulo.
 
 ## Estado del desarrollo
 
@@ -311,9 +368,12 @@ Prueban la lógica pura en un PC, sin ESP32-C3 ni base.
 | Revisión del 12 de octubre de 2026: `pio run -e colgante` | Compila sin advertencias. RAM 10.8 %, Flash 71.7 % |
 | Preparación de la prueba en hardware (12 de octubre de 2026): pruebas host | 39 casos y 599 verificaciones aprobados (HEARTBEAT al encender, secuencia inicial aleatoria) |
 | Preparación de la prueba en hardware: `pio run -e colgante` | Compila sin advertencias, también con `HEARTBEAT_PRUEBA_S = 30`. RAM 10.8 %, Flash 71.7 % |
+| Batería real (27 de octubre de 2026): pruebas host | 43 casos y 653 verificaciones aprobados (divisor 100 kΩ / 100 kΩ, límite ADC 2400 mV) |
+| Batería real: `pio run -e colgante` con `BATERIA_MODO_SIMULADO = 0` | Compila. RAM 10.8 % (35 464 B), Flash 72.6 % (951 079 B) |
 
-Que compile y pase las pruebas host no demuestra que el colgante funcione: no se ha probado radio,
-alcance, ACK de una base real, deep sleep, botón, buzzer, ADC, batería ni consumo. La lista de
+Que compile y pase las pruebas host no demuestra que el colgante funcione. Radio, botón, buzzer y
+deep sleep se probaron en banco por USB (`pruebas_fisicas.md`, primera parte); falta la lectura
+del ADC con la batería, el alcance en la casa, la base real y el consumo. La lista de
 verificación para el hardware está en `pruebas_fisicas.md`.
 
 ## Integración con la base
@@ -350,24 +410,23 @@ WiFi); guía de prueba en `firmware/base-radar/README.md`.
   base revisa el duplicado antes de aplicar `FLAG_ARRANQUE_FRIO` (`docs/protocolo.md`, sección 5;
   código en `firmware/comun/protocolo/duplicados.h`).
 - **Batería.** `bateria_mv = 0` significa lectura no disponible, no 0 V; llega con
-  `FLAG_BATERIA_BAJA`. Mientras `BATERIA_MODO_SIMULADO = 1`, todos los mensajes llevan 3900 mV y el
-  paquete no indica que sean simulados: la base y el panel no deben tratarlos como telemetría real.
+  `FLAG_BATERIA_BAJA`. Con `BATERIA_MODO_SIMULADO = 0` el valor es la medición del divisor. Con
+  `1`, todos los mensajes llevan 3900 mV y el paquete no indica que sean simulados: la base y el
+  panel no deben tratarlos como telemetría real. Por USB (con `OUT+` desconectado) llega cerca de
+  0 mV con `FLAG_BATERIA_BAJA`.
 - **Ausencia.** Heartbeat cada 15 min; la base marca ausente tras `COLGANTE_AUSENTE_S` (45 min).
 - **Sin cifrado.** ESP-NOW sin PMK/LMK en ambos lados (ver "Transmisión ESP-NOW").
 
 ## Pendientes físicos
 
-Según el estado registrado en el README principal, ninguna de estas tareas está hecha. No dependen
-del firmware:
+Hecho el 2026-10-27: batería soldada, R3 cambiada (≈237 mA), alimentación desde `OUT+` al pin
+`5V`, botón, buzzer y divisor de batería armados. Falta:
 
-- Recibir la batería Li-ion 240 mAh y la pasta flux (pedidas, sin llegar).
-- Cambiar R3 del TP4056 por una resistencia THT de 4.7 kΩ y confirmar la corriente con la hoja de
-  datos de la celda.
-- Soldar la batería a los pads `BAT+` / `BAT-` del TP4056.
-- Definir cómo se alimenta la Super Mini desde `OUT+` / `OUT-`.
-- Armar botón, buzzer y divisor de batería, y confirmar los pines.
+- Conector header/dupont en `OUT+` para desconectarlo al programar.
+- Medir el consumo en deep sleep: no se pudo, el fusible de la escala de mA del multímetro está
+  quemado. Sin ese dato no se puede estimar la autonomía.
+- Confirmar en la hoja de datos de la celda que acepta ~237 mA de carga.
+- Comparar la lectura de batería con el multímetro (`pruebas_fisicas.md`, sección 4).
 - Diseñar e imprimir la carcasa y el cordón.
-- Primera prueba en protoboard con el receptor `firmware/pruebas/receptor_espnow`
-  (`pruebas_fisicas.md`, primera parte).
 - Ejecutar el resto de `pruebas_fisicas.md` y ajustar con mediciones: `BATERIA_BAJA_MV`, tiempos
   de ACK, `CANAL_MAX` según el router, y necesidad de pull-up externo para el botón.

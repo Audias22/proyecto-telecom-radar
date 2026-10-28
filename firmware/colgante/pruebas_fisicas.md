@@ -6,7 +6,7 @@ Dos partes:
   pulsador, el buzzer activo y el receptor de prueba `firmware/pruebas/receptor_espnow` en un
   ESP32 clásico haciendo de base.
 - **Lista completa** (más abajo): para el colgante terminado, con batería, TP4056 y la base
-  real.
+  real. Conexiones finales armadas el 2026-10-27 (abajo).
 
 Registrar cada sesión en `pruebas/` (fecha, placa, firmware/commit, lo medido, resultado). Marcar
 una casilla solo con la medición hecha; si algo falla, anotar qué se observó y no marcarla.
@@ -186,19 +186,43 @@ mesa, a 0.6-1 m, el RSSI pasó de ~-90 a ~-74/-80 dBm.
 
 ## Lista completa (colgante terminado)
 
-Para cuando estén disponibles la batería, el TP4056 modificado, la carcasa y la base con
-`espnow_rx` implementado. Ninguna se ha ejecutado todavía.
+Con la batería, el TP4056 modificado, la carcasa y la base real. La batería, el TP4056 y el
+circuito se armaron el 2026-10-27; la carcasa todavía no.
+
+### Conexión final (2026-10-27)
+
+| Elemento | Conexión |
+|---|---|
+| Batería Li-ion 240 mAh | Soldada a `B+` / `B-` del TP4056 HW-373 V1.2.1 (con protección). Medía 3.86 V antes de cargar |
+| Alimentación | `OUT+` → pin `5V` del C3, `OUT-` → `G` |
+| Divisor de batería | `OUT+` — 100 kΩ — GPIO1 — 100 kΩ — `G`, sin capacitor. 2.1 V en GPIO1 con 4.2 V |
+| Pulsador | GPIO3 ↔ `G` |
+| Buzzer azul (PNP S8550) | `VCC` a `3V3`, `I/O` a GPIO10 (activo en bajo), `GND` a `G` |
+| Corriente de carga | R3 (1.202 kΩ, 1 A) quitada; 4.7 kΩ THT de la patita 2 (`PROG`) del TP4056 al pad `OUT-`, porque un pad de R3 quedó dañado |
+
+**Regla: nunca conectar el USB del C3 con la batería conectada.** En el C3 Super Mini el pin
+`5V` y el VBUS del USB están unidos, sin selector de fuente: el USB metería 5 V en la batería.
+La batería se carga solo por el USB-C del TP4056. Para programar o ver el monitor, desconectar
+primero `OUT+` del pin `5V` (irá con un conector header/dupont). Por USB, sin `OUT+`, la batería
+se lee cerca de 0 mV con `FLAG_BATERIA_BAJA`; es lo esperado.
+
+Por eso el monitor Serial no sirve con la batería conectada: las pruebas con batería se ven en el
+monitor de la base o del receptor de prueba.
 
 ### 0. Preparación y seguridad
 
-- [ ] R3 del TP4056 cambiada por 4.7 kΩ. Medir la corriente de carga con multímetro en serie:
-      cerca de 255 mA y aceptada por la hoja de datos de la celda.
+- [x] R3 del TP4056 cambiada por 4.7 kΩ. (2026-10-27: 0.1 Ω entre la patita 2 y el pad de R3
+      del lado `PROG`, 4.65 kΩ entre la patita 2 y `OUT-`. Cargando, V(`PROG`) = 0.918 V, es decir
+      `0.918 / 4650 × 1200 ≈ 237 mA`. No se midió en serie: fusible de mA quemado)
+- [ ] Corriente de ~237 mA aceptada por la hoja de datos de la celda.
 - [ ] Polaridad de `BAT+` / `BAT-` verificada antes de soldar. Celda sin calentamiento al cargar.
-- [ ] Identificadas en el módulo real las salidas protegidas `OUT+` / `OUT-`.
-- [ ] Definido y probado el pin de alimentación de la Super Mini desde `OUT+` (5V o 3V3); la
-      placa arranca con la batería entre 3.5 y 4.2 V.
-- [ ] GPIO1 nunca supera 1.5 V con la batería a 4.2 V (medido con multímetro antes de conectar al
-      ESP32-C3).
+- [x] Identificadas en el módulo real las salidas protegidas `OUT+` / `OUT-`. (2026-10-27)
+- [x] Definido el pin de alimentación de la Super Mini: `OUT+` al pin `5V`. (2026-10-27)
+- [ ] La placa arranca y transmite con la batería entre 3.5 y 4.2 V (a 3.5 V el regulador de la
+      placa puede quedarse corto de 3.3 V; anotar desde qué voltaje deja de funcionar).
+- [ ] Conector header/dupont en `OUT+` para desconectarlo al programar.
+- [ ] GPIO1 nunca supera 2.4 V (`BATERIA_ADC_LIMITE_MV`) con la batería a 4.2 V: con el divisor
+      100 kΩ / 100 kΩ debe dar ~2.1 V. Medido con multímetro.
 - [ ] `secrets.h` con la MAC STA real de la base y `COLGANTE_ID`; nunca subirlo al repositorio.
 
 ### 1. Botón (GPIO3)
@@ -237,13 +261,17 @@ Para cuando estén disponibles la batería, el TP4056 modificado, la carcasa y l
 
 ### 4. Batería y ADC
 
-- [ ] `BATERIA_MODO_SIMULADO = 0` cargado.
-- [ ] Comparar el valor reportado con el multímetro en al menos 4.2, 3.9, 3.7, 3.5 y 3.3 V
-      (o lo que permita la descarga), con y sin radio activo. Anotar el error.
-- [ ] Error de las resistencias reales del divisor medido.
+- [ ] `BATERIA_MODO_SIMULADO = 0` cargado. (En `config.h` desde el 2026-10-27; falta cargarlo
+      y ver los valores en la base)
+- [ ] Comparar el valor reportado (`bat=` en la base) con el multímetro en `OUT+` en al menos
+      4.2, 3.9, 3.7, 3.5 y 3.3 V (o lo que permita la descarga), con y sin radio activo. Anotar el
+      error. El divisor no tiene capacitor y la fuente es de 50 kΩ: un error fijo de unas decenas
+      de mV o lecturas que varían más de ~35 mV entre heartbeats seguidos indican que hace falta
+      un capacitor de 10-100 nF de GPIO1 a GND (ver `README.md`, "Lectura real").
+- [ ] Error de las resistencias reales del divisor medido (las dos de 100 kΩ, sueltas).
 - [ ] Curva de descarga registrada; voltaje de corte de la protección identificado.
 - [ ] `BATERIA_BAJA_MV` confirmado o ajustado con esa curva (hoy 3500 mV, hipótesis).
-- [ ] Si se puede provocar de forma segura una lectura de GPIO1 por encima de 1500 mV, el paquete
+- [ ] Si se puede provocar de forma segura una lectura de GPIO1 por encima de 2400 mV, el paquete
       lleva `0 mV` y `FLAG_BATERIA_BAJA`. No forzar más de 3.3 V en el pin.
 
 ### 5. Enlace ESP-NOW con la base
@@ -274,7 +302,8 @@ Para cuando estén disponibles la batería, el TP4056 modificado, la carcasa y l
 
 ### 8. Consumo y autonomía
 
-- [ ] Corriente en deep sleep de la placa completa (LED, regulador, divisor, pull-up).
+- [ ] Corriente en deep sleep de la placa completa (LED, regulador, divisor de 21 µA, pull-up).
+      (2026-10-27: no se pudo medir, el fusible de la escala de mA del multímetro está quemado)
 - [ ] Carga por alerta y por heartbeat (corriente y duración con radio activo).
 - [ ] Autonomía estimada con la celda de 240 mAh y un heartbeat cada 15 min.
 - [ ] Con `REGISTROS_SERIAL_HABILITADOS = 0`, comparar el tiempo despierto con el modo de
