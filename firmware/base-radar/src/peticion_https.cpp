@@ -226,7 +226,9 @@ AccionVigilante vigilar(bool alerta_urgente, char *motivo, size_t tamano) {
     bool pospuesto;
     {
         Bloqueo b;
-        accion = vigilante.revisar(ultima_ms, alerta_urgente);
+        // millis() con el candado tomado: leído antes, la tarea de red podía anotar una marca
+        // posterior mientras loop() esperaba el candado o le cedía el procesador.
+        accion = vigilante.revisar(millis(), alerta_urgente);
         p = vigilante.peticion();
         pospuesto = vigilante.reinicioPospuesto();
         if (accion == VIGILANTE_CORTAR) {

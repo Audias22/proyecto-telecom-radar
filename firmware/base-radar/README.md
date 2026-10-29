@@ -366,7 +366,7 @@ se conecta el USB para entrar al modo de carga, y soltarlo antes de reiniciar.
 `pruebas_host/` compila en el PC la lógica pura de la base (ventana de actividad, JSON de
 Firebase y Telegram, cola de peticiones y cola offline, lector del cuerpo HTTP, vigilante de la
 tarea de red, detectores de eventos y límite de Telegram) con los `.cpp` reales y la ejecuta, sin
-ESP32 (63 casos, 1674 verificaciones):
+ESP32 (64 casos, 1684 verificaciones):
 
 ```
 powershell -File firmware\base-radar\pruebas_host\ejecutar.ps1

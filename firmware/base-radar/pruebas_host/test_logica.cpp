@@ -570,6 +570,31 @@ void vigilanteVueltaMillis() {
     VERIFICAR(v.revisar(inicio + MAX_MS, false) == VIGILANTE_CORTAR);
 }
 
+// loop() lee millis() y recién después toma el candado; mientras tanto la tarea de red puede anotar
+// una vuelta o empezar una petición con un millis() posterior (falla del 2026-10-28: reinicio con
+// la red sana). Una marca posterior a `ahora` es reciente, no una tarea trabada.
+void vigilanteMarcaPosterior() {
+    const uint32_t ahora = 331750;
+    VigilanteRed v;
+    v.latir(ahora + 1);
+    VERIFICAR(v.revisar(ahora, false) == VIGILANTE_NADA);
+    v.latir(ahora + 3500);
+    VERIFICAR(v.revisar(ahora, false) == VIGILANTE_NADA);
+    v.empezar("PUT", "lecturas/base01/1793242608063", ahora + 1);
+    VERIFICAR(v.revisar(ahora, false) == VIGILANTE_NADA);
+    VERIFICAR(v.cortes() == 0);
+    VERIFICAR(!v.terminar(ahora + 200));
+    // Lo mismo justo en la vuelta de millis().
+    v.latir(0);
+    VERIFICAR(v.revisar(0xFFFFFFFFu, false) == VIGILANTE_NADA);
+    // La protección sigue: desde la marca, a los 45 s corta y 30 s después reinicia.
+    VERIFICAR(v.revisar(MAX_MS - 1, false) == VIGILANTE_NADA);
+    VERIFICAR(v.revisar(MAX_MS, false) == VIGILANTE_REINICIAR);
+    v.empezar("PUT", "lecturas/base01/1793242608063", ahora + 1);
+    VERIFICAR(v.revisar(ahora + 1 + MAX_MS, false) == VIGILANTE_CORTAR);
+    VERIFICAR(v.revisar(ahora + 1 + MAX_MS + TRAS_CORTE_MS, false) == VIGILANTE_REINICIAR);
+}
+
 void vigilanteRutaLarga() {
     VigilanteRed v;
     char ruta[100];
@@ -1153,6 +1178,7 @@ int main() {
     ejecutar("vigilante: la alerta local pospone el reinicio", vigilanteAlertaPospone);
     ejecutar("vigilante: tarea sin vueltas fuera de una peticion", vigilanteTareaSinVueltas);
     ejecutar("vigilante: vuelta de millis()", vigilanteVueltaMillis);
+    ejecutar("vigilante: marca posterior a la revision (carrera con loop)", vigilanteMarcaPosterior);
     ejecutar("vigilante: metodo y ruta largos se recortan", vigilanteRutaLarga);
 
     ejecutar("offline: al reconectar, eventos y despues lecturas en orden", offlineOrdenAlReconectar);
