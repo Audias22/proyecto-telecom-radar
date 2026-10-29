@@ -7,7 +7,7 @@ Configuración de Firebase, panel web del cuidador y simulador de la base.
 | `firebase.json` | Qué se publica en Hosting, archivo de reglas, puertos de emuladores |
 | `.firebaserc` | Id del proyecto de Firebase (`monitor-respiracion`); no es secreto |
 | `database.rules.json` | Reglas de seguridad de Realtime Database (ver `docs/modelo-datos.md`) |
-| `panel/` | Panel web (HTML/JS) que se publica con Firebase Hosting |
+| `panel/` | Panel web del cuidador (HTML/CSS/JS) que se publica con Firebase Hosting (`docs/panel.md`) |
 | `simulador/` | Simulador de la base y verificación de las reglas (Python, solo librería estándar) |
 
 Se usa el plan Spark (gratis): Realtime Database, Hosting y Authentication. No se usan Cloud
@@ -106,11 +106,18 @@ Notas:
 
 ## Panel
 
+Publicado en https://monitor-respiracion.web.app. Detalle de qué muestra, qué consultas hace y cómo
+se probó en `docs/panel.md`.
+
 ```
 cd web
-copy panel\config.example.js panel\config.js   (poner el firebaseConfig de la app "panel")
+copy panel\config.ejemplo.js panel\config.js   (poner el firebaseConfig de la app "panel")
+firebase serve --only hosting --port 5050       (prueba local)
 firebase deploy --only hosting
 ```
+
+`config.js` no se sube al repositorio. El `firebaseConfig` sale de
+`firebase apps:sdkconfig web` o de la consola.
 
 ## Probar reglas sin tocar el proyecto real
 

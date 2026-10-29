@@ -161,6 +161,10 @@ Las reglas también validan:
 considera desconectada la base si `ultimo_contacto` tiene más de 3 minutos (3 periodos de
 `estado`), sin importar el valor de `online`.
 
+`/eventos` tiene `.indexOn` en `timestamp` (últimos eventos) y en `atendido` (el panel consulta
+los eventos sin atender con `orderByChild('atendido')` y `equalTo(false)` para el modo emergencia;
+sin el índice el SDK descargaría todo `/eventos`). Consultas del panel en `panel.md`.
+
 Las reglas se prueban contra el proyecto real con `web/simulador/simulador.py verificar` (ver
 `web/README.md`).
 

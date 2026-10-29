@@ -25,7 +25,7 @@ Guevara Mejicanos; el resto del equipo pasó a otros proyectos de la universidad
 | Radar (MR60BHA2) | Recibido y probado | Guatemala Digital, Q322.40 (con envío), orden #1493658. Lectura integrada en el firmware de la base: ~16 muestras de fase por segundo con persona. Probado sentado, acostado y una noche completa: detecta a una persona cuando la ve, pero durmiendo la perdió ~la mitad de la noche; la detección de apnea **no se usa como alarma** (`docs/radar.md`, sección 13) |
 | Colgante (botón + ESP32) | Pasó las pruebas en banco | Firmware de Abraham revisado y fusionado el 12 oct (39 casos de prueba en PC). Pruebas 1 a 9 en banco el 12 oct, por USB y con batería simulada: arranque, ALERTA con ACK, beeps, sin receptor, barrido de canales, ACK perdido y duplicados, heartbeat por timer, sin falsas alertas y potencia de transmisión (`pruebas/resultados/2026-10-12_colgante_banco.md`). Falta: despertar en distintos momentos del intervalo, RSSI bajo de la antena del ESP32-C3 (~-85 dBm a 3 m), alcance en la casa. 27 oct: armado con batería (R3 del TP4056 cambiada por 4.7 kΩ, carga a ~237 mA; `OUT+` al pin 5V del C3; divisor 100 kΩ / 100 kΩ en GPIO1) y firmware con la medición real de batería; falta comparar la lectura con el multímetro y medir el consumo en deep sleep (multímetro sin escala de mA). Conexiones en `firmware/colgante/README.md`. Falta diseñar/imprimir carcasa y cordón |
 | Base + notificación | Firebase probado en hardware; Telegram, eventos y cola offline listos, por confirmar en hardware | Usa el XIAO ESP32-C6 del kit con su antena externa. Lee el radar, recibe al colgante por ESP-NOW (ACK y duplicados), maneja el LED WS2812 y el buzzer en D10, y el botón BOOT silencia la alerta. Se conecta al router con reconexión propia. Probado el 15 oct (v0.5.1): escribe en Firebase estado, lecturas cada 5 s, colgante y evento BOTON (~270 ms del botón al evento), y sin internet reporta el error en 5 s y reintenta sin colgarse. v0.6.0 (27 oct, compilado y 63 casos de prueba en PC): avisos por Telegram, eventos BATERIA_BAJA, COLGANTE_AUSENTE, RADAR_SIN_DATOS y BASE_DESCONECTADA una vez por episodio, 1 h de lecturas sin red, eventos que sobreviven a un reinicio, watchdog de tareas y aviso de reinicio inesperado; tabla de particiones sin OTA (app de 3 MB, al 40 %). Guía de prueba en `firmware/base-radar/README.md` |
-| Firebase + panel web | Reglas publicadas y base escribiendo | Modelo de datos y reglas publicados; la base y el simulador (`web/simulador/`) escriben en el proyecto real. Panel web sin código funcional todavía |
+| Firebase + panel web | Panel publicado | Modelo de datos y reglas publicados (57 casos de verificación); la base y el simulador (`web/simulador/`) escriben en el proyecto real. Panel del cuidador en https://monitor-respiracion.web.app (28 oct): estado de la base y del colgante, radar con anillo de respiración, cinta de 6 h, gráficas, eventos con "Atendido" y modo emergencia. Probado con el simulador en Edge; falta probarlo en un celular real (`docs/panel.md`) |
 | Documento de propuesta | Listo | Ver `/docs/propuesta.docx` (o donde se suba) |
 | Cronograma | Listo | 11 semanas, del 9 ago al 24 oct |
 
@@ -165,7 +165,8 @@ En VS Code: abrir la carpeta del proyecto (`firmware/base-radar` o `firmware/col
 
 ### Panel web y Firebase
 
-Instrucciones en `web/README.md`.
+Panel del cuidador: https://monitor-respiracion.web.app (descripción en `docs/panel.md`).
+Instrucciones de Firebase, simulador y publicación en `web/README.md`.
 
 ---
 
@@ -184,6 +185,9 @@ Instrucciones en `web/README.md`.
 - Nube de la base, parte 2 (v0.6.0): cola offline de 1 h con eventos guardados en NVS, eventos BATERIA_BAJA (con histéresis), COLGANTE_AUSENTE, RADAR_SIN_DATOS y BASE_DESCONECTADA una vez por episodio, avisos por Telegram con el botón primero y límite de frecuencia, watchdog de tareas y aviso de reinicio inesperado, particiones sin OTA. 63 casos de prueba en PC. Falta probarlo en hardware (`docs/fallos.md`, "Qué está cubierto")
 
 - Colgante armado con batería: R3 del TP4056 cambiada por 4.7 kΩ (~237 mA), batería en B+/B−, `OUT+` al pin 5V del C3 (sin conectar nunca el USB del C3 con la batería), divisor 100 kΩ / 100 kΩ sin capacitor en GPIO1. Firmware con la medición real de batería (atenuación de 12 dB, rango 0-2500 mV según la hoja de datos del ESP32-C3), 43 casos de prueba en PC. Consumo en deep sleep sin medir
+
+### 28 octubre 2026
+- Panel web del cuidador (`web/panel/`, `docs/panel.md`), publicado en Firebase Hosting: inicio de sesión, base en línea / desconectada, colgante con batería y señal, radar con anillo de respiración que sigue `resp_rpm` (marcada como estimación no validada), cinta de 6 h con los eventos encima, gráficas de 15 min / 1 h / 6 h, eventos con "Atendido" y modo emergencia (franja, título y sonido) con un BOTON sin atender. Índice de `atendido` en las reglas y 2 casos nuevos en la verificación (57/57)
 
 ---
 
