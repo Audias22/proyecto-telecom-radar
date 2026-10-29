@@ -35,6 +35,12 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
   (`COLGANTE_AUSENTE_S`), **batería baja** bajo 3500 mV (`BATERIA_BAJA_MV`) o con 0 mV (sin dato),
   si no **normal**. El porcentaje sale de una curva típica de Li-ion (3300 mV = 0 %, 4200 mV =
   100 %) y se muestra como aproximado: falta la curva de descarga medida (`protocolo.md`).
+- **Datos viejos**: el colgante y el radar solo llegan a Firebase a través de la base. Si la base
+  está desconectada, el colgante dice "sin datos (base desconectada)" en vez de normal / batería
+  baja / ausente, la pila y las cifras quedan en gris y el voltaje y la señal dicen "último dato"
+  con la hora; el radar dice "Sin datos (base desconectada)" con la hora de la última lectura y el
+  WiFi de la base dice "último dato". Si el que perdió la conexión es el panel, lo mismo con
+  "panel sin conexión", y la base tampoco se marca en línea ni desconectada.
 - **Cinta de las últimas 6 horas**: un minuto por columna: persona detectada (mayoría de lecturas
   del minuto), objetivo con actividad baja, sin objetivo o sin lecturas (línea punteada). Los
   eventos van clavados encima (rojo = botón; círculo hueco = sin atender); al pasar el mouse,
@@ -49,8 +55,14 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
   origen. "Atendido" escribe `atendido: true`, `atendido_por` (uid) y `atendido_en` (hora del
   servidor) en un solo `update`. Se muestra "Atendido por ti" o "por otro cuidador (uid…)"; las
   reglas solo guardan el uid, así que el panel no puede mostrar el correo de otro cuidador.
-- **Modo emergencia**: mientras haya un `BOTON` sin atender, franja roja fija arriba con el más
-  reciente y "Marcar atendido", fondo del panel en rojo pálido, título de la pestaña alternando
+- **Contadores**: la franja cuenta solo botones ("5 botones sin atender"); Eventos cuenta todos los
+  tipos ("10 avisos sin atender").
+- **Modo emergencia**: mientras haya un `BOTON` sin atender, franja roja fija arriba con cuántos
+  botones hay, el más reciente y "Marcar atendido" (marca ese). Con 2 o más aparece "Atender todos
+  (N)", que pide confirmación en un diálogo y marca solo los que estaban pendientes al abrirlo (un
+  `update` por evento, el mismo que el de un evento suelto). Al bajar más de 60 px la franja se
+  reduce a una barra delgada ("Auxilio / N botones", "Marcar atendido" y "Silenciar") y vuelve a
+  su tamaño al subir cerca del inicio. Fondo del panel en rojo pálido, título de la pestaña alternando
   "AUXILIO: botón presionado", y un pitido cada 2.5 s. El navegador no deja sonar audio antes de
   la primera interacción, así que la franja dice "Toca la pantalla para activar el sonido" hasta
   entonces. "Silenciar sonido" solo afecta a ese equipo. Con varios `BOTON` pendientes hay que
@@ -100,5 +112,11 @@ Prueba del 28 oct 2026, en Edge (Playwright) contra el proyecto real con el simu
 `normal` y la cuenta del cuidador: inicio de sesión (y error con contraseña incorrecta), sin
 desbordamiento horizontal a 390 px, escritorio a 1366 px, globo en gráficas y cinta, modo
 emergencia con el `BOTON` del simulador y "Atendido" guardando quién y cuándo. Lo mismo contra la
-versión publicada. Sin probar: el sonido en un celular real y el aviso de sin conexión cortando la
+versión publicada.
+
+Prueba del 28 oct 2026 (correcciones): la franja compacta, los contadores y "Atender todos"
+(cancelar no escribe nada; confirmar hace un `update` por botón y la franja desaparece) se
+probaron a 390 px y 1366 px con un Firebase falso: Playwright sirve versiones simuladas de los
+módulos del SDK y registra los `update` sin escribir en el proyecto. "Datos viejos" se probó
+también con los datos reales (base desconectada), solo leyendo. Sin probar: el sonido en un celular real y el aviso de sin conexión cortando la
 red.
