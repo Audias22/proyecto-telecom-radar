@@ -30,7 +30,7 @@ y probado en `pruebas_host/`, pero todavía **por confirmar con el módulo**.
 |---|---|---|
 | 1, 2, 3 | Paquete perdido, duplicado, cambio de canal | Hardware (colgante en banco y base con el router, 2026-10-12 y 2026-10-14) |
 | 4 | Caída de WiFi | Hardware: alerta local sin red y reconexión. Código y PC: cola offline de 1 h, eventos en NVS, orden al volver. Por confirmar con el módulo: 1 h sin router y el vaciado de la cola al volver |
-| 5 | Caída de Firebase o de internet | Hardware (v0.5.1, 2026-10-15): sin internet el error sale en 5 s y la base reintenta sin colgarse. Hardware (v0.6.0, 2026-10-28): cada cliente TLS perdía los certificados tras su primer cierre; arreglado en código ("Certificados TLS tras cerrar una conexión"), por confirmar con el módulo. Por confirmar con el módulo: que Telegram salga con Firebase caído |
+| 5 | Caída de Firebase o de internet | Hardware (v0.5.1, 2026-10-15): sin internet el error sale en 5 s y la base reintenta sin colgarse. Hardware (v0.6.0, 2026-10-28): cada cliente TLS perdía los certificados tras su primer cierre; arreglo confirmado en hardware el mismo día ("Certificados TLS tras cerrar una conexión"). Ese día también un reinicio falso del vigilante con la red sana; arreglado en código y PC ("Falso reinicio del vigilante"), por confirmar con el módulo. Por confirmar con el módulo: que Telegram salga con Firebase caído |
 | 6 | Base apagada | Código y PC: `BASE_DESCONECTADA` con la duración. Por confirmar con el módulo |
 | 7 | Colgante sin batería o ausente | Código y PC: `BATERIA_BAJA` con histéresis y `COLGANTE_AUSENTE`. Por confirmar con el módulo (batería simulada del colgante) |
 | 8 | Persona no detectada | Hardware (`radar.md`, 13) |
@@ -368,6 +368,69 @@ Sin prueba host: el arreglo es la interacción con `ssl_client` del framework, q
 PC. **Por confirmar con el módulo**: con `FIREBASE_TRAZA 1`, dejar la base más de 2 min y ver que
 cada `PATCH .../estado` responde 200 tras el cierre de la conexión; mandar dos avisos de Telegram
 con más de 30 s entre ellos; y que no vuelva a salir `useRootCABundle is set`.
+
+**Confirmado en hardware (2026-10-28)**: `PATCH .../estado` 204 a los 135, 195, 256 y 316 s, dos
+`BOTON` por Telegram con 200 separados 2 min y sin `useRootCABundle is set`.
+
+### Falso reinicio del vigilante (escenario 5)
+
+**Falla medida en hardware (base v0.6.0 con el arreglo TLS, 2026-10-28).** Tras un `BOTON` (aviso
+de Telegram, evento y colgante con 204), las lecturas siguieron saliendo con 204 cada 5 s y el
+estado con 204, pero el vigilante reinició la base:
+
+```
+# [   335240 ms] firebase: PUT lecturas/... -> HTTP 204 (206 ms)
+# [   331752 ms] vigilante: la tarea de red no avanza hace mas de 45 s; se reinicia la base ...
+```
+
+**Causa (confirmada en el código).** Una carrera entre `loop()` y la tarea de red con una resta sin
+signo; no tuvo que ver con Telegram, `ClienteTls` ni el cierre de 30 s.
+
+1. La tarea de red marca su avance con `VigilanteRed::latir()`, en cada vuelta de su bucle (cada
+   ~50 ms sin trabajo) y al terminar cada petición (`terminar()` llama a `latir()`). Lo hace con el
+   candado de `peticion_https` tomado y con un `millis()` leído dentro.
+2. `peticion_https::vigilar()` (desde `loop()`, una vez por segundo) leía `ultima_ms = millis()`
+   y **después** tomaba el candado y llamaba a `revisar(ultima_ms)`. `loop()` y la tarea de red
+   tienen la misma prioridad (1) en un solo núcleo: si entre esas dos líneas `loop()` esperaba el
+   candado o el planificador le pasaba el procesador a la tarea de red, ésta anotaba un latido con
+   un `millis()` posterior.
+3. `revisar()` calculaba `ahora - latido_ms_` en `uint32_t`. Con el latido 1 ms después de `ahora`
+   el resultado es 4 294 967 295, no menor que `FIREBASE_PETICION_MAX_MS`: rama "la tarea de red no
+   avanza", y sin alerta urgente activa, reinicio. Es justo el mensaje del log, mientras las
+   lecturas seguían saliendo cada 5 s. Con una petición en curso la misma carrera daba un corte
+   falso (`ahora - inicio_ms`).
+
+La ventana es de pocos microsegundos por revisión, por eso aparece rara vez (más de 5 min en esta
+prueba). El orden de las líneas del log no es cronológico entre tareas: la del vigilante se armó a
+los 331 752 ms y salió por el USB después de la de la tarea de red.
+
+**Arreglo** (`src/vigilante_red.cpp` y `src/peticion_https.cpp`):
+
+- `revisar()` mide con `transcurrido(ahora, desde)`: la resta sin signo de siempre (aguanta la
+  vuelta de `millis()`), pero una marca posterior a `ahora` cuenta 0, porque es lo más reciente
+  posible. Una tarea trabada de verdad deja la marca en el pasado y la diferencia crece igual que
+  antes: el corte a los 45 s y el reinicio 30 s después no cambian.
+- `vigilar()` lee `millis()` con el candado tomado, para que la marca no pueda quedar después de
+  `ahora` en primer lugar. `ultima_ms` queda solo para revisar una vez por segundo.
+- Prueba host "vigilante: marca posterior a la revisión (carrera con loop)": falla con el código
+  anterior (reinicio y corte falsos) y pasa con el arreglo, que también conserva el corte y el
+  reinicio de una tarea trabada.
+
+**Error -76 después del reinicio: inofensivo.** Tras arrancar salió una vez:
+
+```
+[E][ssl_client.cpp:36] _handle_error(): [data_to_read():406]: (-76) UNKNOWN ERROR CODE (004C)
+[E][NetworkClientSecure.cpp:313] available(): Closing connection on failed available check
+```
+
+seguido de `auth/signInWithPassword -> 200`. -76 es -0x004C, `MBEDTLS_ERR_NET_RECV_FAILED`: el
+`recv()` del socket falló porque el servidor ya había cerrado (o reseteado) la conexión. Viene del
+cierre de una petición que ya terminó bien: Auth usa `setReuse(false)` y un cliente por petición,
+así que `http.end()` → `HTTPClient::disconnect()` → `connected()` → `available()` sondea un socket
+que Google ya cerró; `available()` lo registra y hace `stop()`, que es lo que `end()` iba a hacer
+igual. La respuesta ya estaba leída entera (si no, `leerCuerpo()` habría devuelto un error y no
+200), y el cliente se destruye al salir de `pedirAuth()`. No se corrige: depende de si el
+servidor cierra antes de que la base cierre, y no pierde datos.
 
 ### Watchdog de tareas y motivo del reinicio (escenario 10)
 
