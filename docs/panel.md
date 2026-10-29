@@ -9,7 +9,8 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
 | `index.html` | Estructura: sesión, franja de emergencia, radar, equipos, cinta, gráficas, eventos |
 | `estilos.css` | Estética de hoja clínica (marfil, papel milimetrado, tinta azul, rojo solo para alertas). Solo tema claro |
 | `app.js` | Sesión, listeners de Realtime Database y pintado de la vista |
-| `graficas.js` | Gráficas de línea con cursor y globo, y la cinta de 6 h con los eventos encima |
+| `graficas.js` | Gráficas de línea, detalle de un punto, eje de tiempo y la cinta de 6 h con los eventos encima |
+| `ampliada.js` | Vista ampliada de una gráfica: zoom, arrastre, pellizco, Volver / Atrás / Esc |
 | `alerta.js` | Modo emergencia: título de la pestaña parpadeando y sonido (Web Audio) |
 | `formato.js` | Umbrales, nombres de eventos, horas, porcentaje de batería y barras de señal |
 | `config.js` | Configuración web de Firebase y `BASE_ID`. **No se sube a git**; se copia de `config.ejemplo.js` |
@@ -49,8 +50,32 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
 - **Gráficas** (15 min / 1 h / 6 h, se recuerda la elección): respiración, latido y actividad, cada
   una con su eje (sin doble eje). El trazo se corta donde faltan datos. Cuando hay más lecturas
   que medio píxel por punto (6 h, o 1 h en el celular), cada punto es la mediana de su tramo y el
-  globo dice de cuántas lecturas. La actividad usa escala de raíz para que el umbral 0.03 se vea
-  aunque haya picos de 1 o más.
+  detalle lo aclara. La actividad usa escala de raíz para que el umbral 0.03 se vea aunque haya
+  picos de 1 o más; el umbral se nombra en la leyenda de la gráfica y su marca del eje va en
+  ámbar, así no queda tapado por la línea. El eje de tiempo elige el paso para dejar ~90 px entre
+  etiquetas (de 5 s a 2 h) y pasa a hh:mm:ss con pasos de menos de un minuto.
+- **Detalle de un punto** (vista normal y ampliada): con el mouse encima, o al tocar o deslizar el
+  dedo sobre la gráfica, se marca la lectura real más cercana (no la mediana) con una línea
+  vertical y una tarjeta: hora hh:mm:ss, valor, y de esa misma lectura si había persona detectada
+  y la actividad. Vale cualquier toque dentro de 1/12 del ancho visible (zona de toque
+  generosa). La tarjeta se ubica arriba del punto (el dedo tapa lo de abajo) y nunca sale de la
+  pantalla. Con el dedo queda puesta hasta tocar en otro lado o hacer scroll, y se mantiene al
+  llegar datos nuevos.
+- **Vista ampliada**: el botón "Ampliar" de cada gráfica la abre; en escritorio también el clic
+  sobre la gráfica. En el celular tocar la gráfica muestra el detalle del punto y no la abre, para
+  que un toque no haga dos cosas. Es pantalla completa en el celular y un panel grande en
+  escritorio. Trabaja sobre las 6 h ya descargadas (no hace consultas nuevas):
+  - Zoom con pellizco o rueda del mouse alrededor del dedo o del puntero, arrastre con un dedo o
+    con el mouse, y botones "+", "−" y "Restablecer" (también las teclas + y −). Entre 1 min y
+    6 h.
+  - Arriba se ve el tramo visible ("23:24:12 – 23:25:12 · 1 min") y si está **en vivo** (el
+    borde derecho es "ahora" y avanza con cada lectura, sin cambiar el zoom) o **detenida en
+    este tramo** (después de moverse al pasado; los datos nuevos llegan pero el tramo no se
+    mueve). "Restablecer" vuelve al rango del selector, en vivo.
+  - "← Volver", el botón Atrás del celular o del navegador y Esc la cierran (al abrir se agrega
+    una entrada al historial, así Atrás no sale del panel).
+  - La franja de emergencia queda encima, en su versión delgada, y la vista empieza debajo de
+    ella.
 - **Eventos**: los últimos 80 más todos los que sigan sin atender, con hora, tipo, detalle y
   origen. "Atendido" escribe `atendido: true`, `atendido_por` (uid) y `atendido_en` (hora del
   servidor) en un solo `update`. Se muestra "Atendido por ti" o "por otro cuidador (uid…)"; las
@@ -118,5 +143,14 @@ Prueba del 28 oct 2026 (correcciones): la franja compacta, los contadores y "Ate
 (cancelar no escribe nada; confirmar hace un `update` por botón y la franja desaparece) se
 probaron a 390 px y 1366 px con un Firebase falso: Playwright sirve versiones simuladas de los
 módulos del SDK y registra los `update` sin escribir en el proyecto. "Datos viejos" se probó
-también con los datos reales (base desconectada), solo leyendo. Sin probar: el sonido en un celular real y el aviso de sin conexión cortando la
-red.
+también con los datos reales (base desconectada), solo leyendo.
+
+Prueba del 28 oct 2026 (gráficas): a 390 px con toques simulados (Playwright; pellizco y
+arrastre de dedo por CDP) y a 1366 px con mouse, con el Firebase falso (que además agrega una
+lectura cada 2 s) y con los datos reales solo leyendo: detalle en la vista normal y en la
+ampliada dentro de la pantalla, Ampliar, franja de emergencia encima, pellizco, "+" hasta 1 min
+con el eje en segundos, arrastre al pasado que no se mueve con 3 lecturas nuevas, en vivo que
+avanza sin perder el zoom, Restablecer, rueda, arrastre con mouse, Atrás, Volver, Esc y
+`prefers-reduced-motion` sin animación de apertura. Sin probar: el pellizco y el arrastre en un celular real (el
+sonido, el login y el modo emergencia ya se probaron en el celular) y el aviso de sin conexión
+cortando la red.
