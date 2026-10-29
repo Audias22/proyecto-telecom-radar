@@ -20,20 +20,22 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
 - **Sesión**: correo y contraseña (Firebase Auth). La cuenta debe estar en `/usuarios_panel`
   (`web/README.md`, "Cuentas"); si no está, el panel lo dice ("Sin permisos").
 - **Radar**: "persona detectada" / "sin persona detectada" (con el motivo: sin objetivo o actividad
-  baja, y la aclaración de que no significa cama vacía) / "radar sin datos recientes" si no llega
-  una lectura en 30 s. Latido, actividad, distancia y hace cuánto llegó la última lectura.
+  baja, y la aclaración de que no significa cama vacía) / sin datos si no llega una lectura en
+  20 s (ver "Tiempos de cada estado"). Latido, actividad, distancia y hace cuánto llegó la última
+  lectura.
 - **Anillo de respiración**: con persona detectada y una `resp_rpm` en los últimos 30 s, se
   expande y contrae con un periodo de 60 / `resp_rpm` segundos (inhalación ~40 % del ciclo). Sin
   persona o sin dato queda quieto y gris y dice "sin dato", nunca "0". Se usa la última estimación
   de 30 s porque el módulo da `resp_rpm` en menos de la mitad de las lecturas (`radar.md`, 13.5).
   Respiración y latido llevan siempre la etiqueta "estimación del radar, no validada
   clínicamente". El panel no habla de apnea ni hace diagnósticos.
-- **Base**: en línea si `ultimo_contacto` tiene 3 min o menos, si no "desconectada"
-  (`modelo-datos.md`, sección 3; no se usa `online`). Hace cuánto, RSSI del WiFi en barras y
-  versión de firmware.
+- **Base**: en línea / sin datos hace X s / desconectada según su señal más reciente (ver "Tiempos
+  de cada estado"; no se usa `online`). "Último dato" con hora hh:mm:ss, RSSI del WiFi en barras
+  y versión de firmware.
 - **Colgantes** (uno por nodo de `/colgantes`): pila dibujada con el porcentaje, voltaje, último
   contacto y RSSI en barras. Estado: **ausente** si `ultimo_heartbeat` pasa de 45 min
-  (`COLGANTE_AUSENTE_S`), **batería baja** bajo 3500 mV (`BATERIA_BAJA_MV`) o con 0 mV (sin dato),
+  (`COLGANTE_AUSENTE_S`), **sin reporte reciente** (ámbar) si pasa de 30 min con la base en línea,
+  **batería baja** bajo 3500 mV (`BATERIA_BAJA_MV`) o con 0 mV (sin dato),
   si no **normal**. El porcentaje sale de una curva típica de Li-ion (3300 mV = 0 %, 4200 mV =
   100 %) y se muestra como aproximado: falta la curva de descarga medida (`protocolo.md`).
 - **Datos viejos**: el colgante y el radar solo llegan a Firebase a través de la base. Si la base
@@ -99,6 +101,54 @@ gstatic. Las gráficas son SVG propio (sin librerías). Está pensado primero pa
 Respeta `prefers-reduced-motion`: el anillo queda fijo y no hay animaciones de números, destellos
 ni parpadeo de la franja.
 
+## Tiempos de cada estado
+
+El panel recalcula todos estos estados cada segundo con un reloj propio, aunque no llegue nada de
+Firebase, y otra vez en cuanto la pestaña vuelve a estar visible (en el celular, con la pantalla
+apagada o la pestaña en segundo plano, el navegador frena o congela los temporizadores). No hace
+falta recargar. "Ahora" es la hora del servidor: `Date.now()` más `.info/serverTimeOffset`, y
+todas las horas de los datos (`ultimo_contacto`, la clave de cada lectura, `ultimo_heartbeat`)
+también son del servidor, así que un reloj mal puesto en el celular no cambia ningún estado.
+
+**Base.** Su señal más reciente es la mayor entre `ultimo_contacto` (la base lo escribe cada
+60 s) y la hora de la última lectura (cada 5 s).
+
+| Sin señal | Estado | Por qué |
+|---|---|---|
+| hasta 20 s | en línea (verde) | Cubre perder hasta 3 lecturas seguidas sin alarmar |
+| más de 20 s | sin datos hace X s (ámbar) | Con lecturas cada 5 s, 20 s ya son 4 perdidas: se avisa rápido, pero sin decir "desconectada" |
+| más de 3 min | desconectada (rojo) | El mismo umbral que usa la base para el evento `BASE_DESCONECTADA` y el aviso por Telegram (`BASE_DESCONECTADA_MIN_MS`, `fallos.md` escenario 6), así panel y Telegram dicen lo mismo |
+
+Si el radar deja de mandar pero la base sigue viva, la base solo escribe `estado` cada 60 s.
+Con el umbral de 20 s pasaría a ámbar entre una actualización y la siguiente. Por eso, cuando
+la última lectura es de antes del último `estado` por más de 70 s, el umbral del ámbar pasa a
+75 s (60 s de periodo más margen). En la práctica, al callarse el radar la base pasa una sola
+vez por ámbar (hasta su siguiente `estado`) y después queda en línea, y el radar dice "Radar sin
+datos recientes".
+
+**Radar.** Sin lecturas en 20 s, el radar no se presenta como dato actual: latido, actividad y
+distancia dicen "sin dato" y el anillo queda quieto. El título depende de la causa: "Sin datos
+hace X s" (ámbar) si la base está en ámbar, "Radar sin datos recientes" si la base sigue en línea
+(falla del radar), y "Sin datos (base desconectada)" a los 3 min. La respiración y el latido usan
+la última estimación de 30 s, porque el módulo no la da en todas las lecturas.
+
+**Colgante.** Manda un heartbeat cada 15 min (`HEARTBEAT_INTERVALO_S` en
+`firmware/comun/protocolo/protocolo.h`; `HEARTBEAT_PRUEBA_S` en `firmware/colgante/include/config.h`
+está en 0, así que vale el normal).
+
+| Sin mensajes del colgante | Estado | Por qué |
+|---|---|---|
+| hasta 30 min | normal (o batería baja) | Hasta un heartbeat perdido es normal (un mensaje que no llegó) |
+| más de 30 min, con la base en línea | sin reporte reciente (ámbar) | El doble del intervalo: se perdieron al menos 2 heartbeats. Aviso temprano, no se declara ausente |
+| más de 45 min | ausente (rojo) | `COLGANTE_AUSENTE_S` (3 heartbeats): el mismo umbral del evento `COLGANTE_AUSENTE` de la base |
+| base desconectada (o panel sin conexión) | sin datos (base desconectada), en gris | El colgante solo llega a Firebase a través de la base: sin base, su último dato no dice nada del estado actual |
+
+"Sin reporte reciente" solo se muestra con la base en línea (no en ámbar ni desconectada): si la
+base no está al día, lo que falta es la base, no el colgante.
+
+**Panel sin conexión.** Si `.info/connected` es falso, base, colgante y radar dicen "sin datos
+(panel sin conexión)" en gris: el panel no sabe si la base sigue escribiendo.
+
 ## Qué descarga (plan Spark)
 
 | Listener | Consulta | Volumen |
@@ -151,6 +201,15 @@ lectura cada 2 s) y con los datos reales solo leyendo: detalle en la vista norma
 ampliada dentro de la pantalla, Ampliar, franja de emergencia encima, pellizco, "+" hasta 1 min
 con el eje en segundos, arrastre al pasado que no se mueve con 3 lecturas nuevas, en vivo que
 avanza sin perder el zoom, Restablecer, rueda, arrastre con mouse, Atrás, Volver, Esc y
-`prefers-reduced-motion` sin animación de apertura. Sin probar: el pellizco y el arrastre en un celular real (el
+`prefers-reduced-motion` sin animación de apertura.
+
+Prueba del 29 oct 2026 (tiempos): con el Firebase falso (lecturas cada 5 s, estado cada 60 s) y
+el reloj simulado de Playwright, sin recargar: al cortar todo, en línea hasta 19 s, "sin datos
+hace 29 s" en ámbar en la base y el radar, el contador sube, y "desconectada" pasados 3 min, con
+el colgante en "sin datos (base desconectada)". Con el radar callado y el estado cada 60 s, un
+solo paso por ámbar y luego en línea durante 6 min, nunca desconectada. Colgante: normal a 20 y
+25 min, "sin reporte reciente" a 31 min (también al pasar el tiempo sin recargar), ausente a 46
+min, y gris con la base desconectada. Con el reloj del celular 5 min adelantado, el offset del
+servidor mantiene la base en línea. Sin probar: el pellizco y el arrastre en un celular real (el
 sonido, el login y el modo emergencia ya se probaron en el celular) y el aviso de sin conexión
 cortando la red.
