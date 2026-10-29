@@ -30,7 +30,7 @@ y probado en `pruebas_host/`, pero todavía **por confirmar con el módulo**.
 |---|---|---|
 | 1, 2, 3 | Paquete perdido, duplicado, cambio de canal | Hardware (colgante en banco y base con el router, 2026-10-12 y 2026-10-14) |
 | 4 | Caída de WiFi | Hardware: alerta local sin red y reconexión. Código y PC: cola offline de 1 h, eventos en NVS, orden al volver. Por confirmar con el módulo: 1 h sin router y el vaciado de la cola al volver |
-| 5 | Caída de Firebase o de internet | Hardware (v0.5.1, 2026-10-15): sin internet el error sale en 5 s y la base reintenta sin colgarse. Por confirmar con el módulo: que Telegram salga con Firebase caído |
+| 5 | Caída de Firebase o de internet | Hardware (v0.5.1, 2026-10-15): sin internet el error sale en 5 s y la base reintenta sin colgarse. Hardware (v0.6.0, 2026-10-28): cada cliente TLS perdía los certificados tras su primer cierre; arreglado en código ("Certificados TLS tras cerrar una conexión"), por confirmar con el módulo. Por confirmar con el módulo: que Telegram salga con Firebase caído |
 | 6 | Base apagada | Código y PC: `BASE_DESCONECTADA` con la duración. Por confirmar con el módulo |
 | 7 | Colgante sin batería o ausente | Código y PC: `BATERIA_BAJA` con histéresis y `COLGANTE_AUSENTE`. Por confirmar con el módulo (batería simulada del colgante) |
 | 8 | Persona no detectada | Hardware (`radar.md`, 13) |
@@ -291,8 +291,8 @@ pierde si la base se apaga justo en ese momento (la alerta local ya sonó).
 ### Telegram
 
 `src/telegram.cpp` y `src/mensajes_telegram.cpp`. `sendMessage` por HTTPS desde la tarea de red,
-con el certificado verificado con el bundle de CA de ESP-IDF (`peticion_https`, igual que
-Firebase; nunca `setInsecure()`).
+con el certificado verificado con el bundle de CA de ESP-IDF (`ClienteTls`, igual que Firebase;
+nunca `setInsecure()`).
 
 - **Independiente de Firebase**: conexión, espera tras error y límite de frecuencia propios. En
   cada vuelta la tarea de red atiende Telegram antes que Firebase, así que un Firebase caído o en
@@ -308,6 +308,66 @@ Firebase; nunca `setInsecure()`).
   para no trabar la cola; el evento en Firebase no se afecta.
 - Con `TELEGRAM_TOKEN` o `TELEGRAM_CHAT_ID` de ejemplo, Telegram queda desactivado y se avisa por
   serial (`telegram: deshabilitado: ...`). Pasos para crear el bot en el README de la base.
+
+### Certificados TLS tras cerrar una conexión (escenario 5)
+
+**Falla medida en hardware (base v0.6.0, 2026-10-28).** Al arrancar, Firebase funcionó (inicio de
+sesión 200, estado, lecturas 204) y Telegram envió `BASE_DESCONECTADA`. Después, toda conexión
+nueva a la base de datos fallaba:
+
+```
+[ssl_client.cpp:217] start_ssl_client(): useRootCABundle is set, but attach_ssl_certificate_bundle(ssl, true); was not called!
+[ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():318]: (-30336) SSL - No CA Chain is set, but required to operate
+firebase: PATCH dispositivos/base01/estado -> error -1 sin conexion (DNS, TCP o TLS)
+firebase: POST eventos -> error -1 (se reintenta)
+```
+
+Telegram seguía respondiendo 200 y el evento `BOTON` quedó en la cola sin llegar a Firebase.
+
+**Causa (confirmada en el código de arduino-esp32 3.3.7, `libraries/NetworkClientSecure`).** No
+era un cliente que le quitaba los certificados a otro: cada cliente perdía los suyos al cerrar su
+propia conexión.
+
+1. `NetworkClientSecure::setCACertBundle()` guarda el callback del bundle en el contexto TLS del
+   cliente (`attach_ssl_certificate_bundle()` → `sslclient->bundle_attach_cb`) y pone
+   `_use_ca_bundle = true`. La base lo llamaba una sola vez, al crear cada cliente.
+2. Todo cierre pasa por `stop()` → `stop_ssl_socket()`: el cierre por inactividad de la base
+   (`FIREBASE_REUSO_MAX_MS`, 45 s; `TELEGRAM_REUSO_MAX_MS`, 30 s), el del servidor y los de
+   `read()`, `write()` o `available()` con error. `stop_ssl_socket()` termina con
+   `memset(ssl_client, 0, sizeof(sslclient_context))` y solo conserva los tiempos y el último
+   error: `bundle_attach_cb` queda en `NULL`. `_use_ca_bundle` es del objeto y sigue en `true`.
+3. En la siguiente `connect()`, `start_ssl_client()` entra por `useRootCABundle` con el callback
+   en `NULL`: escribe el error de la línea 217 y sigue sin cadena de CA. Como la verificación es
+   obligatoria, el handshake falla con -0x7680 (`MBEDTLS_ERR_SSL_CA_CHAIN_REQUIRED`). El cliente
+   no se recupera: solo se recreaba tras un corte del vigilante.
+
+Con las lecturas cada 5 s la conexión de la base de datos dura mientras el servidor o la red no la
+cierren; el primer cierre, cualquiera sea, dejó al cliente inservible para siempre (el log no
+muestra cuál fue). Firebase Auth no lo sufría porque crea un cliente nuevo por petición. Telegram tenía el mismo defecto en su segunda conexión (más de 30 s
+entre mensajes); en esta prueba el `BOTON` salió sin esa reconexión, pero por el código habría
+fallado igual con un aviso posterior.
+
+La otra hipótesis, que un cliente al destruirse soltara el bundle global, no aplica: el destructor
+de `NetworkClientSecure` no lo toca, y solo `setCACertBundle(NULL, 0)` llama a
+`esp_crt_bundle_detach()`, cosa que la base nunca hizo. Aun así `setCACertBundle()` sí escribe
+estado global (`esp_crt_bundle_set()`), compartido por todos los clientes.
+
+**Arreglo.** `src/cliente_tls.h`: todos los clientes TLS de la base (Auth, base de datos y
+Telegram) son `ClienteTls`, una subclase de `NetworkClientSecure` que:
+
+- Vuelve a enganchar el callback del bundle (`attach_ssl_certificate_bundle(sslclient, true)` y
+  `_use_ca_bundle = true`) en cada `connect()`, antes del handshake. `HTTPClient` conecta con
+  `connect(host, puerto, timeout)`, que pasa por la `connect(host, puerto)` virtual sobrescrita.
+- No llama a `setCACertBundle()` ni a `esp_crt_bundle_set()`: `esp_crt_bundle_attach()` usa el
+  bundle embebido de menuconfig (`CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL`, el mismo que se
+  pasaba antes). Ningún cliente cambia estado global, así que ninguno puede dejar sin certificados
+  a otro.
+- Sigue verificando cadena y nombre del servidor; nunca `setInsecure()`.
+
+Sin prueba host: el arreglo es la interacción con `ssl_client` del framework, que no compila en el
+PC. **Por confirmar con el módulo**: con `FIREBASE_TRAZA 1`, dejar la base más de 2 min y ver que
+cada `PATCH .../estado` responde 200 tras el cierre de la conexión; mandar dos avisos de Telegram
+con más de 30 s entre ellos; y que no vuelva a salir `useRootCABundle is set`.
 
 ### Watchdog de tareas y motivo del reinicio (escenario 10)
 
