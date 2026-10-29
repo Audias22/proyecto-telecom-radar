@@ -13,13 +13,6 @@
 #include "registro.h"
 #include "watchdog_tareas.h"
 
-// Bundle de certificados raíz que trae ESP-IDF dentro de libmbedtls.a de arduino-esp32 3.3.7
-// (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL: la lista de Mozilla, ~69 kB en flash). Incluye
-// las raíces de Google Trust Services (googleapis.com, firebaseio.com) y la de Go Daddy G2
-// (api.telegram.org).
-extern const uint8_t bundle_ca_inicio[] asm("_binary_x509_crt_bundle_start");
-extern const uint8_t bundle_ca_fin[] asm("_binary_x509_crt_bundle_end");
-
 namespace peticion_https {
 
 namespace {
@@ -108,12 +101,7 @@ bool iniciar() {
 }
 
 // Límites de config.h (FIREBASE_TIMEOUT_*); qué espera cubre cada uno en docs/fallos.md,
-// escenario 5.
-void configurarCliente(NetworkClientSecure &cliente) {
-    cliente.setCACertBundle(bundle_ca_inicio, static_cast<size_t>(bundle_ca_fin - bundle_ca_inicio));
-    cliente.setHandshakeTimeout(FIREBASE_TIMEOUT_TLS_MS / 1000);  // recibe segundos
-}
-
+// escenario 5. El del handshake TLS lo fija ClienteTls.
 void configurarHttp(HTTPClient &http) {
     // Va al connect() del cliente TLS: select del connect TCP y socket_timeout de ssl_client, que
     // también corta una escritura TLS sin avance.

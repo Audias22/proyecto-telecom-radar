@@ -11,7 +11,8 @@ Firmware del XIAO ESP32-C6 que viene en el kit Seeed MR60BHA2.
 | `espnow_rx` | Recibir mensajes del colgante, filtrar duplicados, responder ACK |
 | `red_wifi` | Conexión WiFi STA y reconexión |
 | `firebase_cliente` | Tarea de red: sesión de Firebase Auth, escritura en Realtime Database por REST (HTTPS), eventos en NVS, `BASE_DESCONECTADA`; atiende también Telegram |
-| `peticion_https` | Lo común de cada petición HTTPS (Firebase y Telegram): certificado, límites de tiempo, cuerpo, vigilante y traza |
+| `peticion_https` | Lo común de cada petición HTTPS (Firebase y Telegram): límites de tiempo, cuerpo, vigilante y traza |
+| `cliente_tls` | Cliente TLS de Firebase y Telegram: verifica el certificado con el bundle de CA en cada conexión |
 | `vigilante_red` | Cuándo cortar una petición colgada y cuándo reiniciar (lógica pura) |
 | `cuerpo_http` | Cuerpo de las respuestas HTTP con memoria fija y sin esperas sin límite (lógica pura) |
 | `formato_nube` | JSON exacto que aceptan las reglas y lectura de las respuestas (lógica pura) |
@@ -136,8 +137,11 @@ lectura de `ultimo_contacto` trae datos (~13 bytes por minuto).
   sigue en 400/401/403 (las reglas la rechazan), reintentar no sirve: se descarta y se registra.
   El estado nunca se descarta: rechazado, sigue reintentando con espera.
 - **HTTPS**: el certificado del servidor se verifica con el bundle de CA de ESP-IDF que trae
-  arduino-esp32 3.3.7 dentro de `libmbedtls.a` (`_binary_x509_crt_bundle_start`, lista completa
-  de Mozilla) mediante `NetworkClientSecure::setCACertBundle()`. Nunca `setInsecure()`. Se
+  arduino-esp32 3.3.7 dentro de `libmbedtls.a` (lista completa de Mozilla). Todos los clientes
+  (Auth, base de datos y Telegram) son `ClienteTls` (`src/cliente_tls.h`), que engancha el bundle
+  antes de cada conexión y no toca el bundle global; no se usa `setCACertBundle()` porque deja
+  al cliente sin certificados después de su primer cierre (`docs/fallos.md`, "Certificados TLS
+  tras cerrar una conexión"). Nunca `setInsecure()`. Se
   verifican la cadena y el nombre del servidor; las fechas no, porque el framework se compila sin
   `MBEDTLS_HAVE_TIME_DATE` (la base no tiene reloj al arrancar). La conexión con la base de datos
   queda abierta (keep-alive): un handshake por conexión, no por petición.

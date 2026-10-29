@@ -2,12 +2,12 @@
 
 #include <Arduino.h>
 #include <HTTPClient.h>
-#include <NetworkClientSecure.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
 #include <cstring>
 
+#include "cliente_tls.h"
 #include "config.h"
 #include "formato_nube.h"
 #include "mensajes_telegram.h"
@@ -50,7 +50,7 @@ LimiteTelegram limite;
 const char *motivo_inactivo = "TELEGRAM_HABILITADO 0 en config.h";
 
 // Solo la tarea de red.
-NetworkClientSecure *cliente = nullptr;
+ClienteTls *cliente = nullptr;
 HTTPClient *http = nullptr;
 uint32_t ultimo_uso_ms = 0;
 
@@ -81,8 +81,7 @@ const char *revisarSecretos() {
 }
 
 void crearCliente() {
-    cliente = new NetworkClientSecure();
-    peticion_https::configurarCliente(*cliente);
+    cliente = new ClienteTls();
     http = new HTTPClient();
     peticion_https::configurarHttp(*http);
     http->setReuse(true);

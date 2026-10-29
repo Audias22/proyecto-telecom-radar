@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <HTTPClient.h>
-#include <NetworkClientSecure.h>
 #include <WiFi.h>
 #include <esp_system.h>
 #include <freertos/FreeRTOS.h>
@@ -13,6 +12,7 @@
 #include <cstring>
 
 #include "almacen.h"
+#include "cliente_tls.h"
 #include "cola_peticiones.h"
 #include "config.h"
 #include "detectores.h"
@@ -135,7 +135,7 @@ struct Contacto {
 Sesion sesion = {};
 Contacto contacto = {};
 String url_base;
-NetworkClientSecure *cliente_bd = nullptr;  // conexión a la base de datos, con keep-alive
+ClienteTls *cliente_bd = nullptr;  // conexión a la base de datos, con keep-alive
 HTTPClient *http_bd = nullptr;
 uint32_t ultimo_estado_ms = 0;
 bool estado_enviado = false;
@@ -176,8 +176,7 @@ void contarError() {
 // etiqueta: nombre corto para la traza (la URL lleva la API key).
 int pedirAuth(const char *url, const char *etiqueta, const char *tipo, const String &cuerpo,
               String &respuesta) {
-    NetworkClientSecure cliente;
-    peticion_https::configurarCliente(cliente);
+    ClienteTls cliente;
     HTTPClient http;
     peticion_https::configurarHttp(http);
     http.setReuse(false);
@@ -281,8 +280,7 @@ bool asegurarSesion() {
 // ---------------------------------------------------------------------------
 
 void crearClienteBd() {
-    cliente_bd = new NetworkClientSecure();
-    peticion_https::configurarCliente(*cliente_bd);
+    cliente_bd = new ClienteTls();
     http_bd = new HTTPClient();
     peticion_https::configurarHttp(*http_bd);
     http_bd->setReuse(true);  // keep-alive: un handshake TLS por conexión, no por petición

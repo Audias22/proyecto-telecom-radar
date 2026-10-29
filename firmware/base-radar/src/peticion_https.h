@@ -1,6 +1,6 @@
 // peticion_https.h
 // Lo común a las peticiones HTTPS de la tarea de red (Firebase y Telegram):
-//   - Certificado verificado con el bundle de CA de ESP-IDF, nunca sin verificar.
+//   - Cliente TLS: ClienteTls (cliente_tls.h), que verifica el certificado en cada conexión.
 //   - Límite de cada espera (FIREBASE_TIMEOUT_* en config.h; docs/fallos.md, escenario 5).
 //   - Cuerpo de la respuesta leído con un límite total (cuerpo_http.h), nunca con
 //     HTTPClient::getString(), que no tiene límite.
@@ -34,7 +34,6 @@ namespace peticion_https {
 // Antes de crear la tarea de red. false si no hubo memoria para el candado.
 bool iniciar();
 
-void configurarCliente(NetworkClientSecure &cliente);
 void configurarHttp(HTTPClient &http);
 
 // Anota la petición en el vigilante y la saca del watchdog. ruta: sin token ni parámetros.
