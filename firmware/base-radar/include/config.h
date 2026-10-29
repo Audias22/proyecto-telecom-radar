@@ -63,7 +63,7 @@
 // ---------------------------------------------------------------------------
 
 // Duración de la alerta local por una ALERTA nueva del colgante: LED rojo y buzzer intermitentes.
-#define ALERTA_LOCAL_DURACION_MS  60000UL
+#define ALERTA_LOCAL_DURACION_MS  15000UL
 // Duración de un aviso (LED amarillo, sin buzzer): batería baja del colgante, radar sin datos.
 #define AVISO_LOCAL_DURACION_MS   10000UL
 

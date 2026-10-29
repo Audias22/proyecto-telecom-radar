@@ -79,10 +79,10 @@ Estado (v0.6.0, nube parte 2):
   | Situación | LED | Buzzer |
   |---|---|---|
   | En funcionamiento | verde tenue fijo | no |
-  | ALERTA nueva del colgante | rojo intermitente, 60 s (`ALERTA_LOCAL_DURACION_MS`) | intermitente, 60 s |
+  | ALERTA nueva del colgante | rojo intermitente, 15 s (`ALERTA_LOCAL_DURACION_MS`) | intermitente, 15 s |
   | Aviso: batería baja del colgante, radar sin datos, ESP-NOW no inició | amarillo intermitente, 10 s | no |
 
-  Un duplicado no vuelve a disparar la alerta. Una ALERTA nueva durante otra reinicia los 60 s.
+  Un duplicado no vuelve a disparar la alerta. Una ALERTA nueva durante otra reinicia los 15 s.
   El botón BOOT de la placa (o el comando `s`) silencia la alerta.
   `PATRON_APNEA` está definido pero el radar no lo dispara: la apnea por radar no se usa como
   alarma (`docs/radar.md`, sección 13.6). Brillos en `LED_BRILLO_ALERTA` y `LED_BRILLO_REPOSO`.
@@ -440,11 +440,11 @@ habilitado vale igual, pero el canal es el del router (ver la guía de la fase W
    `HEARTBEAT` con `ARRANQUE_FRIO`: en la base debe salir `HEARTBEAT ... NUEVO ack=OK` y el
    colgante no debe sonar.
 4. **ALERTA**: presionar el botón. En la base, `ALERTA ... NUEVO ack=OK`, LED rojo y buzzer
-   intermitentes durante 60 s; el colgante da el beep corto de confirmación. `s` silencia antes.
+   intermitentes durante 15 s; el colgante da el beep corto de confirmación. `s` silencia antes.
 5. **HEARTBEAT**: esperar el intervalo del colgante (15 min, o el corto de prueba si está
    configurado). Debe salir `HEARTBEAT ... NUEVO` sin alerta local.
 6. **Duplicados**: presionar el botón varias veces durante una alerta; cada pulsación es una
-   secuencia nueva (`NUEVO`) y reinicia los 60 s. Un `DUPLICADO` solo aparece cuando se pierde un
+   secuencia nueva (`NUEVO`) y reinicia los 15 s. Un `DUPLICADO` solo aparece cuando se pierde un
    ACK y el colgante reintenta la misma secuencia: sale `DUPLICADO ack=OK` y la alerta no se
    reinicia. Para provocarlo, alejar el colgante hasta el límite del alcance y mirar los mensajes
    con `REINTENTO` (por confirmar con el módulo que se logre así; la regla es la misma que pasó la
