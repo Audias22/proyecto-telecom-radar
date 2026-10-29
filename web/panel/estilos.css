@@ -206,6 +206,7 @@ h1, h2, h3 { margin: 0; }
   justify-content: space-between;
   box-shadow: 0 6px 24px -8px rgba(120, 20, 10, 0.6);
   animation: latir-franja 1.6s ease-in-out infinite;
+  transition: padding 0.2s ease;
 }
 
 .emergencia__titulo {
@@ -215,9 +216,60 @@ h1, h2, h3 { margin: 0; }
   font-weight: 700;
   line-height: 1.1;
 }
-.emergencia__detalle { margin: 4px 0 0; font-size: 1.05rem; }
+.emergencia__cuenta { margin: 4px 0 0; font-size: 1.1rem; font-weight: 700; }
+.emergencia__detalle { margin: 2px 0 0; font-size: 1rem; }
 .emergencia__sonido { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.85; }
 .emergencia__acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.emergencia .solo-compacta { display: none; }
+
+/* Al bajar, la franja se reduce a una barra: título corto + Marcar atendido + silenciar */
+.emergencia--compacta {
+  padding: 8px 12px;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.emergencia--compacta .solo-amplia { display: none !important; }
+.emergencia--compacta .solo-compacta { display: inline; }
+.emergencia--compacta .emergencia__texto { min-width: 0; }
+.emergencia--compacta .emergencia__titulo { font-size: 1.15rem; }
+.emergencia--compacta .emergencia__titulo small {
+  display: block;
+  font-family: var(--f-texto);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.emergencia--compacta .emergencia__acciones { flex-wrap: nowrap; gap: 6px; flex: none; }
+.emergencia--compacta .boton { min-height: 38px; padding: 6px 12px; font-size: 0.9rem; }
+.emergencia--compacta .boton--emergencia { font-size: 0.9rem; }
+
+.boton--rojo { background: var(--rojo); color: #fff; }
+.boton--rojo:hover { background: #8f1c15; }
+
+/* Diálogo de confirmación */
+.dialogo {
+  width: min(420px, calc(100vw - 32px));
+  border: 1px solid var(--papel-borde);
+  border-top: 4px solid var(--rojo);
+  border-radius: var(--radio);
+  background: var(--papel);
+  color: var(--texto);
+  padding: 20px 20px 18px;
+  box-shadow: var(--sombra-alta);
+}
+.dialogo::backdrop { background: rgba(40, 20, 15, 0.45); }
+.dialogo__titulo { font-family: var(--f-titulo); font-size: 1.3rem; color: var(--rojo); margin-bottom: 8px; }
+.dialogo p { margin: 0 0 10px; }
+.dialogo__nota { font-size: 0.85rem; color: var(--texto-3); }
+.dialogo__acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+/* Datos viejos: la fuente (base o panel) no está al día, el valor es el último conocido */
+.equipo.obsoleto .pila__carga { fill: var(--gris); }
+.equipo.obsoleto .bateria__pct,
+.equipo.obsoleto .ficha dd,
+.equipo.obsoleto .bateria__mv { color: var(--texto-3); }
+.equipo.obsoleto .barras i.encendida { background: var(--gris); }
 
 @keyframes latir-franja {
   0%, 100% { background: var(--rojo); }
@@ -499,9 +551,11 @@ body.en-emergencia .hoja::before { background: rgba(179, 38, 30, 0.35); }
   border-radius: 3px;
   transform: rotate(-2deg);
   color: var(--gris);
-  white-space: nowrap;
+  text-align: center;
+  max-width: 60%;
 }
 .sello--bien { color: var(--verde); }
+.sello--gris { color: var(--texto-3); border-style: dashed; }
 .sello--atencion { color: var(--ambar); }
 .sello--mal { color: var(--rojo); }
 

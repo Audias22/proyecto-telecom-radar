@@ -17,15 +17,35 @@
   <!-- Franja de emergencia: visible mientras haya un BOTON sin atender -->
   <section id="emergencia" class="emergencia" role="alert" aria-live="assertive" hidden>
     <div class="emergencia__texto">
-      <p class="emergencia__titulo">Botón de auxilio presionado</p>
-      <p class="emergencia__detalle" id="emergencia-detalle"></p>
-      <p class="emergencia__sonido" id="emergencia-sonido"></p>
+      <p class="emergencia__titulo">
+        <span class="solo-amplia">Botón de auxilio presionado</span>
+        <span class="solo-compacta" id="emergencia-corto">Auxilio</span>
+      </p>
+      <p class="emergencia__cuenta solo-amplia" id="emergencia-cuenta"></p>
+      <p class="emergencia__detalle solo-amplia" id="emergencia-detalle"></p>
+      <p class="emergencia__sonido solo-amplia" id="emergencia-sonido"></p>
     </div>
     <div class="emergencia__acciones">
       <button type="button" class="boton boton--emergencia" id="emergencia-atender">Marcar atendido</button>
-      <button type="button" class="boton boton--texto-claro" id="emergencia-silenciar">Silenciar sonido</button>
+      <button type="button" class="boton boton--texto-claro solo-amplia" id="emergencia-todos" hidden></button>
+      <button type="button" class="boton boton--texto-claro" id="emergencia-silenciar">
+        <span id="emergencia-silenciar-texto">Silenciar sonido</span>
+      </button>
     </div>
   </section>
+
+  <!-- Confirmación de "Atender todos" -->
+  <dialog id="confirmar-todos" class="dialogo" aria-labelledby="confirmar-titulo">
+    <form method="dialog">
+      <h2 class="dialogo__titulo" id="confirmar-titulo"></h2>
+      <p>Hazlo solo si ya revisaste a la persona. Cada uno queda guardado como atendido por ti, con la hora.</p>
+      <p class="dialogo__nota">Si llega un botón nuevo mientras decides, no se incluye.</p>
+      <div class="dialogo__acciones">
+        <button type="submit" value="cancelar" class="boton boton--texto" autofocus>Cancelar</button>
+        <button type="submit" value="confirmar" class="boton boton--rojo" id="confirmar-si"></button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- Avisos de conexión y permisos -->
   <div id="avisos" class="avisos" aria-live="polite"></div>

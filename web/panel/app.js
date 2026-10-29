@@ -321,21 +321,34 @@ function baseEnLinea() {
   return !!(b && typeof b.ultimo_contacto === "number" && ahora() - b.ultimo_contacto <= BASE_DESCONECTADA_MS);
 }
 
+// Por qué lo que se muestra puede no estar al día: null si la base y el panel están conectados.
+function fuenteObsoleta() {
+  if (!estado.conectado) return "panel sin conexión";
+  if (!baseEnLinea()) return "base desconectada";
+  return null;
+}
+
 function pintarBase(nuevo = false) {
   const b = estado.base;
+  const art = $("equipo-base");
   if (!b) {
     sello($("base-sello"), "sin datos", "atencion");
     poner($("base-hace"), "nunca", false);
     return;
   }
   const t = ahora();
-  if (baseEnLinea()) sello($("base-sello"), "en línea", "bien");
+  // Sin conexión del panel no se sabe si la base sigue escribiendo: no se afirma nada.
+  if (!estado.conectado) sello($("base-sello"), "sin datos (panel sin conexión)", "gris");
+  else if (baseEnLinea()) sello($("base-sello"), "en línea", "bien");
   else sello($("base-sello"), "desconectada", "mal");
+  const obsoleto = fuenteObsoleta() !== null;
+  art.classList.toggle("obsoleto", obsoleto);
   $("base-hace").textContent = typeof b.ultimo_contacto === "number"
     ? `${hace(b.ultimo_contacto, t)} · ${hora(b.ultimo_contacto)}` : "—";
+  const rssi = typeof b.rssi_wifi === "number" ? `${b.rssi_wifi} dBm · ${calidadRssi(b.rssi_wifi)}` : "sin dato";
+  poner($("base-rssi"), obsoleto && typeof b.rssi_wifi === "number" ? `${b.rssi_wifi} dBm · último dato` : rssi, nuevo);
   if (nuevo) {
     $("base-barras").innerHTML = barrasHtml(b.rssi_wifi);
-    poner($("base-rssi"), typeof b.rssi_wifi === "number" ? `${b.rssi_wifi} dBm · ${calidadRssi(b.rssi_wifi)}` : "sin dato");
     poner($("base-version"), b.version_firmware || "—");
     $("base-hace").classList.remove("nuevo");
     if (!reducirMovimiento.matches) {
@@ -391,11 +404,21 @@ function pintarColgantes(nuevo = false) {
     const pct = porcentajeBateria(mv);
     const baja = mv === 0 || (mv !== null && mv < BATERIA_BAJA_MV);
     const ausente = typeof c.ultimo_heartbeat !== "number" || t - c.ultimo_heartbeat > COLGANTE_AUSENTE_MS;
+    // El colgante solo llega a Firebase a través de la base: si la base (o el panel) no está al
+    // día, su último dato no dice nada del estado actual.
+    const motivo = fuenteObsoleta();
 
     const s = art.querySelector(".sello");
-    if (ausente) sello(s, "ausente", "mal");
+    if (motivo) sello(s, `sin datos (${motivo})`, "gris");
+    else if (ausente) sello(s, "ausente", "mal");
     else if (baja) sello(s, "batería baja", "atencion");
     else sello(s, "normal", "bien");
+    art.classList.toggle("obsoleto", motivo !== null);
+    if (mv) {
+      const ultimo = typeof c.ultimo_heartbeat === "number" ? ` · último dato ${hora(c.ultimo_heartbeat)}` : "";
+      poner(art.querySelector(".bateria__mv"),
+        motivo ? `${numero(mv)} mV${ultimo}` : `${numero(mv)} mV · porcentaje aprox.`, nuevo);
+    }
 
     art.querySelector(".c-hace").textContent = typeof c.ultimo_heartbeat === "number"
       ? `${hace(c.ultimo_heartbeat, t)} · ${hora(c.ultimo_heartbeat)}` : "—";
@@ -421,11 +444,11 @@ function pintarColgantes(nuevo = false) {
         poner(art.querySelector(".bateria__mv"), "el colgante no pudo medir la batería");
       } else {
         animarNumero(pctEl, pct, 0, " %");
-        poner(art.querySelector(".bateria__mv"), `${numero(mv)} mV · porcentaje aprox.`);
       }
       art.querySelector(".barras").innerHTML = barrasHtml(c.rssi);
-      poner(art.querySelector(".c-rssi"), typeof c.rssi === "number" ? `${c.rssi} dBm · ${calidadRssi(c.rssi)}` : "sin dato");
     }
+    poner(art.querySelector(".c-rssi"), typeof c.rssi !== "number" ? "sin dato"
+      : motivo ? `${c.rssi} dBm · último dato` : `${c.rssi} dBm · ${calidadRssi(c.rssi)}`, nuevo);
   }
   for (const art of cont.querySelectorAll("[data-colgante]")) {
     if (!(art.dataset.colgante in estado.colgantes)) art.remove();
@@ -456,11 +479,13 @@ function pintarRadar() {
   const rpm = reciente && ultima.persona ? ultimoValor("resp_rpm", t - 30 * 1000) : null;
   const lpm = reciente ? ultimoValor("latido_bpm", t - 30 * 1000) : null;
 
+  const fuente = fuenteObsoleta();
   if (!ultima || !reciente) {
     anillo.dataset.estado = "quieto";
-    poner(est, "Radar sin datos recientes", false);
-    est.dataset.tono = "falla";
-    if (!baseEnLinea()) motivo.textContent = "La base está desconectada; no llegan lecturas.";
+    poner(est, fuente ? `Sin datos (${fuente})` : "Radar sin datos recientes", false);
+    est.dataset.tono = fuente ? "apagado" : "falla";
+    if (fuente === "panel sin conexión") motivo.textContent = "Este equipo perdió la conexión con Firebase; no llegan lecturas.";
+    else if (fuente) motivo.textContent = `La base no se comunica; la última lectura es de las ${ultima ? hora(ultima.ts) : "—"}.`;
     else if (ultima) motivo.textContent = `La última lectura llegó ${hace(ultima.ts, t)}. Revisa la conexión del radar.`;
     else motivo.textContent = "No hay lecturas en las últimas 6 horas.";
   } else if (ultima.persona) {
@@ -599,7 +624,7 @@ function pintarEventos() {
   const t = ahora();
   const pendientes = lista.filter((e) => !e.atendido).length;
   $("eventos-resumen").textContent = lista.length
-    ? `${pendientes ? `${pendientes} sin atender · ` : "todos atendidos · "}últimos ${Math.min(lista.length, EVENTOS_RECIENTES)}`
+    ? `${pendientes ? `${pendientes} ${pendientes === 1 ? "aviso" : "avisos"} sin atender · ` : "todos atendidos · "}últimos ${Math.min(lista.length, EVENTOS_RECIENTES)}`
     : "";
 
   if (!lista.length) {
@@ -676,9 +701,16 @@ function actualizarEmergencia() {
   if (!hay) return;
   const e = botones[0];
   const t = ahora();
-  const otros = botones.length > 1 ? ` (${botones.length} sin atender)` : "";
+  const n = botones.length;
+  const cuenta = n === 1 ? "1 botón sin atender" : `${n} botones sin atender`;
+  $("emergencia-cuenta").textContent = cuenta;
+  $("emergencia-corto").innerHTML = `Auxilio<small>${n === 1 ? "1 botón" : `${n} botones`}</small>`;
   $("emergencia-detalle").textContent =
-    `${e.origen || "colgante"} · ${hora(e.timestamp)} · ${hace(e.timestamp, t)}${otros}`;
+    `${n > 1 ? "El más reciente: " : ""}${e.origen || "colgante"} · ${hora(e.timestamp)} · ${hace(e.timestamp, t)}`;
+  const todos = $("emergencia-todos");
+  todos.hidden = n < 2;
+  todos.textContent = `Atender todos (${n})`;
+  todos.disabled = botones.some((b) => estado.guardando.has(b.id));
   const boton = $("emergencia-atender");
   boton.dataset.id = e.id;
   boton.disabled = estado.guardando.has(e.id);
@@ -691,7 +723,10 @@ function pintarSonido() {
   $("emergencia-sonido").textContent = s === "pendiente"
     ? "Toca la pantalla para activar el sonido de alerta."
     : s === "silenciado" ? "Sonido silenciado en este equipo." : "Sonando en este equipo.";
-  $("emergencia-silenciar").textContent = s === "silenciado" ? "Activar sonido" : "Silenciar sonido";
+  const compacta = $("emergencia").classList.contains("emergencia--compacta");
+  $("emergencia-silenciar-texto").textContent = s === "silenciado"
+    ? (compacta ? "Activar" : "Activar sonido")
+    : (compacta ? "Silenciar" : "Silenciar sonido");
 }
 
 alCambiar(pintarSonido);
@@ -700,6 +735,37 @@ $("emergencia-atender").addEventListener("click", (ev) => {
   const id = ev.currentTarget.dataset.id;
   if (id) marcarAtendido(id);
 });
+
+// "Atender todos": se confirma y solo incluye los botones pendientes al abrir el diálogo.
+let idsPorAtender = [];
+$("emergencia-todos").addEventListener("click", () => {
+  idsPorAtender = botonesPendientes().map((b) => b.id);
+  const n = idsPorAtender.length;
+  $("confirmar-titulo").textContent = `¿Marcar como atendidos los ${n} botones sin atender?`;
+  $("confirmar-si").textContent = `Sí, atender los ${n}`;
+  $("confirmar-todos").showModal();
+});
+
+$("confirmar-todos").addEventListener("close", () => {
+  const ids = idsPorAtender;
+  idsPorAtender = [];
+  if ($("confirmar-todos").returnValue === "confirmar") {
+    Promise.allSettled(ids.map((id) => marcarAtendido(id)));
+  }
+});
+
+// Al bajar, la franja se encoge a una barra; vuelve a su tamaño arriba. Con margen entre los dos
+// umbrales para que no parpadee justo en el límite.
+function ajustarFranja() {
+  const franja = $("emergencia");
+  const compacta = franja.classList.contains("emergencia--compacta");
+  const y = window.scrollY;
+  if (!compacta && y > 60) franja.classList.add("emergencia--compacta");
+  else if (compacta && y < 12) franja.classList.remove("emergencia--compacta");
+  else return;
+  pintarSonido();
+}
+window.addEventListener("scroll", ajustarFranja, { passive: true });
 
 $("emergencia-silenciar").addEventListener("click", () => {
   silenciar(estadoSonido() !== "silenciado");
