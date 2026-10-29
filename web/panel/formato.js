@@ -5,12 +5,20 @@ export const HORA = 60 * MINUTO;
 
 // docs/modelo-datos.md, sección 3: la base está desconectada si ultimo_contacto tiene más de 3 min.
 export const BASE_DESCONECTADA_MS = 3 * MINUTO;
-// docs/protocolo.md, COLGANTE_AUSENTE_S = 2700 s.
+// Sin lecturas (cada 5 s) ni contacto en este tiempo, la base pasa a "sin datos hace X s" (ámbar).
+export const BASE_SIN_DATOS_MS = 20 * 1000;
+// Si la base escribe estado (cada 60 s) pero no lecturas (radar sin datos), el umbral anterior
+// haría parpadear el estado entre dos actualizaciones: se usa el periodo de estado más margen.
+export const ESTADO_PERIODO_MS = 60 * 1000;
+export const BASE_SIN_DATOS_SOLO_ESTADO_MS = ESTADO_PERIODO_MS + 15 * 1000;
+// firmware/comun/protocolo/protocolo.h: HEARTBEAT_INTERVALO_S = 900 s; COLGANTE_AUSENTE_S = 2700 s.
+export const HEARTBEAT_MS = 15 * MINUTO;
+export const COLGANTE_SIN_REPORTE_MS = 2 * HEARTBEAT_MS;
 export const COLGANTE_AUSENTE_MS = 45 * MINUTO;
 // docs/protocolo.md, BATERIA_BAJA_MV.
 export const BATERIA_BAJA_MV = 3500;
-// La base escribe una lectura cada 5 s; sin lecturas en 30 s el radar se considera sin datos.
-export const RADAR_SIN_DATOS_MS = 30 * 1000;
+// La base escribe una lectura cada 5 s; sin lecturas en 20 s (4 perdidas) el radar está sin datos.
+export const RADAR_SIN_DATOS_MS = 20 * 1000;
 // docs/radar.md, 13.6: umbral de actividad para "persona detectada".
 export const UMBRAL_ACTIVIDAD = 0.03;
 

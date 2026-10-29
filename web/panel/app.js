@@ -13,6 +13,7 @@ import {
 import { firebaseConfig, BASE_ID } from "./config.js";
 import {
   MINUTO, HORA, BASE_DESCONECTADA_MS, COLGANTE_AUSENTE_MS, BATERIA_BAJA_MV, RADAR_SIN_DATOS_MS,
+  BASE_SIN_DATOS_MS, BASE_SIN_DATOS_SOLO_ESTADO_MS, ESTADO_PERIODO_MS, COLGANTE_SIN_REPORTE_MS,
   UMBRAL_ACTIVIDAD, hace, hora, horaSeg, fechaCorta, fechaLarga, mismoDia, nombreEvento,
   porcentajeBateria, barrasRssi, calidadRssi, numero, escapar,
 } from "./formato.js";
@@ -317,9 +318,31 @@ function sello(el, texto, tono) {
 // Base
 // ---------------------------------------------------------------------------
 
+// Estado de la base según la señal más reciente: su ultimo_contacto (cada 60 s) o su última
+// lectura (cada 5 s). Ambas son hora del servidor y ahora() también (serverTimeOffset), así que
+// el reloj del celular no influye. Tiempos y motivos en docs/panel.md, "Tiempos de cada estado".
+//   en-linea      señal reciente
+//   sin-datos     más de 20 s sin señal (75 s si la base solo manda estado): ámbar, aviso rápido
+//   desconectada  más de 3 min sin señal, el mismo umbral que BASE_DESCONECTADA y Telegram
+//   desconocido   nunca escribió
+function estadoBase() {
+  const contacto = typeof estado.base?.ultimo_contacto === "number" ? estado.base.ultimo_contacto : null;
+  const ultimaLectura = estado.lecturas[estado.lecturas.length - 1];
+  const lectura = ultimaLectura ? ultimaLectura.ts : null;
+  if (contacto === null && lectura === null) return { estado: "desconocido", ultima: null };
+  const ultima = Math.max(contacto ?? 0, lectura ?? 0);
+  const edad = Math.max(0, ahora() - ultima);
+  if (edad > BASE_DESCONECTADA_MS) return { estado: "desconectada", ultima, edad };
+  // ¿La base venía escribiendo lecturas? Si la última lectura es de antes de su último estado por
+  // más de un periodo, el radar no está mandando y solo cuenta el estado cada 60 s.
+  const conLecturas = lectura !== null && (contacto === null || lectura >= contacto - ESTADO_PERIODO_MS - 10 * 1000);
+  const umbral = conLecturas ? BASE_SIN_DATOS_MS : BASE_SIN_DATOS_SOLO_ESTADO_MS;
+  return { estado: edad > umbral ? "sin-datos" : "en-linea", ultima, edad };
+}
+
 function baseEnLinea() {
-  const b = estado.base;
-  return !!(b && typeof b.ultimo_contacto === "number" && ahora() - b.ultimo_contacto <= BASE_DESCONECTADA_MS);
+  const e = estadoBase().estado;
+  return e === "en-linea" || e === "sin-datos";
 }
 
 // Por qué lo que se muestra puede no estar al día: null si la base y el panel están conectados.
@@ -338,14 +361,15 @@ function pintarBase(nuevo = false) {
     return;
   }
   const t = ahora();
+  const eb = estadoBase();
   // Sin conexión del panel no se sabe si la base sigue escribiendo: no se afirma nada.
   if (!estado.conectado) sello($("base-sello"), "sin datos (panel sin conexión)", "gris");
-  else if (baseEnLinea()) sello($("base-sello"), "en línea", "bien");
+  else if (eb.estado === "en-linea") sello($("base-sello"), "en línea", "bien");
+  else if (eb.estado === "sin-datos") sello($("base-sello"), `sin datos ${hace(eb.ultima, t)}`, "atencion");
   else sello($("base-sello"), "desconectada", "mal");
   const obsoleto = fuenteObsoleta() !== null;
   art.classList.toggle("obsoleto", obsoleto);
-  $("base-hace").textContent = typeof b.ultimo_contacto === "number"
-    ? `${hace(b.ultimo_contacto, t)} · ${hora(b.ultimo_contacto)}` : "—";
+  $("base-hace").textContent = eb.ultima ? `${hace(eb.ultima, t)} · ${horaSeg(eb.ultima)}` : "—";
   const rssi = typeof b.rssi_wifi === "number" ? `${b.rssi_wifi} dBm · ${calidadRssi(b.rssi_wifi)}` : "sin dato";
   poner($("base-rssi"), obsoleto && typeof b.rssi_wifi === "number" ? `${b.rssi_wifi} dBm · último dato` : rssi, nuevo);
   if (nuevo) {
@@ -409,9 +433,14 @@ function pintarColgantes(nuevo = false) {
     // día, su último dato no dice nada del estado actual.
     const motivo = fuenteObsoleta();
 
+    // Con la base en línea, un colgante que no se reporta en el doble de su intervalo de heartbeat
+    // ya perdió al menos un mensaje: aviso en ámbar antes de los 45 min de "ausente".
+    const sinReporte = !ausente && estadoBase().estado === "en-linea" && t - c.ultimo_heartbeat > COLGANTE_SIN_REPORTE_MS;
+
     const s = art.querySelector(".sello");
     if (motivo) sello(s, `sin datos (${motivo})`, "gris");
     else if (ausente) sello(s, "ausente", "mal");
+    else if (sinReporte) sello(s, "sin reporte reciente", "atencion");
     else if (baja) sello(s, "batería baja", "atencion");
     else sello(s, "normal", "bien");
     art.classList.toggle("obsoleto", motivo !== null);
@@ -481,12 +510,17 @@ function pintarRadar() {
   const lpm = reciente ? ultimoValor("latido_bpm", t - 30 * 1000) : null;
 
   const fuente = fuenteObsoleta();
+  const eb = estadoBase();
   if (!ultima || !reciente) {
     anillo.dataset.estado = "quieto";
-    poner(est, fuente ? `Sin datos (${fuente})` : "Radar sin datos recientes", false);
+    const titulo = fuente ? `Sin datos (${fuente})`
+      : eb.estado === "sin-datos" && ultima ? `Sin datos ${hace(ultima.ts, t)}`
+        : "Radar sin datos recientes";
+    poner(est, titulo, false);
     est.dataset.tono = fuente ? "apagado" : "falla";
     if (fuente === "panel sin conexión") motivo.textContent = "Este equipo perdió la conexión con Firebase; no llegan lecturas.";
-    else if (fuente) motivo.textContent = `La base no se comunica; la última lectura es de las ${ultima ? hora(ultima.ts) : "—"}.`;
+    else if (fuente) motivo.textContent = `La base no se comunica; la última lectura es de las ${ultima ? horaSeg(ultima.ts) : "—"}.`;
+    else if (eb.estado === "sin-datos") motivo.textContent = "No llegan lecturas ni contacto de la base. Si sigue así, a los 3 min se marca desconectada.";
     else if (ultima) motivo.textContent = `La última lectura llegó ${hace(ultima.ts, t)}. Revisa la conexión del radar.`;
     else motivo.textContent = "No hay lecturas en las últimas 6 horas.";
   } else if (ultima.persona) {
@@ -811,8 +845,10 @@ $("emergencia-silenciar").addEventListener("click", () => {
 // Reloj: "hace X", estado en línea / ausente y desplazamiento de las gráficas
 // ---------------------------------------------------------------------------
 
+// Reloj: cada segundo se recalculan los estados que dependen del tiempo (en línea / sin datos /
+// desconectada, ausente, "hace X"), aunque no llegue nada de Firebase.
 let tic = 0;
-setInterval(() => {
+function reloj() {
   if (!estado.usuario) return;
   tic++;
   $("enc-fecha").textContent = `${fechaLarga(ahora())} · ${horaSeg(ahora())}`;
@@ -824,4 +860,18 @@ setInterval(() => {
     pintarEventos();
     actualizarEmergencia();
   }
-}, 1000);
+}
+setInterval(reloj, 1000);
+
+// En el celular, con la pestaña en segundo plano o la pantalla apagada, el navegador frena o
+// congela los temporizadores. Al volver se recalcula todo de inmediato.
+function alVolver() {
+  if (document.hidden || !estado.usuario) return;
+  reloj();
+  programarDibujo();
+  pintarEventos();
+  actualizarEmergencia();
+}
+document.addEventListener("visibilitychange", alVolver);
+window.addEventListener("pageshow", alVolver);
+window.addEventListener("focus", alVolver);
