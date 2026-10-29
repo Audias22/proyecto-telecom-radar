@@ -538,6 +538,13 @@ def verificar(credenciales):
         v.caso("cuidador lee colgantes", True, "GET", "colgantes", tc)
         v.caso("cuidador lee el último evento", True, "GET", "eventos", tc,
                parametros={"orderBy": '"timestamp"', "limitToLast": 1})
+        # Las dos consultas que hace el panel (docs/panel.md). Sin ".indexOn" de "atendido" la
+        # API REST responde 400 en vez de filtrar.
+        v.caso("cuidador consulta eventos sin atender (índice de atendido)", True, "GET",
+               "eventos", tc, parametros={"orderBy": '"atendido"', "equalTo": "false"})
+        hace_un_minuto = int(time.time() * 1000) - 60_000
+        v.caso("cuidador lee lecturas por rango de claves", True, "GET", f"lecturas/{base_id}",
+               tc, parametros={"orderBy": '"$key"', "startAt": f'"{hace_un_minuto:013d}"'})
         v.caso("cuidador escribe una lectura", False, "PUT", f"lecturas/{base_id}/{ts_completa}",
                tc, lectura_valida)
         v.caso("cuidador borra lecturas", False, "DELETE", f"lecturas/{base_id}/{ts_completa}", tc)

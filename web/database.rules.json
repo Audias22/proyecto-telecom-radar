@@ -54,7 +54,7 @@
 
     "eventos": {
       ".read": "auth != null && root.child('usuarios_panel').child(auth.uid).val() === true",
-      ".indexOn": ["timestamp"],
+      ".indexOn": ["timestamp", "atendido"],
       "$eventoId": {
         ".write": "auth != null && root.child('cuentas_dispositivo').child(auth.uid).exists() && !data.exists()",
         ".validate": "newData.hasChildren(['tipo', 'origen', 'timestamp', 'atendido'])",
