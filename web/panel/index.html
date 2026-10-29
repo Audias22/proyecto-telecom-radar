@@ -159,15 +159,24 @@
           </div>
         </div>
         <figure class="grafica" id="grafica-resp">
-          <figcaption><strong>Respiración</strong> <span>resp/min · estimación del radar, no validada clínicamente</span></figcaption>
+          <figcaption>
+            <span class="grafica__titulo"><strong>Respiración</strong> <span>resp/min · estimación del radar, no validada clínicamente</span></span>
+            <button type="button" class="ampliar" data-ampliar="resp" aria-label="Ampliar la gráfica de respiración"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg>Ampliar</button>
+          </figcaption>
           <div class="grafica__lienzo papel"></div>
         </figure>
         <figure class="grafica" id="grafica-latido">
-          <figcaption><strong>Latido</strong> <span>lat/min · estimación del radar, no validada clínicamente</span></figcaption>
+          <figcaption>
+            <span class="grafica__titulo"><strong>Latido</strong> <span>lat/min · estimación del radar, no validada clínicamente</span></span>
+            <button type="button" class="ampliar" data-ampliar="latido" aria-label="Ampliar la gráfica de latido"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg>Ampliar</button>
+          </figcaption>
           <div class="grafica__lienzo papel"></div>
         </figure>
         <figure class="grafica" id="grafica-actividad">
-          <figcaption><strong>Actividad</strong> <span>movimiento visto por el radar, escala de raíz; sobre 0.03 se considera persona detectada</span></figcaption>
+          <figcaption>
+            <span class="grafica__titulo"><strong>Actividad</strong> <span>movimiento visto por el radar, escala de raíz</span><span class="leyenda-umbral"><i class="muestra muestra--umbral"></i>umbral 0.03: encima se considera persona detectada</span></span>
+            <button type="button" class="ampliar" data-ampliar="actividad" aria-label="Ampliar la gráfica de actividad"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg>Ampliar</button>
+          </figcaption>
           <div class="grafica__lienzo papel"></div>
         </figure>
       </section>
@@ -185,6 +194,31 @@
     <footer class="pie">
       Datos en tiempo real de Firebase. Este panel no hace diagnósticos: la alarma confiable es el botón del colgante.
     </footer>
+  </div>
+
+
+  <!-- Vista ampliada de una gráfica -->
+  <div id="ampliada" class="ampliada" role="dialog" aria-modal="true" aria-labelledby="ampliada-titulo" hidden>
+    <div class="ampliada__hoja">
+      <header class="ampliada__cabeza">
+        <button type="button" class="boton boton--texto ampliada__volver" id="ampliada-volver">&larr; Volver</button>
+        <div class="ampliada__nombre">
+          <h2 class="seccion" id="ampliada-titulo"></h2>
+          <p class="ampliada__sub" id="ampliada-sub"></p>
+        </div>
+      </header>
+      <div class="ampliada__barra">
+        <p class="ampliada__rango"><span class="mono" id="ampliada-rango"></span> <span class="ampliada__vivo" id="ampliada-vivo"></span></p>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button type="button" id="zoom-menos" aria-label="Alejar">&minus;</button>
+          <button type="button" id="zoom-mas" aria-label="Acercar">+</button>
+          <button type="button" id="zoom-restablecer">Restablecer</button>
+        </div>
+      </div>
+      <p class="ampliada__leyenda" id="ampliada-umbral" hidden><span class="leyenda-umbral"><i class="muestra muestra--umbral"></i>umbral 0.03: encima se considera persona detectada</span></p>
+      <div class="ampliada__lienzo papel" id="ampliada-lienzo"></div>
+      <p class="ampliada__ayuda">Pellizca o usa la rueda del mouse para acercar; arrastra para moverte en el tiempo. Toca la línea para ver un punto.</p>
+    </div>
   </div>
 
   <div class="globo" id="globo" role="tooltip" hidden></div>

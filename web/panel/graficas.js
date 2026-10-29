@@ -14,11 +14,15 @@ export function mostrarGlobo(html, x, y) {
   globo.innerHTML = html;
   globo.hidden = false;
   const r = globo.getBoundingClientRect();
+  const anchoV = document.documentElement.clientWidth;
+  const altoV = window.innerHeight;
+  // Arriba del punto (el dedo tapa lo de abajo); si no cabe, abajo. Nunca fuera de la pantalla.
   let left = x + 14;
-  let top = y - r.height - 12;
-  if (left + r.width > window.innerWidth - 8) left = x - r.width - 14;
-  if (left < 8) left = 8;
-  if (top < 8) top = y + 16;
+  if (left + r.width > anchoV - 8) left = x - r.width - 14;
+  left = Math.min(Math.max(left, 8), anchoV - r.width - 8);
+  let top = y - r.height - 16;
+  if (top < 8) top = y + 20;
+  top = Math.min(Math.max(top, 8), altoV - r.height - 8);
   globo.style.left = `${left}px`;
   globo.style.top = `${top}px`;
 }
@@ -46,11 +50,21 @@ export function buscarDesde(lecturas, t) {
   return lo;
 }
 
-function pasoMarcas(rango) {
-  if (rango <= 20 * MINUTO) return 5 * MINUTO;
-  if (rango <= 90 * MINUTO) return 15 * MINUTO;
-  if (rango <= 3 * HORA) return 30 * MINUTO;
-  return HORA;
+// Marcas del eje de tiempo: el paso se elige para dejar ~90 px entre etiquetas; con pasos de
+// menos de un minuto las etiquetas llevan segundos.
+const PASOS_TIEMPO = [
+  5000, 10000, 15000, 30000, MINUTO, 2 * MINUTO, 5 * MINUTO, 10 * MINUTO, 15 * MINUTO,
+  30 * MINUTO, HORA, 2 * HORA,
+];
+
+export function marcasTiempo(desde, hasta, ancho) {
+  const cuantas = Math.max(2, Math.floor(ancho / 90));
+  const paso = PASOS_TIEMPO.find((p) => (hasta - desde) / p <= cuantas) || 2 * HORA;
+  // Alineado a la hora local (la zona de Guatemala no tiene horario de verano).
+  const zona = new Date(desde).getTimezoneOffset() * MINUTO;
+  const marcas = [];
+  for (let t = Math.ceil((desde - zona) / paso) * paso + zona; t <= hasta; t += paso) marcas.push(t);
+  return { marcas, formato: paso < MINUTO ? horaSeg : hora };
 }
 
 function marcasY(lo, hi) {
@@ -91,7 +105,8 @@ function medianas(puntos, desde, paso) {
 // Gráfica de línea
 // ---------------------------------------------------------------------------
 
-// opciones: { lecturas, desde, hasta, campo, unidad, decimales, yMin, yTopeMin, umbral, vacio }
+// opciones: { lecturas, desde, hasta, campo, unidad, decimales, yMin, yTopeMin, umbral, raiz,
+//             vacio, descripcion, nota, propia (la vista ampliada maneja los gestos), alAmpliar }
 export function dibujarGrafica(lienzo, opciones) {
   lienzo._opciones = opciones;
   const ancho = lienzo.clientWidth;
@@ -105,10 +120,15 @@ export function dibujarGrafica(lienzo, opciones) {
 
   const i0 = buscarDesde(lecturas, desde);
   let puntos = [];
+  const crudos = [];
   for (let i = i0; i < lecturas.length && lecturas[i].ts <= hasta; i++) {
     const v = lecturas[i][campo];
-    if (typeof v === "number") puntos.push({ ts: lecturas[i].ts, v, n: 1 });
+    if (typeof v === "number") {
+      puntos.push({ ts: lecturas[i].ts, v, n: 1 });
+      crudos.push(lecturas[i]);
+    }
   }
+  lienzo._crudos = crudos;
   // Con más lecturas que medio píxel por punto, cada punto es la mediana de su tramo de tiempo:
   // a 1 h y 6 h el trazo crudo cada 5 s es ilegible en un celular.
   if (puntos.length > w / 2) puntos = medianas(puntos, desde, (hasta - desde) / (w / 2));
@@ -137,18 +157,17 @@ export function dibujarGrafica(lienzo, opciones) {
     el("line", { x1: m.izq, x2: m.izq + w, y1: y(v), y2: y(v) }, ejes);
     const t = el("text", { x: m.izq - 6, y: y(v) + 3.5, "text-anchor": "end" }, ejes);
     t.textContent = numero(v, v % 1 ? (v < 0.1 ? 2 : 1) : 0);
-    if (opciones.raiz && v === 0.03) t.setAttribute("visibility", "hidden"); // ya lo nombra el umbral
+    // El umbral se nombra en la leyenda de la gráfica; en el eje su marca va en ámbar.
+    if (v === opciones.umbral) t.setAttribute("class", "umbral-texto");
   }
-  const paso = pasoMarcas(hasta - desde);
-  for (let t = Math.ceil(desde / paso) * paso; t <= hasta; t += paso) {
+  const tiempo = marcasTiempo(desde, hasta, w);
+  for (const t of tiempo.marcas) {
     const tx = el("text", { x: x(t), y: alto - 6, "text-anchor": "middle" }, ejes);
-    tx.textContent = hora(t);
+    tx.textContent = tiempo.formato(t);
   }
 
   if (typeof opciones.umbral === "number" && opciones.umbral < tope) {
     el("line", { class: "umbral", x1: m.izq, x2: m.izq + w, y1: y(opciones.umbral), y2: y(opciones.umbral) }, svg);
-    const t = el("text", { class: "umbral-texto", x: m.izq + 4, y: y(opciones.umbral) - 4 }, svg);
-    t.textContent = `umbral ${numero(opciones.umbral, 2)}`;
   }
 
   // Trazo: se corta donde faltan datos para no inventar valores entre huecos.
@@ -181,57 +200,114 @@ export function dibujarGrafica(lienzo, opciones) {
 
   const cursor = el("g", { visibility: "hidden" }, svg);
   el("line", { class: "cursor-linea", y1: m.arr, y2: m.arr + h }, cursor);
-  el("circle", { class: "cursor-punto", r: 4.5 }, cursor);
+  el("circle", { class: "cursor-punto", r: 5 }, cursor);
   lienzo._cursor = cursor;
+  lienzo._agrupado = puntos.length < crudos.length;
 
   lienzo.replaceChildren(svg);
 
-  if (!lienzo._escuchando) {
+  // Si había un punto marcado, sigue marcado al redibujar (llegan datos cada 5 s).
+  if (lienzo._detalleTs) detalleEnTs(lienzo, lienzo._detalleTs);
+
+  if (!lienzo._escuchando && !opciones.propia) {
     lienzo._escuchando = true;
-    const mover = (ev) => moverCursor(lienzo, ev);
+    // Mouse: el detalle sigue al puntero. Dedo: al tocar y al deslizar de lado.
+    const mover = (ev) => detalleEn(lienzo, ev.clientX);
     lienzo.addEventListener("pointermove", mover);
     lienzo.addEventListener("pointerdown", mover);
-    lienzo.addEventListener("pointerleave", () => {
-      lienzo._cursor?.setAttribute("visibility", "hidden");
-      ocultarGlobo();
+    // Con el dedo, el detalle queda puesto hasta tocar en otro lado o hacer scroll.
+    lienzo.addEventListener("pointerleave", (ev) => {
+      if (ev.pointerType !== "touch") ocultarDetalle(lienzo);
+    });
+    // El clic con mouse abre la vista ampliada; con el dedo se usa el botón "Ampliar".
+    lienzo.addEventListener("click", (ev) => {
+      if (ev.pointerType === "mouse" || ev.pointerType === "pen") lienzo._opciones.alAmpliar?.();
     });
   }
 }
 
-function moverCursor(lienzo, ev) {
-  const puntos = lienzo._puntos;
+// ---------------------------------------------------------------------------
+// Detalle de un punto
+// ---------------------------------------------------------------------------
+
+const lienzosConDetalle = new Set();
+
+// Marca la lectura real (no la mediana) más cercana a la posición x de la pantalla.
+export function detalleEn(lienzo, clientX) {
+  const esc = lienzo._escala;
+  const crudos = lienzo._crudos;
+  if (!esc || !crudos) return;
+  const r = lienzo.getBoundingClientRect();
+  const px = Math.min(Math.max(clientX - r.left, esc.m.izq), esc.m.izq + esc.w);
+  const t = esc.desde + ((px - esc.m.izq) / esc.w) * (esc.hasta - esc.desde);
+  if (!crudos.length) {
+    lienzo._detalleTs = null;
+    lienzosConDetalle.add(lienzo);
+    mostrarGlobo(`<b>${horaSeg(t)}</b><small>sin lecturas del radar en este rango</small>`,
+      clientX, r.top + esc.m.arr + 20);
+    return;
+  }
+  let i = buscarDesde(crudos, t);
+  if (i >= crudos.length || (i > 0 && t - crudos[i - 1].ts < crudos[i].ts - t)) i -= 1;
+  const l = crudos[Math.max(0, i)];
+  // Zona de toque generosa: vale el punto más cercano dentro de 1/12 del ancho visible.
+  const tolerancia = Math.max(30 * 1000, (esc.hasta - esc.desde) / 12);
+  if (Math.abs(l.ts - t) > tolerancia) {
+    lienzo._detalleTs = null;
+    lienzo._cursor.setAttribute("visibility", "hidden");
+    lienzosConDetalle.add(lienzo);
+    mostrarGlobo(`<b>${horaSeg(t)}</b><small>sin dato del radar cerca de esta hora</small>`,
+      clientX, r.top + esc.m.arr + 20);
+    return;
+  }
+  detalleEnTs(lienzo, l.ts);
+}
+
+function detalleEnTs(lienzo, ts) {
   const esc = lienzo._escala;
   const op = lienzo._opciones;
-  if (!puntos || !esc) return;
-  const r = lienzo.getBoundingClientRect();
-  const px = ev.clientX - r.left;
-  const t = esc.desde + ((px - esc.m.izq) / esc.w) * (esc.hasta - esc.desde);
-  if (!puntos.length || px < esc.m.izq - 4 || px > esc.m.izq + esc.w + 4) {
-    lienzo._cursor.setAttribute("visibility", "hidden");
-    ocultarGlobo();
+  const crudos = lienzo._crudos;
+  const l = crudos[buscarDesde(crudos, ts)];
+  if (!l || l.ts !== ts || ts < esc.desde || ts > esc.hasta) {
+    ocultarDetalle(lienzo);
     return;
   }
-  let i = buscarDesde(puntos, t);
-  if (i >= puntos.length || (i > 0 && t - puntos[i - 1].ts < puntos[i].ts - t)) i -= 1;
-  const p = puntos[Math.max(0, i)];
-  const tolerancia = Math.max(30 * 1000, (esc.hasta - esc.desde) / 60);
-  if (Math.abs(p.ts - t) > tolerancia) {
-    lienzo._cursor.setAttribute("visibility", "hidden");
-    mostrarGlobo(`<b>${horaSeg(t)}</b><small>sin dato del radar</small>`, ev.clientX, ev.clientY);
-    return;
-  }
+  lienzo._detalleTs = ts;
+  lienzosConDetalle.add(lienzo);
+  const v = l[op.campo];
   const [linea, punto] = lienzo._cursor.children;
-  linea.setAttribute("x1", esc.x(p.ts));
-  linea.setAttribute("x2", esc.x(p.ts));
-  punto.setAttribute("cx", esc.x(p.ts));
-  punto.setAttribute("cy", esc.y(p.v));
+  linea.setAttribute("x1", esc.x(ts));
+  linea.setAttribute("x2", esc.x(ts));
+  punto.setAttribute("cx", esc.x(ts));
+  punto.setAttribute("cy", esc.y(v));
   lienzo._cursor.setAttribute("visibility", "visible");
-  const rp = lienzo.getBoundingClientRect();
-  const tramo = p.n > 1 ? `<small>mediana de ${p.n} lecturas</small>` : "";
+  const persona = l.persona ? "sí" : "no";
+  const actividad = typeof l.actividad === "number" ? numero(l.actividad, 3) : "sin dato";
+  const nota = op.nota ? `<small>${escapar(op.nota)}</small>` : "";
+  const agrupado = lienzo._agrupado ? "<small>La línea muestra medianas; este es el valor de esta lectura.</small>" : "";
+  const r = lienzo.getBoundingClientRect();
   mostrarGlobo(
-    `<b>${numero(p.v, op.decimales)} ${escapar(op.unidad)}</b><small>${horaSeg(p.ts)}${op.nota ? " · " + escapar(op.nota) : ""}</small>${tramo}`,
-    rp.left + esc.x(p.ts), rp.top + esc.y(p.v));
+    `<b>${horaSeg(ts)}</b><span class="globo__valor">${numero(v, op.decimales)} ${escapar(op.unidad)}</span>${nota}` +
+    `<small>Persona detectada: ${persona}${op.campo === "actividad" ? "" : ` · Actividad: ${actividad}`}</small>${agrupado}`,
+    r.left + esc.x(ts), r.top + esc.y(v));
 }
+
+export function ocultarDetalle(lienzo) {
+  if (!lienzo) {
+    for (const l of [...lienzosConDetalle]) ocultarDetalle(l);
+    return;
+  }
+  lienzo._detalleTs = null;
+  lienzo._cursor?.setAttribute("visibility", "hidden");
+  lienzosConDetalle.delete(lienzo);
+  ocultarGlobo();
+}
+
+// Tocar fuera de una gráfica o hacer scroll quita el detalle.
+document.addEventListener("pointerdown", (ev) => {
+  if (!ev.target.closest?.(".grafica__lienzo, .ampliada__lienzo")) ocultarDetalle();
+}, true);
+window.addEventListener("scroll", () => ocultarDetalle(), { passive: true });
 
 // ---------------------------------------------------------------------------
 // Cinta de presencia con eventos clavados encima

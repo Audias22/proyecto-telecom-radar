@@ -18,6 +18,7 @@ import {
 } from "./formato.js";
 import { dibujarGrafica, dibujarCinta, ocultarGlobo, buscarDesde } from "./graficas.js";
 import { activarEmergencia, silenciar, estadoSonido, alCambiar } from "./alerta.js";
+import { iniciarAmpliada, abrirAmpliada, redibujar as redibujarAmpliada, estaAbierta } from "./ampliada.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -544,30 +545,59 @@ function listaEventos() {
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
+// Configuración de cada gráfica; la usan la vista normal y la ampliada.
+const GRAFICAS = {
+  resp: {
+    titulo: "Respiración", subtitulo: "resp/min · estimación del radar, no validada clínicamente",
+    campo: "resp_rpm", unidad: "resp/min", decimales: 1, yTopeMin: 24, nota: "estimación del radar, no validada",
+    vacio: "Sin estimación de respiración en este rango",
+    descripcion: "Respiración estimada por el radar, en respiraciones por minuto",
+  },
+  latido: {
+    titulo: "Latido", subtitulo: "lat/min · estimación del radar, no validada clínicamente",
+    campo: "latido_bpm", unidad: "lat/min", decimales: 0, yMin: 40, yTopeMin: 110, nota: "estimación del radar, no validada",
+    vacio: "Sin estimación de latido en este rango",
+    descripcion: "Latido estimado por el radar, en latidos por minuto",
+  },
+  actividad: {
+    titulo: "Actividad", subtitulo: "movimiento visto por el radar, escala de raíz",
+    campo: "actividad", unidad: "de actividad", decimales: 3, yTopeMin: 0.1, umbral: UMBRAL_ACTIVIDAD, raiz: true,
+    vacio: "Sin actividad en este rango",
+    descripcion: "Actividad que ve el radar; sobre el umbral se considera persona detectada",
+  },
+};
+
 function pintarGraficas() {
   const hasta = ahora();
   const desde = hasta - estado.rangoMin * MINUTO;
-  const comun = { lecturas: estado.lecturas, desde, hasta };
-  dibujarGrafica(document.querySelector("#grafica-resp .grafica__lienzo"), {
-    ...comun, campo: "resp_rpm", unidad: "resp/min", decimales: 1, yTopeMin: 24, nota: "estimación del radar",
-    vacio: "El radar no dio estimación de respiración en este rango",
-    descripcion: "Respiración estimada por el radar, en respiraciones por minuto",
-  });
-  dibujarGrafica(document.querySelector("#grafica-latido .grafica__lienzo"), {
-    ...comun, campo: "latido_bpm", unidad: "lat/min", decimales: 0, yMin: 40, yTopeMin: 110, nota: "estimación del radar",
-    vacio: "El radar no dio estimación de latido en este rango",
-    descripcion: "Latido estimado por el radar, en latidos por minuto",
-  });
-  dibujarGrafica(document.querySelector("#grafica-actividad .grafica__lienzo"), {
-    ...comun, campo: "actividad", unidad: "", decimales: 3, yTopeMin: 0.1, umbral: UMBRAL_ACTIVIDAD, raiz: true,
-    vacio: "Sin actividad registrada en este rango",
-    descripcion: "Actividad que ve el radar; sobre el umbral se considera persona detectada",
-  });
+  for (const [id, conf] of Object.entries(GRAFICAS)) {
+    const figura = $(`grafica-${id}`);
+    dibujarGrafica(figura.querySelector(".grafica__lienzo"), {
+      ...conf, lecturas: estado.lecturas, desde, hasta,
+      alAmpliar: () => abrirAmpliada(id, figura.querySelector(".ampliar")),
+    });
+  }
   dibujarCinta($("cinta"), {
     lecturas: estado.lecturas, eventos: listaEventos(), desde: hasta - VENTANA_MS, hasta,
     rangoDesde: desde, ahora: hasta,
   });
+  redibujarAmpliada();
 }
+
+for (const b of document.querySelectorAll("[data-ampliar]")) {
+  b.addEventListener("click", () => abrirAmpliada(b.dataset.ampliar, b));
+}
+
+iniciarAmpliada({
+  configs: GRAFICAS,
+  lecturas: () => estado.lecturas,
+  ahora,
+  ventanaMs: VENTANA_MS,
+  rangoMs: () => estado.rangoMin * MINUTO,
+  // Con la vista ampliada abierta la franja de emergencia queda en su versión delgada, encima.
+  alAbrir: () => ajustarFranja(),
+  alCerrar: () => ajustarFranja(),
+});
 
 function programarDibujo() {
   if (dibujoPendiente) return;
@@ -759,13 +789,19 @@ $("confirmar-todos").addEventListener("close", () => {
 function ajustarFranja() {
   const franja = $("emergencia");
   const compacta = franja.classList.contains("emergencia--compacta");
-  const y = window.scrollY;
+  const y = estaAbierta() ? Infinity : window.scrollY;
   if (!compacta && y > 60) franja.classList.add("emergencia--compacta");
   else if (compacta && y < 12) franja.classList.remove("emergencia--compacta");
   else return;
   pintarSonido();
 }
 window.addEventListener("scroll", ajustarFranja, { passive: true });
+
+// La vista ampliada empieza debajo de la franja de emergencia, que sigue visible encima.
+new ResizeObserver(() => {
+  const franja = $("emergencia");
+  document.documentElement.style.setProperty("--alto-emergencia", `${franja.hidden ? 0 : franja.offsetHeight}px`);
+}).observe($("emergencia"));
 
 $("emergencia-silenciar").addEventListener("click", () => {
   silenciar(estadoSonido() !== "silenciado");
