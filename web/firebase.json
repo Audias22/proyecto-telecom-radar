@@ -8,8 +8,19 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
-      "config.example.js",
+      "config.ejemplo.js",
       "README.md"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(html|js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
     ]
   },
   "emulators": {

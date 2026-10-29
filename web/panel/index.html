@@ -2,29 +2,184 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5efe2">
+  <meta name="color-scheme" content="light">
   <title>Monitor de respiración</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%231d3a7a' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%231d3a7a'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="estilos.css">
 </head>
-<body>
-  <header>
-    <h1>Monitor de respiración</h1>
-  </header>
+<body class="cargando">
 
-  <main>
-    <!-- TODO: formulario de inicio de sesión (Firebase Authentication, correo y contraseña) -->
-    <section id="sesion"></section>
+  <!-- Franja de emergencia: visible mientras haya un BOTON sin atender -->
+  <section id="emergencia" class="emergencia" role="alert" aria-live="assertive" hidden>
+    <div class="emergencia__texto">
+      <p class="emergencia__titulo">Botón de auxilio presionado</p>
+      <p class="emergencia__detalle" id="emergencia-detalle"></p>
+      <p class="emergencia__sonido" id="emergencia-sonido"></p>
+    </div>
+    <div class="emergencia__acciones">
+      <button type="button" class="boton boton--emergencia" id="emergencia-atender">Marcar atendido</button>
+      <button type="button" class="boton boton--texto-claro" id="emergencia-silenciar">Silenciar sonido</button>
+    </div>
+  </section>
 
-    <!-- TODO: estado de la base (online según ultimo_contacto) y de los colgantes (batería) -->
-    <section id="estado"></section>
+  <!-- Avisos de conexión y permisos -->
+  <div id="avisos" class="avisos" aria-live="polite"></div>
 
-    <!-- TODO: gráficas de respiración y latido de las últimas horas -->
-    <section id="graficas"></section>
-
-    <!-- TODO: lista de eventos con botón para marcarlos como atendidos -->
-    <section id="eventos"></section>
+  <!-- Inicio de sesión -->
+  <main id="vista-sesion" class="vista-sesion" hidden>
+    <form id="form-sesion" class="hoja hoja--sesion" novalidate>
+      <p class="membrete">Hoja de vigilancia</p>
+      <h1 class="titulo">Monitor de respiración</h1>
+      <p class="sesion__intro">Panel del cuidador. Entra con la cuenta que te dieron.</p>
+      <label class="campo">
+        <span class="campo__etiqueta">Correo</span>
+        <input type="email" id="sesion-correo" autocomplete="username" required inputmode="email">
+      </label>
+      <label class="campo">
+        <span class="campo__etiqueta">Contraseña</span>
+        <input type="password" id="sesion-clave" autocomplete="current-password" required>
+      </label>
+      <p class="sesion__error" id="sesion-error" role="alert"></p>
+      <button type="submit" class="boton boton--tinta" id="sesion-entrar">Entrar</button>
+    </form>
   </main>
 
+  <!-- Panel -->
+  <div id="vista-panel" class="vista-panel" hidden>
+    <header class="encabezado">
+      <div>
+        <p class="membrete">Hoja de vigilancia · <span id="enc-base"></span></p>
+        <h1 class="titulo">Monitor de respiración</h1>
+      </div>
+      <div class="encabezado__usuario">
+        <span id="enc-fecha" class="mono"></span>
+        <span id="enc-correo" class="encabezado__correo"></span>
+        <button type="button" class="boton boton--texto" id="cerrar-sesion">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="rejilla">
+      <!-- Radar y anillo de respiración -->
+      <section class="hoja hoja--radar" aria-labelledby="t-radar">
+        <h2 class="seccion" id="t-radar">Radar junto a la cama</h2>
+        <div class="radar">
+          <div class="anillo" id="anillo" data-estado="quieto">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle class="anillo__guia" cx="100" cy="100" r="92"/>
+              <circle class="anillo__guia" cx="100" cy="100" r="74"/>
+              <circle class="anillo__guia" cx="100" cy="100" r="56"/>
+              <g class="anillo__pulso">
+                <circle class="anillo__relleno" cx="100" cy="100" r="74"/>
+                <circle class="anillo__trazo" cx="100" cy="100" r="74"/>
+              </g>
+            </svg>
+            <div class="anillo__centro">
+              <span class="anillo__valor" id="radar-rpm">—</span>
+              <span class="anillo__unidad">resp/min</span>
+            </div>
+          </div>
+          <div class="radar__datos">
+            <p class="radar__estado" id="radar-estado">Esperando datos…</p>
+            <p class="radar__motivo" id="radar-motivo"></p>
+            <dl class="ficha">
+              <div><dt>Latido</dt><dd><span id="radar-latido">—</span></dd></div>
+              <div><dt>Actividad</dt><dd><span id="radar-actividad">—</span></dd></div>
+              <div><dt>Distancia</dt><dd><span id="radar-distancia">—</span></dd></div>
+              <div><dt>Última lectura</dt><dd><span id="radar-hace">—</span></dd></div>
+            </dl>
+            <p class="nota-clinica">Respiración y latido: estimación del radar, no validada clínicamente.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Base y colgantes -->
+      <section class="hoja hoja--equipos" aria-labelledby="t-equipos">
+        <h2 class="seccion" id="t-equipos">Equipos</h2>
+        <article class="equipo" id="equipo-base">
+          <header class="equipo__cabeza">
+            <h3>Base</h3>
+            <span class="sello" id="base-sello">—</span>
+          </header>
+          <dl class="ficha">
+            <div><dt>Último contacto</dt><dd id="base-hace">—</dd></div>
+            <div><dt>WiFi</dt><dd class="con-icono"><span class="barras" id="base-barras"></span><span id="base-rssi">—</span></dd></div>
+            <div><dt>Firmware</dt><dd id="base-version">—</dd></div>
+          </dl>
+        </article>
+        <div id="colgantes"></div>
+      </section>
+
+      <!-- Cinta del día -->
+      <section class="hoja hoja--cinta" aria-labelledby="t-cinta">
+        <div class="seccion-fila">
+          <h2 class="seccion" id="t-cinta">Cinta de las últimas 6 horas</h2>
+          <p class="leyenda">
+            <span class="leyenda__item"><i class="muestra muestra--persona"></i>persona detectada</span>
+            <span class="leyenda__item"><i class="muestra muestra--baja"></i>objetivo, actividad baja</span>
+            <span class="leyenda__item"><i class="muestra muestra--sin"></i>sin objetivo</span>
+            <span class="leyenda__item"><i class="muestra muestra--hueco"></i>sin lecturas</span>
+          </p>
+        </div>
+        <div class="cinta" id="cinta"></div>
+      </section>
+
+      <!-- Gráficas -->
+      <section class="hoja hoja--graficas" aria-labelledby="t-graficas">
+        <div class="seccion-fila">
+          <h2 class="seccion" id="t-graficas">Gráficas</h2>
+          <div class="selector" role="radiogroup" aria-label="Rango de las gráficas">
+            <button type="button" role="radio" data-rango="15" aria-checked="false">15 min</button>
+            <button type="button" role="radio" data-rango="60" aria-checked="true">1 h</button>
+            <button type="button" role="radio" data-rango="360" aria-checked="false">6 h</button>
+          </div>
+        </div>
+        <figure class="grafica" id="grafica-resp">
+          <figcaption><strong>Respiración</strong> <span>resp/min · estimación del radar, no validada clínicamente</span></figcaption>
+          <div class="grafica__lienzo papel"></div>
+        </figure>
+        <figure class="grafica" id="grafica-latido">
+          <figcaption><strong>Latido</strong> <span>lat/min · estimación del radar, no validada clínicamente</span></figcaption>
+          <div class="grafica__lienzo papel"></div>
+        </figure>
+        <figure class="grafica" id="grafica-actividad">
+          <figcaption><strong>Actividad</strong> <span>movimiento visto por el radar, escala de raíz; sobre 0.03 se considera persona detectada</span></figcaption>
+          <div class="grafica__lienzo papel"></div>
+        </figure>
+      </section>
+
+      <!-- Eventos -->
+      <section class="hoja hoja--eventos" aria-labelledby="t-eventos">
+        <div class="seccion-fila">
+          <h2 class="seccion" id="t-eventos">Eventos</h2>
+          <p class="leyenda" id="eventos-resumen"></p>
+        </div>
+        <ol class="eventos" id="eventos"></ol>
+      </section>
+    </main>
+
+    <footer class="pie">
+      Datos en tiempo real de Firebase. Este panel no hace diagnósticos: la alarma confiable es el botón del colgante.
+    </footer>
+  </div>
+
+  <div class="globo" id="globo" role="tooltip" hidden></div>
+
   <script type="module" src="app.js"></script>
+  <script>
+    // Si app.js no carga (falta config.js, sin red la primera vez, navegador muy viejo) se avisa
+    // en vez de dejar la página en blanco.
+    setTimeout(function () {
+      if (!document.body.classList.contains("cargando")) return;
+      document.body.classList.remove("cargando");
+      document.getElementById("avisos").innerHTML =
+        '<p class="aviso aviso--error"><strong>No cargó</strong><span>El panel no pudo iniciar. ' +
+        'Revisa la conexión a internet y recarga la página. Si sigue igual, falta config.js en el servidor.</span></p>';
+    }, 8000);
+  </script>
 </body>
 </html>
